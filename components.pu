@@ -1,0 +1,23 @@
+@startuml "Strahls Komponentdiagramm"
+
+package Backend {
+    component "Scene Graph"
+    component "Rendering Backend" as backend
+    () Renderer
+    () SceneGraphProvider
+    component RenderPipeline {
+        fetch -> draw
+        draw -> present
+    }
+    backend - Renderer
+    SceneGraphProvider - backend
+}
+component "UI Abstraction Layer" as pal
+component "Frontend" as frontend
+
+Renderer <-- frontend
+SceneGraphProvider <-- frontend
+present -- pal
+frontend *- pal
+
+@enduml

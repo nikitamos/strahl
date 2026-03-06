@@ -20,7 +20,7 @@ class Node {
 protected:
   Node(bool is_collidable [[deprecated]] = false,
        Material mat = Material::kEmpty)
-      : collidable_(is_collidable) {}
+      : collidable_(is_collidable), material(mat) {}
 
 public:
   bool IsCollidable() { return collidable_; }

@@ -2,6 +2,8 @@
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
+#include <iomanip>
+#include <iostream>
 #include <vector>
 
 #include "backend.hpp"
@@ -41,19 +43,31 @@ Response CpuRaymarcherBackend::Render() {
     }
   }
 
+  const int kMaxIters = 500;
+  int count = 0;
   for (auto &r : rays) {
-    if (r.GetBounces() >= opts_.bounces) {
-      continue;
+    int iters = 0;
+    for (int count = 0; iters < kMaxIters; ++iters) {
+      if (r.GetBounces() >= opts_.bounces) {
+        break;
+      }
+      auto pos = r.GetPos();
+      Node *victim = root_->ClosestNode(pos);
+      auto distance = victim->Distance(pos);
+      if (distance < 1.0E-5) { // collision
+        r.Intersect(victim->GetMaterial(), victim->GetNormal(pos));
+      } else {
+        r.Advance(distance);
+      }
     }
-    auto pos = r.GetPos();
-    Node *victim = root_->ClosestNode(pos);
-    auto distance = victim->Distance(pos);
-    if (distance < 1.0E-5) { // collision
-      r.Intersect(victim->GetMaterial(), victim->GetNormal(pos));
-    } else {
-      r.Advance(distance);
+    if (count % viewport.y == 0) {
+      std::cout << std::endl;
     }
+
+    std::cout << std::setw(2) << iters;
+    count += 1;
   }
+  std::cout << std::endl;
 
   std::vector<glm::vec3> image(rays.size());
   for (size_t i = 0; i < image.size(); ++i) {

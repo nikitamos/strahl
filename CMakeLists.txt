@@ -21,5 +21,5 @@ add_executable(strahl-cli frontends/cli/main.cc)
 target_link_libraries(strahl-cli
     strahl-abstractions
     cpu-raymarcher
-    CImg
+    png
 )

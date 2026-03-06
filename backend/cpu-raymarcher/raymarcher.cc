@@ -22,19 +22,20 @@ Response CpuRaymarcherBackend::Render() {
   glm::vec3 screen_center = cam_pos + opts_.screen;
   glm::vec3 screen_up =
       glm::normalize(glm::cross(opts_.screen_right, opts_.screen)) *
+      glm::length(opts_.screen_right) *
       ((float)opts_.resolution.y / opts_.resolution.x);
 
   auto viewport = opts_.resolution;
   auto top_left = screen_center + screen_up - opts_.screen_right;
   auto x_step = 2.0f / viewport.x * opts_.screen_right;
-  auto y_step = 2.0f / viewport.y * screen_up;
+  auto y_step = -2.0f / viewport.y * screen_up;
 
   // Create rays
   std::ofstream f("rays.csv");
   std::vector<Ray> rays;
   rays.reserve(viewport.x * viewport.y);
-  for (int i = 0; i < opts_.resolution.x; ++i) {
-    for (int j = 0; j < opts_.resolution.y; ++j) {
+  for (int i = 0; i < viewport.x; ++i) {
+    for (int j = 0; j < viewport.y; ++j) {
       auto point = top_left + (float)i * x_step + (float)j * y_step;
       auto ray_direction = glm::normalize(point - cam_pos);
       rays.emplace_back(opts_.camera, ray_direction, opts_);
@@ -72,6 +73,20 @@ Response CpuRaymarcherBackend::Render() {
   std::vector<glm::vec3> image(rays.size());
   for (size_t i = 0; i < image.size(); ++i) {
     image[i] = rays[i].GetColor();
+  }
+  for (int i = 0; i < viewport.x; ++i) {
+    for (int j = 0; j < viewport.y; ++j) {
+      if (image[j * viewport.x + i].r == 1.0) {
+        std::cout << 'r';
+      } else if (image[j * viewport.x + i].g == 1.0) {
+        std::cout << 'g';
+      } else if (image[j * viewport.x + i].b == 1.0) {
+        std::cout << 'b';
+      } else {
+        std::cout << '0';
+      }
+    }
+    std::cout << '\n';
   }
 
   return {std::move(image), viewport};

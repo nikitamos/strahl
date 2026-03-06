@@ -1,8 +1,18 @@
-#include "CImg.h"
+#include <boost/gil.hpp>
+#include <boost/gil/extension/dynamic_image/any_image.hpp>
+#include <boost/gil/extension/io/png.hpp>
+#include <boost/gil/image_view.hpp>
+#include <boost/mp11.hpp>
+
+#include <glm/fwd.hpp>
+#include <iostream>
+
+// #include <Magick++.h>
+#include <boost/gil.hpp>
+#include <glm/glm.hpp>
+
 #include "raymarcher.hpp"
 #include "rm-scene.hpp"
-#include <glm/glm.hpp>
-#include <iostream>
 
 // using namespace strahl;
 using namespace strahl::cpu_raymarcher;
@@ -19,10 +29,20 @@ int main(int argc, char **argv) {
   back.GetOptions().resolution = {48, 36};
   auto res = back.Render();
 
-  cimg_library::CImg<float> img(
-      reinterpret_cast<const float *>(res.image.data()), res.resolution.x,
-      res.resolution.y, 1, 3);
-  img *= 255.0;
+  auto data_view = boost::gil::interleaved_view(
+      48, 36, (const boost::gil::rgb8_pixel_t *)res.image.data(),
+      sizeof(glm::vec3) * 48);
+  boost::gil::rgb32f_image_t img(36, 48);
+  boost::gil::write_view("render-boost.png", data_view, boost::gil::png_tag{});
 
-  img.save_png("render.png");
+  // Magick::Blob blob(res.image.data(),
+  //                   res.image.size() *
+  //                   sizeof(decltype(res.image)::value_type));
+  // Magick::Image img(blob, Magick::Geometry(48, 36), );
+  // MagickCore::BlobToImage(MagickCore::ImageInfo{}, const void *, const
+  // size_t,
+  //                         ExceptionInfo *)
+  //     MagickCore
+
+  // img.save_png("render.png");
 }

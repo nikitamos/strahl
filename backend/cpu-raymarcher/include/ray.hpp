@@ -1,6 +1,8 @@
 #pragma once
+#include "backend.hpp"
 #include "raymarcher.hpp"
 #include <cassert>
+#include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 
@@ -13,9 +15,12 @@ public:
   }
   void Advance(float length);
   void Backtrack();
+  void Intersect(Material m, glm::vec3 normal);
 
+  auto GetBounces() const { return bounces_; }
   glm::vec3 GetPos() const { return cur_pos_; }
   void SetColor(glm::vec3 col) { color_ = col; }
+  glm::vec3 GetColor() const { return color_; }
 
 private:
   void Reflect(glm::vec3 normal);

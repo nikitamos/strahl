@@ -21,4 +21,8 @@ float Sphere::Distance(glm::vec3 point) {
 Sphere::~Sphere() {}
 PointLight::~PointLight() {}
 Plane::~Plane() {}
+glm::vec3 Plane::GetNormal(glm::vec3 point) { return normal_; }
+glm::vec3 Sphere::GetNormal(glm::vec3 point) {
+  return glm::normalize(point - center_);
+}
 } // namespace strahl::cpu_raymarcher

@@ -13,7 +13,9 @@ struct CpuRaymarcherBackendOptions : BackendOptions {
 
 class CpuRaymarcherBackend : Backend {
 public:
+  [[nodiscard]]
   Response Render() override;
+  [[nodiscard]]
   CpuRaymarcherBackendOptions &GetOptions() override;
   void SetScene(Scene *s) override;
   void SetRoot(Node *n) { root_ = n; }

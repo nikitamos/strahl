@@ -1,8 +1,10 @@
 #include <fstream>
+#include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 #include <vector>
 
+#include "backend.hpp"
 #include "include/ray.hpp"
 #include "include/raymarcher.hpp"
 #include "include/rm-scene.hpp"
@@ -26,7 +28,7 @@ Response CpuRaymarcherBackend::Render() {
   auto y_step = 2.0f / viewport.y * screen_up;
 
   // Create rays
-  // std::ofstream f("rays.csv");
+  std::ofstream f("rays.csv");
   std::vector<Ray> rays;
   rays.reserve(viewport.x * viewport.y);
   for (int i = 0; i < opts_.resolution.x; ++i) {
@@ -34,24 +36,31 @@ Response CpuRaymarcherBackend::Render() {
       auto point = top_left + (float)i * x_step + (float)j * y_step;
       auto ray_direction = glm::normalize(point - cam_pos);
       rays.emplace_back(opts_.camera, ray_direction, opts_);
-      // f << ray_direction.x << "," << ray_direction.y << "," <<
-      // ray_direction.z
-      //   << '\n';
+      f << ray_direction.x << "," << ray_direction.y << "," << ray_direction.z
+        << '\n';
     }
   }
 
   for (auto &r : rays) {
+    if (r.GetBounces() >= opts_.bounces) {
+      continue;
+    }
     auto pos = r.GetPos();
     Node *victim = root_->ClosestNode(pos);
     auto distance = victim->Distance(pos);
     if (distance < 1.0E-5) { // collision
-      // Handle collision
+      r.Intersect(victim->GetMaterial(), victim->GetNormal(pos));
     } else {
       r.Advance(distance);
     }
   }
 
-  return {};
+  std::vector<glm::vec3> image(rays.size());
+  for (size_t i = 0; i < image.size(); ++i) {
+    image[i] = rays[i].GetColor();
+  }
+
+  return {std::move(image), viewport};
 }
 
 CpuRaymarcherBackend::~CpuRaymarcherBackend() {}

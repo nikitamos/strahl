@@ -25,14 +25,15 @@ struct BackendOptions {
 // };
 
 struct Response {
+  const std::vector<glm::vec3> image;
   const glm::vec<2, int> resolution;
-  const std::span<glm::vec<3, float>> GetBuffer();
   // format -> R8G8B8 by default
 };
 
 struct Backend {
   virtual void SetScene(Scene *s) = 0;
   virtual Response Render() = 0;
+  [[nodiscard]]
   virtual BackendOptions &GetOptions() = 0;
   virtual ~Backend() {}
 };

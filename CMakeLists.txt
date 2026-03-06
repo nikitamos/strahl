@@ -12,6 +12,7 @@ target_sources(CImg
 target_precompile_headers(CImg
      INTERFACE 3rdparty/CImg.h
 )
+target_compile_definitions(CImg INTERFACE cimg_display=0)
 
 add_subdirectory(abstractions)
 add_subdirectory(backend/cpu-raymarcher)

@@ -2,6 +2,7 @@
 #include "backend.hpp"
 #include <algorithm>
 #include <cassert>
+#include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 
@@ -17,17 +18,21 @@ namespace strahl::cpu_raymarcher {
 
 class Node {
 protected:
-  Node(bool is_collidable [[deprecated]] = false)
+  Node(bool is_collidable [[deprecated]] = false,
+       Material mat = Material::kEmpty)
       : collidable_(is_collidable) {}
 
 public:
   bool IsCollidable() { return collidable_; }
   virtual float Distance(glm::vec3 point);
   virtual Node *ClosestNode(glm::vec3 point) { return this; }
+  virtual glm::vec3 GetNormal(glm::vec3 point) { return {}; }
+  const Material &GetMaterial() const { return material; }
 
 private:
   [[deprecated]]
   const bool collidable_;
+  Material material;
 };
 
 class CompositionNode : public Node {
@@ -55,13 +60,15 @@ private:
 
 class Plane : public Node {
 public:
-  Plane(glm::vec3 origin, glm::vec3 normal)
-      : origin_(origin), normal_(normal), Node(true) {
-    abcd_ = glm::vec4(normal, -glm::dot(origin, normal));
-    denom_ = glm::length(normal);
+  Plane(glm::vec3 origin, glm::vec3 normal, Material m = Material::kEmpty)
+      : origin_(origin), normal_(normal), Node(true, m) {
+    normal_ = glm::normalize(normal_);
+    abcd_ = glm::vec4(normal_, -glm::dot(origin, normal_));
+    denom_ = glm::length(normal_);
     assert(denom_ != 0 && "normal vector seems to be zero");
   }
   float Distance(glm::vec3 point) override;
+  glm::vec3 GetNormal(glm::vec3 point) override;
   virtual ~Plane();
 
 private:
@@ -73,8 +80,10 @@ private:
 
 class Sphere : public Node {
 public:
-  Sphere(glm::vec3 center, float r) : center_(center), r_(r), Node(true) {}
+  Sphere(glm::vec3 center, float r, Material m = Material::kEmpty)
+      : center_(center), r_(r), Node(true, m) {}
   float Distance(glm::vec3 point) override;
+  glm::vec3 GetNormal(glm::vec3 point) override;
   virtual ~Sphere();
 
 private:

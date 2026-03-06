@@ -34,7 +34,7 @@ struct Backend {
   virtual void SetScene(Scene *s) = 0;
   virtual Response Render() = 0;
   virtual BackendOptions &GetOptions() = 0;
-  virtual ~Backend() = 0;
+  virtual ~Backend() {}
 };
 
 } // namespace strahl

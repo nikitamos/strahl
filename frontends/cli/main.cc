@@ -15,4 +15,6 @@ int main(int argc, char **argv) {
   auto *sphere = new Sphere({0, 1.5, 0}, 0.5);
   CompositionNode composite{left, right, sphere};
   back.SetRoot(&composite);
+  back.GetOptions().resolution = {480, 360};
+  back.Render();
 }

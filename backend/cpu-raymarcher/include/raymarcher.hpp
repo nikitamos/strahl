@@ -8,7 +8,7 @@ struct CpuRaymarcherBackendOptions : BackendOptions {
     float epsilon = 1E-4;
     glm::vec3 camera = {0, -2, 0};
     glm::vec3 screen = {0, 2, 0};
-    glm::vec3 screen_right = {0, 0, 5};
+    glm::vec3 screen_right = {5, 0, 0};
 };
 
 class CpuRaymarcherBackend : Backend {

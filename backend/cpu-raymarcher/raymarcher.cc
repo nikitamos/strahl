@@ -10,6 +10,7 @@
 #include "include/ray.hpp"
 #include "include/raymarcher.hpp"
 #include "include/rm-scene.hpp"
+#include "term-colors.hpp"
 
 namespace strahl::cpu_raymarcher {
 
@@ -34,8 +35,8 @@ Response CpuRaymarcherBackend::Render() {
   std::ofstream f("rays.csv");
   std::vector<Ray> rays;
   rays.reserve(viewport.x * viewport.y);
-  for (int i = 0; i < viewport.x; ++i) {
-    for (int j = 0; j < viewport.y; ++j) {
+  for (int j = 0; j < viewport.y; ++j) {
+    for (int i = 0; i < viewport.x; ++i) {
       auto point = top_left + (float)i * x_step + (float)j * y_step;
       auto ray_direction = glm::normalize(point - cam_pos);
       rays.emplace_back(opts_.camera, ray_direction, opts_);
@@ -61,11 +62,21 @@ Response CpuRaymarcherBackend::Render() {
         r.Advance(distance);
       }
     }
-    if (count % viewport.y == 0) {
+    if (count % viewport.x == 0) {
       std::cout << std::endl;
     }
 
-    std::cout << std::setw(2) << iters;
+    if (r.GetColor().r == 1.0) {
+      std::cout << LR6::Color::kRed;
+    } else if (r.GetColor().g == 1.0) {
+      std::cout << LR6::Color::kGreen;
+    } else if (r.GetColor().b == 1.0) {
+      std::cout << LR6::Color::kBlue;
+    } else {
+      std::cout << LR6::Style::kDim;
+    }
+
+    std::cout << std::setw(2) << iters << LR6::kReset;
     count += 1;
   }
   std::cout << std::endl;
@@ -74,8 +85,8 @@ Response CpuRaymarcherBackend::Render() {
   for (size_t i = 0; i < image.size(); ++i) {
     image[i] = rays[i].GetColor();
   }
-  for (int i = 0; i < viewport.x; ++i) {
-    for (int j = 0; j < viewport.y; ++j) {
+  for (int j = 0; j < viewport.y; ++j) {
+    for (int i = 0; i < viewport.x; ++i) {
       if (image[j * viewport.x + i].r == 1.0) {
         std::cout << 'r';
       } else if (image[j * viewport.x + i].g == 1.0) {

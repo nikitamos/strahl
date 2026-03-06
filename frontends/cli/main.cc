@@ -1,7 +1,10 @@
 #include <boost/gil.hpp>
+#include <boost/gil/algorithm.hpp>
 #include <boost/gil/extension/dynamic_image/any_image.hpp>
 #include <boost/gil/extension/io/png.hpp>
+#include <boost/gil/image.hpp>
 #include <boost/gil/image_view.hpp>
+#include <boost/gil/typedefs.hpp>
 #include <boost/mp11.hpp>
 
 #include <glm/fwd.hpp>
@@ -10,12 +13,14 @@
 // #include <Magick++.h>
 #include <boost/gil.hpp>
 #include <glm/glm.hpp>
+#include <type_traits>
 
 #include "raymarcher.hpp"
 #include "rm-scene.hpp"
 
 // using namespace strahl;
 using namespace strahl::cpu_raymarcher;
+namespace gil = boost::gil;
 
 int main(int argc, char **argv) {
   std::cout << "Strahl CLI\n"
@@ -26,23 +31,22 @@ int main(int argc, char **argv) {
   auto *sphere = new Sphere({0, 1.5, 0}, 0.5, {{0.0, 0.0, 1.0}});
   CompositionNode composite{left, right, sphere};
   back.SetRoot(&composite);
-  back.GetOptions().resolution = {48, 36};
+  auto &opts = back.GetOptions();
+  opts.resolution = {48, 36};
+
   auto res = back.Render();
 
-  auto data_view = boost::gil::interleaved_view(
-      48, 36, (const boost::gil::rgb8_pixel_t *)res.image.data(),
-      sizeof(glm::vec3) * 48);
-  boost::gil::rgb32f_image_t img(36, 48);
-  boost::gil::write_view("render-boost.png", data_view, boost::gil::png_tag{});
-
-  // Magick::Blob blob(res.image.data(),
-  //                   res.image.size() *
-  //                   sizeof(decltype(res.image)::value_type));
-  // Magick::Image img(blob, Magick::Geometry(48, 36), );
-  // MagickCore::BlobToImage(MagickCore::ImageInfo{}, const void *, const
-  // size_t,
-  //                         ExceptionInfo *)
-  //     MagickCore
-
-  // img.save_png("render.png");
+  gil::rgb32f_view_t data_view =
+      gil::interleaved_view(opts.resolution.x, opts.resolution.y,
+                            (gil::rgb32f_pixel_t *)res.image.data(),
+                            sizeof(gil::rgb32f_pixel_t) * opts.resolution.x);
+  gil::rgb8_planar_image_t transformed_img(opts.resolution.x,
+                                           opts.resolution.y);
+  auto transformed_view = gil::view(transformed_img);
+  gil::transform_pixels(data_view, transformed_view, [](gil::rgb32f_pixel_t x) {
+    return gil::rgb8_pixel_t(x.at(std::integral_constant<int, 0>{}) * 255,
+                             x.at(std::integral_constant<int, 1>{}) * 255,
+                             x.at(std::integral_constant<int, 2>{}) * 255);
+  });
+  gil::write_view("render-boost.png", transformed_view, boost::gil::png_tag{});
 }

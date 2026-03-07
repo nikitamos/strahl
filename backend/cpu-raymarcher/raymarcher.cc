@@ -30,7 +30,6 @@ Response CpuRaymarcherBackend::Render() {
   auto y_step = -2.0f / viewport.y * screen_up;
 
   // Create rays
-  // std::ofstream f("rays.csv");
   const float kMaxDist = 5.0;
   std::vector<Ray> rays;
   rays.reserve(viewport.x * viewport.y);
@@ -39,16 +38,14 @@ Response CpuRaymarcherBackend::Render() {
       auto point = top_left + (float)i * x_step + (float)j * y_step;
       auto ray_direction = glm::normalize(point - cam_pos);
       rays.emplace_back(opts_.camera, ray_direction, opts_);
-      // f << ray_direction.x << "," << ray_direction.y << "," <<
-      // ray_direction.z
-      //   << '\n';
     }
   }
 
   const int kMaxIters = 500;
+#pragma omp parallel for
   for (auto &r : rays) {
     int iters = 0;
-    for (int count = 0; iters < kMaxIters; ++iters) {
+    for (; iters < kMaxIters; ++iters) {
       if (r.GetBounces() >= opts_.bounces) {
         float s =
             1.0; // glm::clamp(glm::distance(r.GetPos(), cam_pos) / kMaxDist,
@@ -65,6 +62,10 @@ Response CpuRaymarcherBackend::Render() {
         r.Advance(distance);
       }
     }
+    // TODO: Ambient material
+    // if (iters >= kMaxIters) { // No light source hit
+    // r.SetColor(glm::vec3{0.2, 0.3, 0.4} * 0.43f);
+    // }
   }
 
   std::vector<glm::vec3> image(rays.size());

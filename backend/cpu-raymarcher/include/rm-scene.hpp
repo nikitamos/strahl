@@ -18,20 +18,21 @@ namespace strahl::cpu_raymarcher {
 
 class Node {
 protected:
-  Node(bool is_collidable [[deprecated]] = false,
-       Material mat = Material::kEmpty)
-      : collidable_(is_collidable), material(mat) {}
+  Node(bool is_terminal = false, Material mat = Material::kEmpty)
+      : is_terminal(is_terminal), material(mat) {}
 
 public:
-  bool IsCollidable() { return collidable_; }
+  bool IsCollidable() { return is_terminal; }
   virtual float Distance(glm::vec3 point);
   virtual Node *ClosestNode(glm::vec3 point) { return this; }
   virtual glm::vec3 GetNormal(glm::vec3 point) { return {}; }
   const Material &GetMaterial() const { return material; }
 
+protected:
+  void SetTerminal(bool t) { is_terminal = t; }
+
 private:
-  [[deprecated]]
-  const bool collidable_;
+  bool is_terminal;
   Material material;
 };
 
@@ -61,7 +62,7 @@ private:
 class Plane : public Node {
 public:
   Plane(glm::vec3 origin, glm::vec3 normal, Material m = Material::kEmpty)
-      : origin_(origin), normal_(normal), Node(true, m) {
+      : origin_(origin), normal_(normal), Node(false, m) {
     normal_ = glm::normalize(normal_);
     abcd_ = glm::vec4(normal_, -glm::dot(origin, normal_));
     denom_ = glm::length(normal_);
@@ -81,7 +82,7 @@ private:
 class Sphere : public Node {
 public:
   Sphere(glm::vec3 center, float r, Material m = Material::kEmpty)
-      : center_(center), r_(r), Node(true, m) {}
+      : center_(center), r_(r), Node(false, m) {}
   float Distance(glm::vec3 point) override;
   glm::vec3 GetNormal(glm::vec3 point) override;
   virtual ~Sphere();
@@ -92,6 +93,10 @@ private:
 };
 
 class PointLight : public Sphere {
+public:
+  PointLight(glm::vec3 pos, glm::vec3 color, float r = 0.2f) : Sphere(pos, r) {
+    SetTerminal(true);
+  }
   virtual ~PointLight();
 };
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "backend.hpp"
+#include "material.hpp"
 #include "raymarcher.hpp"
 #include <cassert>
 #include <glm/fwd.hpp>
@@ -28,12 +29,15 @@ public:
 
 private:
   void Reflect(glm::vec3 normal);
-  void MixColor(glm::vec3 new_color);
+  void MixColor(Material m, glm::vec3 light_dir, glm::vec3 eye,
+                glm::vec3 normal);
 
   glm::vec3 cur_pos_;
   glm::vec3 direction_;
   glm::vec3 color_;
   int bounces_ = 0;
+  float multiple_ = 1.0;
+  glm::vec3 cur_specular_;
   const CpuRaymarcherBackendOptions &opts_;
 };
 } // namespace strahl::cpu_raymarcher

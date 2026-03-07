@@ -1,16 +1,14 @@
 #include <fstream>
+#include <glm/common.hpp>
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
-#include <iomanip>
-#include <iostream>
 #include <vector>
 
 #include "backend.hpp"
 #include "include/ray.hpp"
 #include "include/raymarcher.hpp"
 #include "include/rm-scene.hpp"
-#include "term-colors.hpp"
 
 namespace strahl::cpu_raymarcher {
 
@@ -32,7 +30,8 @@ Response CpuRaymarcherBackend::Render() {
   auto y_step = -2.0f / viewport.y * screen_up;
 
   // Create rays
-  std::ofstream f("rays.csv");
+  // std::ofstream f("rays.csv");
+  const float kMaxDist = 5.0;
   std::vector<Ray> rays;
   rays.reserve(viewport.x * viewport.y);
   for (int j = 0; j < viewport.y; ++j) {
@@ -40,17 +39,21 @@ Response CpuRaymarcherBackend::Render() {
       auto point = top_left + (float)i * x_step + (float)j * y_step;
       auto ray_direction = glm::normalize(point - cam_pos);
       rays.emplace_back(opts_.camera, ray_direction, opts_);
-      f << ray_direction.x << "," << ray_direction.y << "," << ray_direction.z
-        << '\n';
+      // f << ray_direction.x << "," << ray_direction.y << "," <<
+      // ray_direction.z
+      //   << '\n';
     }
   }
 
   const int kMaxIters = 500;
-  int count = 0;
   for (auto &r : rays) {
     int iters = 0;
     for (int count = 0; iters < kMaxIters; ++iters) {
       if (r.GetBounces() >= opts_.bounces) {
+        float s =
+            1.0; // glm::clamp(glm::distance(r.GetPos(), cam_pos) / kMaxDist,
+                 //      0.0f, 1.0f);
+        r.SetColor(r.GetColor() * s);
         break;
       }
       auto pos = r.GetPos();
@@ -62,42 +65,11 @@ Response CpuRaymarcherBackend::Render() {
         r.Advance(distance);
       }
     }
-    if (count % viewport.x == 0) {
-      std::cout << std::endl;
-    }
-
-    if (r.GetColor().r == 1.0) {
-      std::cout << LR6::Color::kRed;
-    } else if (r.GetColor().g == 1.0) {
-      std::cout << LR6::Color::kGreen;
-    } else if (r.GetColor().b == 1.0) {
-      std::cout << LR6::Color::kBlue;
-    } else {
-      std::cout << LR6::Style::kDim;
-    }
-
-    std::cout << std::setw(2) << iters << LR6::kReset;
-    count += 1;
   }
-  std::cout << std::endl;
 
   std::vector<glm::vec3> image(rays.size());
   for (size_t i = 0; i < image.size(); ++i) {
     image[i] = rays[i].GetColor();
-  }
-  for (int j = 0; j < viewport.y; ++j) {
-    for (int i = 0; i < viewport.x; ++i) {
-      if (image[j * viewport.x + i].r == 1.0) {
-        std::cout << 'r';
-      } else if (image[j * viewport.x + i].g == 1.0) {
-        std::cout << 'g';
-      } else if (image[j * viewport.x + i].b == 1.0) {
-        std::cout << 'b';
-      } else {
-        std::cout << '0';
-      }
-    }
-    std::cout << '\n';
   }
 
   return {std::move(image), viewport};

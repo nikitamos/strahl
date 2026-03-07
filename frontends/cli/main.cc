@@ -32,7 +32,8 @@ int main(int argc, char **argv) {
   CompositionNode composite{left, right, sphere};
   back.SetRoot(&composite);
   auto &opts = back.GetOptions();
-  opts.resolution = {48, 36};
+  opts.resolution = {480, 360};
+  opts.bounces = 2;
 
   auto res = back.Render();
 

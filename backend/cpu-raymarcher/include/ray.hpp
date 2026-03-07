@@ -7,6 +7,10 @@
 #include <glm/glm.hpp>
 
 namespace strahl::cpu_raymarcher {
+struct RayEnvironment {
+  glm::vec3 color;
+  float ior;
+};
 class Ray {
 public:
   Ray(glm::vec3 pos, glm::vec3 dir, const CpuRaymarcherBackendOptions &opts)
@@ -24,6 +28,7 @@ public:
 
 private:
   void Reflect(glm::vec3 normal);
+  void MixColor(glm::vec3 new_color);
 
   glm::vec3 cur_pos_;
   glm::vec3 direction_;

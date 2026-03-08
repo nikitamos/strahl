@@ -16,6 +16,7 @@ target_compile_definitions(CImg INTERFACE cimg_display=0)
 
 add_subdirectory(abstractions)
 add_subdirectory(backend/cpu-raymarcher)
+add_subdirectory(frontends/qt-gui)
 
 add_executable(strahl-cli frontends/cli/main.cc)
 target_link_libraries(strahl-cli

@@ -1,9 +1,9 @@
 @startuml "Strahls Klassensdiagramm"
-package Backend {
+package DTOs {
     
 }
 
-package BackendAbstractions {
+package Abstractions {
     interface BackendFactory {
 
     }
@@ -13,7 +13,7 @@ package BackendAbstractions {
     }
     note "Concrete scene graph representation\nis an implementation detail" as n1
     BackendProvider .. n1
-
+    
 }
 
 @enduml

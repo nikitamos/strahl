@@ -1,3 +1,6 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
+
 class Expr x where
     eval :: x -> Int
 
@@ -19,6 +22,15 @@ instance Expr SimpleAlgebra where
 instance ExprAlgebra SimpleAlgebra where
   lit = SimpleLit
   add = Sum
+
+type Vec3 = (Float, Float, Float)
+data AllNodes = Sphere Vec3 Float | Plane Vec3
+
+class NodeAlgebra b where
+  sphere :: Vec3 -> Float -> b
+  plane :: Vec3 -> b
+
+-- class Node
 
 main =
     let x = Sum (SimpleLit 1) (SimpleLit 3)

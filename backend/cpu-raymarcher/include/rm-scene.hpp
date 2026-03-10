@@ -1,5 +1,4 @@
 #pragma once
-#include "backend.hpp"
 #include <algorithm>
 #include <cassert>
 #include <glm/fwd.hpp>
@@ -7,33 +6,32 @@
 #include <glm/glm.hpp>
 
 #include <initializer_list>
-#include <iterator>
-#include <limits>
 #include <memory>
-#include <ranges>
-#include <utility>
 #include <vector>
+
+#include "factory.hpp"
 
 namespace strahl::cpu_raymarcher {
 
-class Node {
+class Node : public RenderNode {
 protected:
   Node(bool is_terminal = false, Material mat = Material::kEmpty)
-      : is_terminal(is_terminal), material(mat) {}
+      : is_terminal(is_terminal), material_(mat) {}
 
 public:
   bool IsCollidable() { return is_terminal; }
   virtual float Distance(glm::vec3 point);
   virtual Node *ClosestNode(glm::vec3 point) { return this; }
   virtual glm::vec3 GetNormal(glm::vec3 point) { return {}; }
-  const Material &GetMaterial() const { return material; }
+  const Material &GetMaterial() const override { return material_; }
+  Material &GetMaterial() override { return material_; }
 
 protected:
   void SetTerminal(bool t) { is_terminal = t; }
 
 private:
   bool is_terminal;
-  Material material;
+  Material material_;
 };
 
 class CompositionNode : public Node {

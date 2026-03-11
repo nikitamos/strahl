@@ -1,6 +1,5 @@
 #pragma once
 
-#include "collision-context.hpp"
 #include "glm/glm.hpp"
 
 namespace strahl {

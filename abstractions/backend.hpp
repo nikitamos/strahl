@@ -1,28 +1,33 @@
 #pragma once
-#include "scene/scene.hpp"
+#include <concepts>
 #include <glm/glm.hpp>
 #include <memory>
 #include <span>
 
+#include "scene/scene.hpp"
+
 namespace strahl {
-
-struct CpuRenderResponse {};
-struct WgpuRenderResponse {};
-struct VulkanRenderResponse {};
-
-template <typename TIn, typename TOut> struct RaytracingPipelineStep {
-  virtual TOut Process(TIn input) = 0;
+namespace erased {
+struct IScene {
+  virtual void *AddSphere(glm::vec3 c, float r) = 0;
 };
+
+/// Internally manages all required resources.
+/// Scenes and etc may contain a weak reference to the backend
+struct Backend {
+  virtual IScene *CreateScene() = 0;
+};
+}  // namespace erased
 
 struct BackendOptions {
   glm::vec<2, int> resolution;
   int bounces = 2;
 };
 
-// template<typename TResponse>
-// struct RenderTarget {
-//   virtual void
-// };
+template <typename TBackend, typename TScene>
+concept rt_backend = requires(TBackend b) {
+  { b.DoSomething() } -> std::same_as<TScene>;
+};
 
 struct Response {
   const std::vector<glm::vec3> image;
@@ -38,4 +43,16 @@ struct Backend {
   virtual ~Backend() {}
 };
 
-} // namespace strahl
+struct AbstractBackend {};
+
+template <typename TScene, rt_backend<TScene> TBackend>
+class BackendWrapper : public AbstractBackend {
+ public:
+  BackendWrapper(TBackend &&backend)
+      : back_(std::make_unique(std::move(backend))) {}
+
+ private:
+  std::unique_ptr<TBackend> back_;
+};
+
+}  // namespace strahl

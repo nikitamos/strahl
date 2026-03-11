@@ -1,23 +1,43 @@
 @startuml "Strahls Komponentdiagramm"
 
-package Backend {
-    component "Scene Graph"
-    component "Rendering Backend" as backend
-    () Renderer
-    () SceneGraphProvider
-    component RenderPipeline {
-        fetch -> draw
-        draw -> present
-    }
-    backend - Renderer
-    SceneGraphProvider - backend
-}
-component "UI Abstraction Layer" as pal
-component "Frontend" as frontend
+package Abstractions {
+    note "All interfaces in this package are type-erased" as N1
+    struct Material {
 
-Renderer <-- frontend
-SceneGraphProvider <-- frontend
-present -- pal
-frontend *- pal
+    }
+    ' Object algebra? (so it can be extended by front-end to enable)
+    interface Scene {
+        + CreateSphere(center, r)
+        + CreatePlane()
+        + CreateMesh()
+        + CreateLightSource()
+        + AddPrimitive()
+    }
+    ' Synchronization
+    interface RTPipeline {
+        + RenderScene(Scene)
+    }
+    interface Backend {
+        + GetScene()
+        + CreateRTPipeline(RTPipelineCreateInfo)
+    }
+    class RTPipelineCreateInfo {
+                
+    }
+}
+
+' Abstractions -[hidden] Layer
+
+package Layer {
+    enum Backends {
+        Vulkan
+        CPU
+        WGPU
+    }
+
+    class BackendProvider {
+        + CreateBackend(backend: Backends): Abstractions.Backend
+    }
+}
 
 @enduml

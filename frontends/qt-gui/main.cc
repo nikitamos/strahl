@@ -14,8 +14,7 @@ int main(int argc, char **argv) {
     std::cerr << "Warn: non-Vulkan window" << std::endl;
     w.setSurfaceType(QSurface::VulkanSurface);
   }
-  std::cout << w.surfaceType();
-//   w.
-//   QLabel *lbl = new QLabel(&w, "Hello?");
+  std::cout << w.surfaceType() << " " << QSurface::VulkanSurface << std::endl;
+
   return QGuiApplication::exec();
 }

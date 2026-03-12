@@ -14,6 +14,11 @@ template <typename T>
 concept pod = std::is_standard_layout_v<T> && std::is_trivial_v<T>;
 
 class Allocator {
+ private:
+  /// Finds the first suitable memory type and returns its index. If no such type is found, returns
+  /// UINT32_MAX
+  uint32_t findMemType(vk::MemoryPropertyFlags properties, uint32_t allowed_mem_types) const;
+
  public:
   static constexpr const auto kStagingFlags =
     vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCached;
@@ -21,12 +26,13 @@ class Allocator {
   Allocator(vk::PhysicalDevice phy, vk::Device dev);
 
   std::optional<vk::DeviceMemory> allocate(
-    vk::DeviceSize size, vk::MemoryPropertyFlags flags, void *next = nullptr) const;
+    vk::DeviceSize size,
+    vk::MemoryPropertyFlags flags,
+    uint32_t supported_mem_types,
+    void *next = nullptr) const;
 
   std::optional<vk::DeviceMemory> allocStagingMem(
-    vk::DeviceSize size,
-    vk::MemoryPropertyFlags supported_flags = vk::MemoryPropertyFlags(~0),
-    void *next = nullptr) const;
+    vk::DeviceSize size, uint32_t supported_mem_types = 0xFFFFFFFF, void *next = nullptr) const;
 
   vk::DeviceMemory allocLocalMem(
     vk::DeviceSize size, vk::MemoryPropertyFlags flags, void *next = nullptr);
@@ -58,7 +64,7 @@ class GpuVector {
     auto mem_size = mem_req.get().memoryRequirements.size;
 
     auto mdai = *vk::MemoryDedicatedAllocateInfo{.buffer = buf_};
-    mem_ = alloc_->allocStagingMem(mem_size, (vk::MemoryPropertyFlags)mem_type, &mdai).value();
+    mem_ = alloc_->allocStagingMem(mem_size, mem_type, &mdai).value();
     dev_.bindBufferMemory(buf_, mem_, 0);
   }
 

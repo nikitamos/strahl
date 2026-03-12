@@ -1,36 +1,32 @@
-#include <vulkan/vulkan.hpp>
-#include <algorithm>
-#include <iostream>
-
 #include "alloc.hpp"
 
-namespace strahl::vulkan::detail {
-static bool areFlagsSupported(auto required, auto supported) {
-  return static_cast<decltype(required)::MaskType>(required & supported) != 0;
-}
+#include <algorithm>
+#include <cstdint>
+#include <ios>
+#include <iostream>
+#include <limits>
+#include <vulkan/vulkan.hpp>
 
+namespace strahl::vulkan::detail {
 std::optional<vk::DeviceMemory> Allocator::allocStagingMem(
-  vk::DeviceSize size, vk::MemoryPropertyFlags supported_flags, void *next) const {
-  if (areFlagsSupported(kStagingFlags, supported_flags)) {
-    return allocate(size, kStagingFlags, next);
-  }
-  return std::nullopt;
+  vk::DeviceSize size, uint32_t supported_mem_types, void *next) const {
+  return allocate(size, kStagingFlags, supported_mem_types, next);
 }
 std::optional<vk::DeviceMemory> Allocator::allocate(
-  vk::DeviceSize size, vk::MemoryPropertyFlags flags, void *next) const {
-  std::cout << "requested allocation with flags: " << vk::to_string(flags) << next << std::endl;
-  const vk::MemoryType *mem_type = std::find_if(
-    props_.memoryTypes.data(),
-    props_.memoryTypes + props_.memoryTypeCount,
-    [flags](vk::MemoryType props) { return flags == (flags & props.propertyFlags); });
-  if (mem_type - props_.memoryTypes.data() >= props_.memoryTypeCount) {
+  vk::DeviceSize size,
+  vk::MemoryPropertyFlags flags,
+  uint32_t allowed_mem_types,
+  void *next) const {
+  std::cout << "requested allocation with flags: " << vk::to_string(flags)
+            << ", supported types: 0x" << std::hex << allowed_mem_types << " :: ";
+  uint32_t mem_type = findMemType(flags, allowed_mem_types);
+  if (mem_type == std::numeric_limits<uint32_t>::max()) {
+    std::cout << " no suitable memory type" << std::endl;
     return std::nullopt;
   }
+  std::cout << "using mem type " << mem_type << std::endl;
   return dev_.allocateMemory(
-    vk::MemoryAllocateInfo{
-      .pNext = next,
-      .allocationSize = size,
-      .memoryTypeIndex = static_cast<uint32_t>(mem_type - props_.memoryTypes.data())});
+    vk::MemoryAllocateInfo{.pNext = next, .allocationSize = size, .memoryTypeIndex = mem_type});
 }
 
 strahl::vulkan::detail::Allocator::Allocator(vk::PhysicalDevice phy, vk::Device dev) : dev_(dev) {
@@ -44,5 +40,16 @@ strahl::vulkan::detail::Allocator::Allocator(vk::PhysicalDevice phy, vk::Device 
     std::cout << "heap " << i << ": size=" << props_.memoryHeaps[i].size
               << " flags=" << vk::to_string(props_.memoryHeaps[i].flags) << '\n';
   }
+}
+uint32_t Allocator::findMemType(
+  vk::MemoryPropertyFlags properties, uint32_t allowed_mem_types) const {
+  for (size_t i = 0; allowed_mem_types != 0; ++i, allowed_mem_types >>= 1) {
+    if (
+      (allowed_mem_types & 0x01) != 0 &&
+      ((properties & props_.memoryTypes[i].propertyFlags) == properties)) {
+      return i;
+    }
+  }
+  return std::numeric_limits<uint32_t>::max();
 }
 }  // namespace strahl::vulkan::detail

@@ -12,17 +12,18 @@
 
 namespace strahl::vulkan {
 VulkanBackend::VulkanBackend() : owns_instance_(true) {
-  vk::ApplicationInfo appInfo{
-      .pApplicationName = "strahl",
-      .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-      .apiVersion = vk::ApiVersion12,
+  vk::ApplicationInfo app_info{
+    .pApplicationName = "strahl",
+    .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
+    .apiVersion = vk::ApiVersion12,
   };
   vk::InstanceCreateInfo ici{
-      .pApplicationInfo = &appInfo,
+    .pApplicationInfo = &app_info,
   };
   instance_ = vk::createInstance(ici);
   // Find physical device
   findDeviceQueue();
+  // TODO: family indices
   vec_ = std::make_unique<detail::GpuVector>(device_, transfer_, alloc_.get(), 0);
 }
 VulkanBackend::~VulkanBackend() {
@@ -64,10 +65,10 @@ void VulkanBackend::findDeviceQueue() {
       std::cout << "queue family " << q << ": count=" << queues[q].queueCount
                 << " flags=" << vk::to_string(queues[q].queueFlags) << std::endl;
       if (device_com_queues[d] < 0 && (queues[q].queueFlags & vk::QueueFlagBits::eCompute)) {
-        device_com_queues[d] = q;
+        device_com_queues[d] = (int)q;
       }
       if (device_tx_queues[d] < 0 && (queues[q].queueFlags & vk::QueueFlagBits::eTransfer)) {
-        device_tx_queues[d] = q;
+        device_tx_queues[d] = (int)q;
       }
     }
     // TODO: give some points if tx and com queues are distinct
@@ -78,8 +79,7 @@ void VulkanBackend::findDeviceQueue() {
               << " com:" << device_com_queues[d] << std::endl
               << std::endl;
   }
-  auto target_dev =
-      std::max_element(scores.begin(), scores.end()) - scores.begin();
+  auto target_dev = std::max_element(scores.begin(), scores.end()) - scores.begin();
   if (scores[target_dev] < 0) {
     throw std::runtime_error("Failed to find a suitable device.");
   }
@@ -87,27 +87,30 @@ void VulkanBackend::findDeviceQueue() {
   int com_family = device_com_queues[target_dev];
   // TODO: probably override this logic to select distinct queues of the same
   // family if available
-  int com_index = 0;
-  int tx_index = 0;
+  uint32_t com_index = 0;
+  uint32_t tx_index = 0;
 
   std::vector<vk::DeviceQueueCreateInfo> qci;
   static float priorities[] = {1.0, 1.0};
   if (tx_family == com_family) {
-    qci = {{.queueFamilyIndex = (uint32_t)com_family,
-            .queueCount = 2,
-            .pQueuePriorities = priorities}};
+    uint32_t queue_count =
+      std::min(2U, devs[target_dev].getQueueFamilyProperties()[com_family].queueCount);
+    qci = {
+      {.queueFamilyIndex = (uint32_t)com_family,
+       .queueCount = queue_count,
+       .pQueuePriorities = priorities}};
+    tx_index = queue_count - 1;
   } else {
-    qci = {{.queueFamilyIndex = (uint32_t)com_family,
-            .queueCount = 1,
-            .pQueuePriorities = priorities},
-           {.queueFamilyIndex = (uint32_t)tx_family,
-            .queueCount = 1,
-            .pQueuePriorities = priorities + 1}};
+    qci = {
+      {.queueFamilyIndex = (uint32_t)com_family, .queueCount = 1, .pQueuePriorities = priorities},
+      {.queueFamilyIndex = (uint32_t)tx_family,
+       .queueCount = 1,
+       .pQueuePriorities = priorities + 1}};
   }
   auto phy_dev = devs[target_dev];
-  device_ = phy_dev.createDevice(vk::DeviceCreateInfo{
-      .queueCreateInfoCount = (uint32_t)qci.size(),
-      .pQueueCreateInfos = qci.data()
+  device_ = phy_dev.createDevice(
+    vk::DeviceCreateInfo{
+      .queueCreateInfoCount = (uint32_t)qci.size(), .pQueueCreateInfos = qci.data()
       /* no layers or extensions*/});
   transfer_ = device_.getQueue(tx_family, tx_index);
   compute_ = device_.getQueue(com_family, com_index);

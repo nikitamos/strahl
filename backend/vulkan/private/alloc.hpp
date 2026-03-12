@@ -7,7 +7,6 @@
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_to_string.hpp>
 
-
 #define SVDT_DBG_81934243
 
 namespace strahl::vulkan::detail {
@@ -69,7 +68,7 @@ class GpuVector {
     vk::Device dev,
     vk::Queue queue,
     Allocator *alloc,
-    uint32_t family_indices,
+    vk::ArrayProxy<uint32_t> family_indices,
     vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eUniformBuffer |
                                  vk::BufferUsageFlagBits::eStorageBuffer,
     size_t initial_capacity = 16)
@@ -78,8 +77,8 @@ class GpuVector {
       .size = initial_capacity * sizeof(T),
       .usage = usage,
       .sharingMode = vk::SharingMode::eExclusive,
-      .queueFamilyIndexCount = 1,
-      .pQueueFamilyIndices = &family_indices};
+      .queueFamilyIndexCount = family_indices.size(),
+      .pQueueFamilyIndices = family_indices.data()};
     buf_ = dev_.createBuffer(bci);
     allocateMemory();
   }

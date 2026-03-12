@@ -7,11 +7,18 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Launch",
+            "name": "CLI",
             "program": "${workspaceFolder}/build/strahl-cli",
             "args": [],
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "GUI",
+            "program": "${workspaceFolder}/build/frontends/qt-gui/strahl-qui",
+            "args": [],
+            "cwd": "${workspaceFolder}"
         }
-
     ]
 }

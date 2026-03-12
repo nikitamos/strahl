@@ -6,7 +6,7 @@
 
 namespace strahl::vulkan::detail {
 static bool areFlagsSupported(auto required, auto supported) {
-  return required == (required & supported);
+  return static_cast<decltype(required)::MaskType>(required & supported) != 0;
 }
 
 std::optional<vk::DeviceMemory> Allocator::allocStagingMem(

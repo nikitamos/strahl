@@ -2,7 +2,9 @@ include(cmake/slang.cmake)
 
 find_package(Vulkan)
 add_library(strahl-vulkan
-    SHARED strahl-vulkan.cc
+    SHARED
+    strahl-vulkan.cc
+    private/alloc.cc
 )
 add_compile_definitions(VULKAN_HPP_NO_STRUCT_CONSTRUCTORS)
 target_compile_definitions(
@@ -11,6 +13,7 @@ target_compile_definitions(
 )
 
 target_include_directories(strahl-vulkan PUBLIC include)
+target_include_directories(strahl-vulkan PRIVATE private)
 # target_precompile_headers()
 
 # add_slang_shader(out.spv

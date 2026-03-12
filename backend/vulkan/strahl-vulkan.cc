@@ -3,14 +3,15 @@
 #include <algorithm>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_to_string.hpp>
 
-#include "vulkan/vulkan.hpp"
+#include "private/alloc.hpp"
 
 namespace strahl::vulkan {
-VulkanBackend::VulkanBackend() {
+VulkanBackend::VulkanBackend() : owns_instance_(true) {
   vk::ApplicationInfo appInfo{
       .pApplicationName = "strahl",
       .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
@@ -21,61 +22,60 @@ VulkanBackend::VulkanBackend() {
   };
   instance_ = vk::createInstance(ici);
   // Find physical device
-  findDevice();
+  findDeviceQueue();
+  vec_ = std::make_unique<detail::GpuVector>(device_, transfer_, alloc_.get(), 0);
 }
 VulkanBackend::~VulkanBackend() {
+  vec_ = nullptr;
+  device_.destroy();
   if (owns_instance_) {
     instance_.destroy();
   }
-  device_.destroy();
   // Queue destruction is impossible
 }
-void VulkanBackend::findDevice() {
+void VulkanBackend::findDeviceQueue() {
   auto devs = instance_.enumeratePhysicalDevices();
   std::vector<int> scores(devs.size());
   std::vector<int> device_com_queues(devs.size(), -1);
   std::vector<int> device_tx_queues(devs.size(), -1);
-  for (size_t i = 0; i < devs.size(); ++i) {
-    auto props = devs[i].getProperties();
-    std::cout << "device #" << i << "" << props.deviceName << " ("
-              << devs[i].getQueueFamilyProperties().size() << " families)"
-              << std::endl;
+  for (size_t d = 0; d < devs.size(); ++d) {
+    auto props = devs[d].getProperties();
+    std::cout << "device #" << d << " " << props.deviceName << " ("
+              << devs[d].getQueueFamilyProperties().size() << " families)" << std::endl;
     switch (props.deviceType) {
       case vk::PhysicalDeviceType::eOther:
-        scores[i] -= 20;
+        scores[d] -= 20;
         break;
       case vk::PhysicalDeviceType::eIntegratedGpu:
-        scores[i] += 50;
+        scores[d] += 50;
         break;
       case vk::PhysicalDeviceType::eDiscreteGpu:
-        scores[i] += 100;
+        scores[d] += 100;
         break;
       case vk::PhysicalDeviceType::eVirtualGpu:
-        scores[i] += 80;
+        scores[d] += 80;
         break;
       case vk::PhysicalDeviceType::eCpu:
-        scores[i] += 40;
+        scores[d] += 40;
         break;
     }
-    auto queues = devs[i].getQueueFamilyProperties();
+    auto queues = devs[d].getQueueFamilyProperties();
     for (size_t q = 0; q < queues.size(); ++q) {
-      std::cout << "queue family " << i << ": count=" << queues[i].queueCount
-                << "flags=" << vk::to_string(queues[q].queueFlags) << std::endl;
-      if (device_com_queues[i] < 0 &&
-          (queues[q].queueFlags & vk::QueueFlagBits::eCompute)) {
-        device_com_queues[i] = q;
+      std::cout << "queue family " << q << ": count=" << queues[q].queueCount
+                << " flags=" << vk::to_string(queues[q].queueFlags) << std::endl;
+      if (device_com_queues[d] < 0 && (queues[q].queueFlags & vk::QueueFlagBits::eCompute)) {
+        device_com_queues[d] = q;
       }
-      if (device_tx_queues[i] < 0 &&
-          (queues[q].queueFlags & vk::QueueFlagBits::eTransfer)) {
-        device_tx_queues[i] = q;
+      if (device_tx_queues[d] < 0 && (queues[q].queueFlags & vk::QueueFlagBits::eTransfer)) {
+        device_tx_queues[d] = q;
       }
     }
     // TODO: give some points if tx and com queues are distinct
-    if (device_tx_queues[i] < 0 || device_com_queues[i] < 0) {
-      scores[i] = std::numeric_limits<int>::min();
+    if (device_tx_queues[d] < 0 || device_com_queues[d] < 0) {
+      scores[d] = std::numeric_limits<int>::min();
     }
-    std::cout << "-> score:" << scores[i] << " tx: " << device_tx_queues[i]
-              << " com: " << device_com_queues[i] << std::endl
+    std::cout << "-> score:" << scores[d] << " tx:" << device_tx_queues[d]
+              << " com:" << device_com_queues[d] << std::endl
               << std::endl;
   }
   auto target_dev =
@@ -111,5 +111,9 @@ void VulkanBackend::findDevice() {
       /* no layers or extensions*/});
   transfer_ = device_.getQueue(tx_family, tx_index);
   compute_ = device_.getQueue(com_family, com_index);
+
+  alloc_ = std::make_unique<detail::Allocator>(phy_dev, device_);
 }
+VulkanScene* VulkanBackend::createScene() { return nullptr; }
+VulkanBackend::VulkanBackend(VkInstance inst) : instance_(inst) {}
 }  // namespace strahl::vulkan

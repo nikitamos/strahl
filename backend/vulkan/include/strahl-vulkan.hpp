@@ -1,20 +1,34 @@
 #pragma once
-#include <vulkan/vulkan.h>
-
-#include <array>
+#include <memory>
 #include <vulkan/vulkan.hpp>
 
-#include "vulkan/vulkan.hpp"
-
 namespace strahl::vulkan {
+namespace detail {
+class GpuVector;
+class Allocator;
+}  // namespace detail
+class Sphere {};
+class VulkanScene {
+ public:
+  VulkanScene(vk::Queue tx, vk::Queue com) {}
+  Sphere* AddSphere();
+
+ private:
+  vk::Queue transfer_, compute_;
+};
+
 class VulkanBackend final {
  public:
   VulkanBackend();
-  VulkanBackend(VkInstance inst) : instance_(inst) {}
+  explicit VulkanBackend(VkInstance inst);
+  VulkanScene* createScene();
   ~VulkanBackend();
 
  private:
-  void findDevice();
+  // Note: the members are destroyed in the reverse declaration order
+  std::unique_ptr<detail::Allocator> alloc_;
+  std::unique_ptr<detail::GpuVector> vec_;
+  void findDeviceQueue();
   bool owns_instance_ = false;
   vk::Instance instance_;
   vk::Device device_;

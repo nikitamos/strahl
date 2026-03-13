@@ -9,6 +9,7 @@
 #include <vulkan/vulkan_to_string.hpp>
 
 #include "private/alloc.hpp"
+#include "private/gpu-vector.hpp"
 
 namespace strahl::vulkan {
 VulkanBackend::VulkanBackend() : owns_instance_(true) {

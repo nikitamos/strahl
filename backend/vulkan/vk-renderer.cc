@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <vulkan/vulkan.hpp>
 
+#include "private/device-queue.hpp"
 #include "private/shader-loader.hpp"
-#include "vulkan/vulkan.hpp"
 
 // NOLINTBEGIN
 struct DescriptorSet0Layout {
@@ -28,20 +28,19 @@ struct DescriptorSet0Layout {
 // NOLINTEND
 
 namespace strahl::vulkan {
-VulkanRenderer::VulkanRenderer(vk::Device dev, vk::Queue com, vk::Queue tx)
-  : compute_(com), transfer_(tx) {
+VulkanRenderer::VulkanRenderer(detail::DeviceQueueInfo *dqi) : dqi_(dqi) {
   auto shader = detail::readShader("out.spv").value();
   vk::ShaderModuleCreateInfo smci{
     .codeSize = shader.size(),
     .pCode = (uint32_t *)shader.data(),
   };
-  auto module = dev.createShaderModule(smci);
+  auto module = dqi_->dev.createShaderModule(smci);
 
   DescriptorSet0Layout l;
   auto dslci = l.CreateInfo();
-  auto set0 = dev.createDescriptorSetLayout(dslci);
+  auto set0 = dqi_->dev.createDescriptorSetLayout(dslci);
   vk::PipelineLayoutCreateInfo plci{.setLayoutCount = 1, .pSetLayouts = &set0};
-  auto layout = dev.createPipelineLayout(plci);
+  auto layout = dqi_->dev.createPipelineLayout(plci);
 
   vk::PipelineShaderStageCreateInfo sci{
     .stage = vk::ShaderStageFlagBits::eCompute, .module = module, .pName = "main"};
@@ -49,12 +48,12 @@ VulkanRenderer::VulkanRenderer(vk::Device dev, vk::Queue com, vk::Queue tx)
     .stage = sci,
     .layout = layout,
   };
-  auto pipeline = dev.createComputePipeline(nullptr, cpci).value;
+  auto pipeline = dqi_->dev.createComputePipeline(nullptr, cpci).value;
 
-  dev.destroyPipeline(pipeline);
-  dev.destroy(layout);
-  dev.destroy(set0);
-  dev.destroy(module);
+  dqi_->dev.destroyPipeline(pipeline);
+  dqi_->dev.destroy(layout);
+  dqi_->dev.destroy(set0);
+  dqi_->dev.destroy(module);
 }
 
 }  // namespace strahl::vulkan

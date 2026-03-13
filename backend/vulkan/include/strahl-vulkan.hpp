@@ -9,6 +9,7 @@ namespace strahl::vulkan {
 namespace detail {
 class GpuVector;
 class Allocator;
+class DeviceQueueInfo;
 }  // namespace detail
 
 /// `VulkanBackend` is an entry point to the API.
@@ -20,16 +21,17 @@ class VulkanBackend final {
   ~VulkanBackend();
 
  private:
+  void findDeviceQueue();
+  vk::CommandPool createCommandPool(uint32_t queue_family);
   // Note: the members are destroyed in the reverse declaration order
   std::unique_ptr<detail::Allocator> alloc_;
   std::unique_ptr<detail::GpuVector> vec_;
-  void findDeviceQueue();
   bool owns_instance_ = false;
   vk::Instance instance_;
-  vk::Device device_;
 
-  vk::Queue transfer_;
-  vk::Queue compute_;
+  vk::CommandPool tx_pool_;
+  vk::CommandPool com_pool_;
+  std::unique_ptr<detail::DeviceQueueInfo> dqi_;
 
   VulkanRenderer renderer_;
 };

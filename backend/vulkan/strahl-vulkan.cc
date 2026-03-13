@@ -1,6 +1,7 @@
 #include "include/strahl-vulkan.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -8,12 +9,14 @@
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_to_string.hpp>
 
+#include "device-queue.hpp"
 #include "private/alloc.hpp"
 #include "private/gpu-vector.hpp"
 #include "vk-renderer.hpp"
 
 namespace strahl::vulkan {
 VulkanBackend::VulkanBackend() : owns_instance_(true) {
+  dqi_ = std::make_unique<detail::DeviceQueueInfo>();
   vk::ApplicationInfo app_info{
     .pApplicationName = "strahl",
     .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
@@ -25,13 +28,13 @@ VulkanBackend::VulkanBackend() : owns_instance_(true) {
   instance_ = vk::createInstance(ici);
   // Find physical device
   findDeviceQueue();
-  // TODO: family indices
-  vec_ = std::make_unique<detail::GpuVector>(device_, transfer_, alloc_.get(), 0);
-  renderer_ = {device_, compute_, transfer_};
+  vec_ = std::make_unique<detail::GpuVector>(dqi_->dev, dqi_->tx, alloc_.get(), dqi_->families);
+  renderer_ = VulkanRenderer(dqi_.get());
 }
 VulkanBackend::~VulkanBackend() {
   vec_ = nullptr;
-  device_.destroy();
+  // TODO: add destructor to the DQI.
+  dqi_->dev.destroy();
   if (owns_instance_) {
     instance_.destroy();
   }
@@ -108,19 +111,22 @@ void VulkanBackend::findDeviceQueue() {
        .queueCount = 1,
        .pQueuePriorities = priorities + 1}};
   }
+  dqi_->tx_family = tx_family;
+  dqi_->com_family = com_family;
   auto phy_dev = devs[target_dev];
   static const char* const kDevExtensions[] = {"VK_GOOGLE_user_type"};
-  device_ = phy_dev.createDevice(
+  dqi_->dev = phy_dev.createDevice(
     vk::DeviceCreateInfo{
       .queueCreateInfoCount = (uint32_t)qci.size(),
       .pQueueCreateInfos = qci.data(),
       .enabledExtensionCount = 1,
       .ppEnabledExtensionNames = kDevExtensions});
-  transfer_ = device_.getQueue(tx_family, tx_index);
-  compute_ = device_.getQueue(com_family, com_index);
+  dqi_->tx = dqi_->dev.getQueue(tx_family, tx_index);
+  dqi_->com = dqi_->dev.getQueue(com_family, com_index);
 
-  alloc_ = std::make_unique<detail::Allocator>(phy_dev, device_);
+  alloc_ = std::make_unique<detail::Allocator>(phy_dev, dqi_->dev);
 }
 VulkanScene* VulkanBackend::createScene() { return nullptr; }
+
 VulkanBackend::VulkanBackend(VkInstance inst) : instance_(inst) {}
 }  // namespace strahl::vulkan

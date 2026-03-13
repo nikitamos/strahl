@@ -2,21 +2,15 @@
 #include <memory>
 #include <vulkan/vulkan.hpp>
 
+#include "vk-scene.hpp"
+
 namespace strahl::vulkan {
 namespace detail {
 class GpuVector;
 class Allocator;
 }  // namespace detail
-class Sphere {};
-class VulkanScene {
- public:
-  VulkanScene(vk::Queue tx, vk::Queue com) {}
-  Sphere* AddSphere();
 
- private:
-  vk::Queue transfer_, compute_;
-};
-
+/// `VulkanBackend` is an entry point to the API.
 class VulkanBackend final {
  public:
   VulkanBackend();

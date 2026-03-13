@@ -10,6 +10,7 @@
 
 #include "private/alloc.hpp"
 #include "private/gpu-vector.hpp"
+#include "vk-renderer.hpp"
 
 namespace strahl::vulkan {
 VulkanBackend::VulkanBackend() : owns_instance_(true) {
@@ -26,6 +27,7 @@ VulkanBackend::VulkanBackend() : owns_instance_(true) {
   findDeviceQueue();
   // TODO: family indices
   vec_ = std::make_unique<detail::GpuVector>(device_, transfer_, alloc_.get(), 0);
+  VulkanRenderer r{device_, compute_, transfer_};
 }
 VulkanBackend::~VulkanBackend() {
   vec_ = nullptr;
@@ -86,8 +88,6 @@ void VulkanBackend::findDeviceQueue() {
   }
   int tx_family = device_tx_queues[target_dev];
   int com_family = device_com_queues[target_dev];
-  // TODO: probably override this logic to select distinct queues of the same
-  // family if available
   uint32_t com_index = 0;
   uint32_t tx_index = 0;
 
@@ -109,10 +109,13 @@ void VulkanBackend::findDeviceQueue() {
        .pQueuePriorities = priorities + 1}};
   }
   auto phy_dev = devs[target_dev];
+  static const char* const kDevExtensions[] = {"VK_GOOGLE_user_type"};
   device_ = phy_dev.createDevice(
     vk::DeviceCreateInfo{
-      .queueCreateInfoCount = (uint32_t)qci.size(), .pQueueCreateInfos = qci.data()
-      /* no layers or extensions*/});
+      .queueCreateInfoCount = (uint32_t)qci.size(),
+      .pQueueCreateInfos = qci.data(),
+      .enabledExtensionCount = 1,
+      .ppEnabledExtensionNames = kDevExtensions});
   transfer_ = device_.getQueue(tx_family, tx_index);
   compute_ = device_.getQueue(com_family, com_index);
 

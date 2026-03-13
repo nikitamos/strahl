@@ -56,6 +56,7 @@ class GpuVector {
       capacity_(initial_capacity),
       dirty_left_(initial_capacity),
       dirty_right_(0) {
+    // TODO: determine correct sharing mode
     vk::BufferCreateInfo bci{
       .size = initial_capacity * sizeof(T),
       .usage = vk::BufferUsageFlagBits::eTransferDst,

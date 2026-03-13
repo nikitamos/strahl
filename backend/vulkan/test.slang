@@ -1,23 +1,9 @@
-struct PhysicalSphere {
+ConstantBuffer<int[8]> in;
+RWStructuredBuffer<int> out;
 
+[shader("compute")]
+void some_calc(uint3 id: SV_DispatchThreadID) {
+    out[id.x] = in[id.x];
 }
 
-struct Material {
-    
-}
 
-struct SphereShape {
-    float3 center;
-    float radius;
-}
-
-struct Ray {
-
-}
-struct RayCollidable {
-
-}
-
-struct Collision {
-    Ray *ray;
-}

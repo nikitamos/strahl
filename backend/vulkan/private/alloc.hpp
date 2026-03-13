@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
@@ -6,6 +7,8 @@
 #include <vector>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_to_string.hpp>
+
+#include "vulkan/vulkan.hpp"
 
 #define SVDT_DBG_81934243
 
@@ -22,6 +25,7 @@ class Allocator {
  public:
   static constexpr const auto kStagingFlags =
     vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCached;
+  static constexpr const auto kDeviceFlags = vk::MemoryPropertyFlagBits::eDeviceLocal;
   Allocator() {}
   Allocator(vk::PhysicalDevice phy, vk::Device dev);
 
@@ -34,8 +38,10 @@ class Allocator {
   std::optional<vk::DeviceMemory> allocStagingMem(
     vk::DeviceSize size, uint32_t supported_mem_types = 0xFFFFFFFF, void *next = nullptr) const;
 
-  vk::DeviceMemory allocLocalMem(
-    vk::DeviceSize size, vk::MemoryPropertyFlags flags, void *next = nullptr);
+  std::optional<vk::DeviceMemory> allocDeviceMem(
+    vk::DeviceSize size, uint32_t supported_mem_types, void *next = nullptr) const {
+    return allocate(size, kDeviceFlags, supported_mem_types);
+  }
 
   void dealloc(vk::DeviceMemory mem, void *next = nullptr) const;
   vk::DeviceMemory realloc(
@@ -54,18 +60,28 @@ template <pod T>
 class GpuVector {
  private:
   void allocateMemory() {
+    // Allocate STAGING buffer & setup some vars
     auto mem_req = vk::StructureChain<vk::MemoryRequirements2, vk::MemoryDedicatedRequirements>{
       vk::MemoryRequirements2{}, vk::MemoryDedicatedRequirements{}};
-    auto mem_req_info = vk::BufferMemoryRequirementsInfo2{.buffer = buf_};
+    auto mem_req_info = vk::BufferMemoryRequirementsInfo2{.buffer = stage_buf_};
     dev_.getBufferMemoryRequirements2(&mem_req_info, &mem_req.get());
-    auto &mdr = mem_req.get<vk::MemoryDedicatedRequirements>();
-
     auto mem_type = mem_req.get().memoryRequirements.memoryTypeBits;
     auto mem_size = mem_req.get().memoryRequirements.size;
+    auto mdai = *vk::MemoryDedicatedAllocateInfo{.buffer = stage_buf_};
 
-    auto mdai = *vk::MemoryDedicatedAllocateInfo{.buffer = buf_};
-    mem_ = alloc_->allocStagingMem(mem_size, mem_type, &mdai).value();
-    dev_.bindBufferMemory(buf_, mem_, 0);
+    stage_mem_ = alloc_->allocStagingMem(mem_size, mem_type, &mdai).value();
+    dev_.bindBufferMemory(stage_buf_, stage_mem_, 0);
+
+    // Allocate DEVICE buffer
+    mem_req_info = {.buffer = dev_buf_};
+    mem_req = {};
+    dev_.getBufferMemoryRequirements2(&mem_req_info, &mem_req.get());
+    mem_type = mem_req.get().memoryRequirements.memoryTypeBits;
+    mem_size = mem_req.get().memoryRequirements.size;
+    mdai = *vk::MemoryDedicatedAllocateInfo{.buffer = dev_buf_};
+
+    dev_mem_ = alloc_->allocDeviceMem(mem_size, mem_type, &mdai).value();
+    dev_.bindBufferMemory(dev_buf_, dev_mem_, 0);
   }
 
  public:
@@ -78,19 +94,33 @@ class GpuVector {
     vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eUniformBuffer |
                                  vk::BufferUsageFlagBits::eStorageBuffer,
     size_t initial_capacity = 16)
-    : dev_(dev), queue_(queue), alloc_(alloc) {
+    : dev_(dev),
+      queue_(queue),
+      alloc_(alloc),
+      capacity_(initial_capacity),
+      dirty_left_(initial_capacity),
+      dirty_right_(0) {
     vk::BufferCreateInfo bci{
       .size = initial_capacity * sizeof(T),
-      .usage = usage,
+      .usage = vk::BufferUsageFlagBits::eTransferDst,
       .sharingMode = vk::SharingMode::eExclusive,
       .queueFamilyIndexCount = family_indices.size(),
       .pQueueFamilyIndices = family_indices.data()};
-    buf_ = dev_.createBuffer(bci);
+    stage_buf_ = dev_.createBuffer(bci);
+    bci = {
+      .size = initial_capacity * sizeof(T),
+      .usage = vk::BufferUsageFlagBits::eTransferDst | usage,
+      .sharingMode = vk::SharingMode::eExclusive,
+      .queueFamilyIndexCount = family_indices.size(),
+      .pQueueFamilyIndices = family_indices.data()};
+    dev_buf_ = dev_.createBuffer(bci);
     allocateMemory();
   }
   ~GpuVector() {
-    dev_.destroy(buf_);
-    dev_.freeMemory(mem_);
+    dev_.destroy(stage_buf_);
+    dev_.freeMemory(stage_mem_);
+    dev_.destroy(dev_buf_);
+    dev_.freeMemory(dev_mem_);
   }
 
   GpuVector(GpuVector &&rhs) noexcept(false) { throw std::runtime_error("not implemented"); }
@@ -100,19 +130,40 @@ class GpuVector {
     throw std::runtime_error("not implemented");
   }
 
+  // TODO: how to synchronize?
   vk::Fence scheduleWrite(vk::Fence fence, vk::CommandBuffer buf) { return {}; }
   vk::Fence scheduleRead(vk::Fence fence, vk::CommandBuffer buf) { return {}; }
 
+  void invalidate() {
+    dirty_left_ = 0;
+    dirty_right_ = capacity_;
+  }
+  vk::DeviceSize size() const { return size_; }
+  vk::DeviceSize capacity() const { return capacity_; }
+  const T &operator[](vk::DeviceSize i) const { return mapped_[i]; }
+  T &operator[](vk::DeviceSize i) {
+    dirty_left_ = std::min(dirty_left_, i);
+    dirty_right_ = std::max(dirty_right_, i + 1);
+    return mapped_[i];
+  }
+  vk::Buffer getDeviceBuffer() const { return dev_buf_; }
+
  private:
-  std::vector<T> host_;
+  T *mapped_;
   vk::DeviceSize capacity_ = 0;
   vk::DeviceSize size_ = 0;
-  vk::Buffer buf_;
-  vk::DeviceMemory mem_;
+
+  vk::DeviceMemory stage_mem_;
+  vk::Buffer stage_buf_;
+  vk::DeviceMemory dev_mem_;
+  vk::Buffer dev_buf_;
+
   vk::Device dev_;
   vk::Queue queue_;
   Allocator *alloc_;
-  bool dirty_ = false;
+
+  vk::DeviceSize dirty_left_;
+  vk::DeviceSize dirty_right_;
 };
 }  // namespace strahl::vulkan::detail
 

@@ -4,10 +4,11 @@
 
 namespace strahl::vulkan {
 
-/// Renderer is responsible for managing piplines and other related resources (e.g. texture)
+/// Renderer is responsible for managing piplines, queues and other related resources (e.g. texture)
 class VulkanRenderer {
  public:
   VulkanRenderer(vk::Device dev, vk::Queue com, vk::Queue tx);
+  VulkanRenderer() {}
 
  private:
   vk::Pipeline main_;

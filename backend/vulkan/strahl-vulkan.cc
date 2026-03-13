@@ -27,7 +27,7 @@ VulkanBackend::VulkanBackend() : owns_instance_(true) {
   findDeviceQueue();
   // TODO: family indices
   vec_ = std::make_unique<detail::GpuVector>(device_, transfer_, alloc_.get(), 0);
-  VulkanRenderer r{device_, compute_, transfer_};
+  renderer_ = {device_, compute_, transfer_};
 }
 VulkanBackend::~VulkanBackend() {
   vec_ = nullptr;

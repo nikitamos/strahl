@@ -1,6 +1,7 @@
-#include "alloc.hpp"
-
 #include <stdexcept>
+
+#include "alloc.hpp"
+#include "vulkan/vulkan.hpp"
 
 #define SVDT_DBG_81934243
 
@@ -88,8 +89,24 @@ class GpuVector {
   }
 
   // TODO: how to synchronize?
-  vk::Fence scheduleWrite(vk::Fence fence, vk::CommandBuffer buf) { return {}; }
-  vk::Fence scheduleRead(vk::Fence fence, vk::CommandBuffer buf) { return {}; }
+  vk::Fence scheduleWrite(vk::Fence fence, vk::CommandBuffer buf) {
+    if (dirty_left_ >= dirty_right_) {
+      return {};
+    }
+    auto copy_size = sizeof(T) * (dirty_right_ - dirty_left_);
+    auto offset = sizeof(T) * dirty_left_;
+    dev_.flushMappedMemoryRanges(
+      vk::MappedMemoryRange{.memory = stage_mem_, .offset = offset, .size = copy_size});
+    buf.copyBuffer(stage_buf_, dev_buf_, vk::BufferCopy{0, offset, copy_size});
+    return {};
+  }
+  vk::Fence scheduleRead(vk::Fence fence, vk::CommandBuffer buf) {
+    auto size = capacity_ * sizeof(T);
+    buf.copyBuffer(dev_buf_, stage_buf_, vk::BufferCopy{0, 0, size});
+    dev_.invalidateMappedMemoryRanges(
+      vk::MappedMemoryRange{.memory = stage_mem_, .offset = 0, .size = size});
+    return {};
+  }
 
   void invalidate() {
     dirty_left_ = 0;

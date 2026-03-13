@@ -2,6 +2,7 @@
 #include <memory>
 #include <vulkan/vulkan.hpp>
 
+#include "vk-renderer.hpp"
 #include "vk-scene.hpp"
 
 namespace strahl::vulkan {
@@ -29,5 +30,7 @@ class VulkanBackend final {
 
   vk::Queue transfer_;
   vk::Queue compute_;
+
+  VulkanRenderer renderer_;
 };
 }  // namespace strahl::vulkan

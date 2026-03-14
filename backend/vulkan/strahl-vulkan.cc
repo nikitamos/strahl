@@ -29,12 +29,12 @@ VulkanBackend::VulkanBackend() : owns_instance_(true) {
   // Find physical device
   findDeviceQueue();
   vec_ = std::make_unique<detail::GpuVector>(dqi_->dev, dqi_->tx, alloc_.get(), dqi_->families);
-  renderer_ = VulkanRenderer(dqi_.get());
+  renderer_ = std::make_unique<VulkanRenderer>(dqi_.get());
 }
 VulkanBackend::~VulkanBackend() {
   vec_ = nullptr;
-  // TODO: add destructor to the DQI.
-  dqi_->dev.destroy();
+  renderer_ = nullptr;
+  dqi_ = nullptr;
   if (owns_instance_) {
     instance_.destroy();
   }

@@ -35,6 +35,7 @@ VulkanRenderer::VulkanRenderer(detail::DeviceQueueInfo *dqi) : dqi_(dqi) {
     .pCode = (uint32_t *)shader.data(),
   };
   auto module = dqi_->dev.createShaderModule(smci);
+  createCommandPoolBufs();
 
   DescriptorSet0Layout l;
   auto dslci = l.CreateInfo();
@@ -48,12 +49,45 @@ VulkanRenderer::VulkanRenderer(detail::DeviceQueueInfo *dqi) : dqi_(dqi) {
     .stage = sci,
     .layout = layout,
   };
-  auto pipeline = dqi_->dev.createComputePipeline(nullptr, cpci).value;
+  pipeline_ = dqi_->dev.createComputePipeline(nullptr, cpci).value;
 
-  dqi_->dev.destroyPipeline(pipeline);
+  // dqi_->dev.destroyPipeline(pipeline);
   dqi_->dev.destroy(layout);
   dqi_->dev.destroy(set0);
   dqi_->dev.destroy(module);
 }
 
+void VulkanRenderer::doSomeRendering() {
+  vk::CommandBufferBeginInfo cbbi{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
+  com_buffer_.begin(cbbi);
+  tx_buffer_.begin(cbbi);
+
+  /// RENDERING HAPPENS HERE
+
+  tx_buffer_.end();
+  com_buffer_.end();
+  vk::SubmitInfo si{.commandBufferCount = 1, .pCommandBuffers = &tx_buffer_};
+  dqi_->tx.submit(si);
+}
+void VulkanRenderer::createCommandPoolBufs() {
+  vk::CommandPoolCreateInfo cpci = {
+    .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+    .queueFamilyIndex = dqi_->com_family,
+  };
+  com_pool_ = dqi_->dev.createCommandPool(cpci);
+  cpci.setQueueFamilyIndex(dqi_->tx_family);
+  tx_pool_ = dqi_->dev.createCommandPool(cpci);
+
+  vk::CommandBufferAllocateInfo cbai{
+    .commandPool = com_pool_, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = 1};
+  com_buffer_ = dqi_->dev.allocateCommandBuffers(cbai)[0];
+  cbai.setCommandPool(tx_pool_);
+  tx_buffer_ = dqi_->dev.allocateCommandBuffers(cbai)[0];
+}
+VulkanRenderer::~VulkanRenderer() {
+  std::cout << "destroying renderer" << std::endl;
+  dqi_->dev.destroy(tx_pool_);
+  dqi_->dev.destroy(com_pool_);
+  dqi_->dev.destroy(pipeline_);
+}
 }  // namespace strahl::vulkan

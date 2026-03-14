@@ -24,6 +24,7 @@ class VulkanBackend final {
   void findDeviceQueue();
   vk::CommandPool createCommandPool(uint32_t queue_family);
   // Note: the members are destroyed in the reverse declaration order
+  std::unique_ptr<detail::DeviceQueueInfo> dqi_;
   std::unique_ptr<detail::Allocator> alloc_;
   std::unique_ptr<detail::GpuVector> vec_;
   bool owns_instance_ = false;
@@ -31,8 +32,7 @@ class VulkanBackend final {
 
   vk::CommandPool tx_pool_;
   vk::CommandPool com_pool_;
-  std::unique_ptr<detail::DeviceQueueInfo> dqi_;
 
-  VulkanRenderer renderer_;
+  std::unique_ptr<VulkanRenderer> renderer_;
 };
 }  // namespace strahl::vulkan

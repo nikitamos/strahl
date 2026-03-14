@@ -4,16 +4,6 @@ project(Strahl LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 find_package(glm REQUIRED)
 
-add_library(CImg INTERFACE)
-target_sources(CImg
-    INTERFACE FILE_SET
-        HEADERS BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty FILES 3rdparty/CImg.h
-)
-target_precompile_headers(CImg
-     INTERFACE 3rdparty/CImg.h
-)
-target_compile_definitions(CImg INTERFACE cimg_display=0)
-
 add_subdirectory(abstractions)
 add_subdirectory(backend/cpu-raymarcher)
 add_subdirectory(backend/vulkan)

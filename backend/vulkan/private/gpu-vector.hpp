@@ -1,6 +1,7 @@
 #include <stdexcept>
 
 #include "alloc.hpp"
+#include "device-queue.hpp"
 #include "vulkan/vulkan.hpp"
 
 #define SVDT_DBG_81934243
@@ -52,15 +53,13 @@ class GpuVector {
                                  vk::BufferUsageFlagBits::eStorageBuffer,
     size_t initial_capacity = 16)
     : dev_(dev),
-      queue_(queue),
       alloc_(alloc),
       capacity_(initial_capacity),
       dirty_left_(initial_capacity),
       dirty_right_(0) {
-    // TODO: determine correct sharing mode
     vk::BufferCreateInfo bci{
       .size = initial_capacity * sizeof(T),
-      .usage = vk::BufferUsageFlagBits::eTransferDst,
+      .usage = vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eTransferSrc,
       .sharingMode = vk::SharingMode::eExclusive,
       .queueFamilyIndexCount = family_indices.size(),
       .pQueueFamilyIndices = family_indices.data()};
@@ -88,17 +87,31 @@ class GpuVector {
     throw std::runtime_error("not implemented");
   }
 
-  // TODO: how to synchronize?
-  vk::Fence scheduleWrite(vk::Fence fence, vk::CommandBuffer buf) {
+  void scheduleWrite(
+    QueueRecorder tx_buf,
+    QueueRecorder work_buf,
+    vk::AccessFlagBits2KHR access,
+    vk::PipelineStageFlags2 stage = vk::PipelineStageFlagBits2::eAllCommands) {
     if (dirty_left_ >= dirty_right_) {
-      return {};
+      return;
     }
     auto copy_size = sizeof(T) * (dirty_right_ - dirty_left_);
     auto offset = sizeof(T) * dirty_left_;
     dev_.flushMappedMemoryRanges(
       vk::MappedMemoryRange{.memory = stage_mem_, .offset = offset, .size = copy_size});
-    buf.copyBuffer(stage_buf_, dev_buf_, vk::BufferCopy{0, offset, copy_size});
-    return {};
+
+    tx_buf->copyBuffer(stage_buf_, dev_buf_, vk::BufferCopy{0, offset, copy_size});
+    transferBufferOwnership(
+      dev_buf_,
+      tx_buf,
+      work_buf,
+      vk::PipelineStageFlagBits2::eCopy,
+      stage,
+      vk::AccessFlagBits2::eTransferWrite,
+      access,
+      offset,
+      copy_size);
+    // TODO: don't transfer if the same queue is used for for transfer and compute
   }
   vk::Fence scheduleRead(vk::Fence fence, vk::CommandBuffer buf) {
     auto size = capacity_ * sizeof(T);
@@ -106,6 +119,32 @@ class GpuVector {
     dev_.invalidateMappedMemoryRanges(
       vk::MappedMemoryRange{.memory = stage_mem_, .offset = 0, .size = size});
     return {};
+  }
+
+  static inline void transferBufferOwnership(
+    vk::Buffer buf,
+    QueueRecorder &src,
+    QueueRecorder &dst,
+    vk::PipelineStageFlags2 src_stage,
+    vk::PipelineStageFlags2 dst_stage,
+    vk::AccessFlags2 src_access,
+    vk::AccessFlags2 dst_access,
+    vk::DeviceSize offset,
+    vk::DeviceSize size) {
+    vk::BufferMemoryBarrier2 barrier{
+      .srcStageMask = src_stage,
+      .srcAccessMask = src_access,
+      .srcQueueFamilyIndex = src.family(),
+      .dstQueueFamilyIndex = dst.family(),
+      .buffer = buf,
+      .offset = offset,
+      .size = size};
+    auto dep = vk::DependencyInfo{.bufferMemoryBarrierCount = 1, .pBufferMemoryBarriers = &barrier};
+    src->pipelineBarrier2(dep);
+    // SRC masks is just ignored by implementation, right?
+    barrier.setDstAccessMask(dst_access);
+    barrier.setDstStageMask(dst_stage);
+    dst->pipelineBarrier2(dep);
   }
 
   void invalidate() {
@@ -120,12 +159,20 @@ class GpuVector {
     dirty_right_ = std::max(dirty_right_, i + 1);
     return mapped_[i];
   }
+  const T &get(vk::DeviceSize i) const { return mapped_[i]; }
+  T &get(vk::DeviceSize i) {
+    dirty_left_ = std::min(dirty_left_, i);
+    dirty_right_ = std::max(dirty_right_, i + 1);
+    return mapped_[i];
+  }
   vk::Buffer getDeviceBuffer() const { return dev_buf_; }
 
  private:
   T *mapped_;
   vk::DeviceSize capacity_ = 0;
   vk::DeviceSize size_ = 0;
+  uint32_t tx_;
+  uint32_t exec_;
 
   vk::DeviceMemory stage_mem_;
   vk::Buffer stage_buf_;
@@ -133,7 +180,6 @@ class GpuVector {
   vk::Buffer dev_buf_;
 
   vk::Device dev_;
-  vk::Queue queue_;
   Allocator *alloc_;
 
   vk::DeviceSize dirty_left_;

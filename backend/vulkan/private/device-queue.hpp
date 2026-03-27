@@ -21,4 +21,15 @@ struct DeviceQueueInfo {
     dev.destroy();
   }
 };
+class QueueRecorder {
+ public:
+  QueueRecorder(vk::CommandBuffer buf, uint32_t family) : buf_(buf), family_(family) {}
+  uint32_t family() const { return family_; }
+  vk::CommandBuffer* operator*() { return &buf_; }
+  vk::CommandBuffer* operator->() { return &buf_; }
+
+ private:
+  vk::CommandBuffer buf_;
+  uint32_t family_;
+};
 }  // namespace strahl::vulkan::detail

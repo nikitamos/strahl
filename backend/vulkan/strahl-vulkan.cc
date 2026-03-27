@@ -20,7 +20,7 @@ VulkanBackend::VulkanBackend() : owns_instance_(true) {
   vk::ApplicationInfo app_info{
     .pApplicationName = "strahl",
     .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-    .apiVersion = vk::ApiVersion12,
+    .apiVersion = vk::ApiVersion13,
   };
   vk::InstanceCreateInfo ici{
     .pApplicationInfo = &app_info,

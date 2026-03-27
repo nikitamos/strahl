@@ -4,7 +4,9 @@
 #include <vulkan/vulkan.hpp>
 
 #include "private/device-queue.hpp"
+#include "private/gpu-vector.hpp"
 #include "private/shader-loader.hpp"
+#include "vulkan/vulkan.hpp"
 
 // NOLINTBEGIN
 struct DescriptorSet0Layout {
@@ -28,7 +30,11 @@ struct DescriptorSet0Layout {
 // NOLINTEND
 
 namespace strahl::vulkan {
-VulkanRenderer::VulkanRenderer(detail::DeviceQueueInfo *dqi) : dqi_(dqi) {
+VulkanRenderer::VulkanRenderer(detail::DeviceQueueInfo *dqi, detail::GpuVector *vec)
+  : dqi_(dqi), vec_(vec) {
+  vec_->get(0) = 13;
+  vec_->get(vec_->capacity() - 1) = 251;
+
   auto shader = detail::readShader("out.spv").value();
   vk::ShaderModuleCreateInfo smci{
     .codeSize = shader.size(),
@@ -36,6 +42,17 @@ VulkanRenderer::VulkanRenderer(detail::DeviceQueueInfo *dqi) : dqi_(dqi) {
   };
   auto module = dqi_->dev.createShaderModule(smci);
   createCommandPoolBufs();
+
+  vk::StructureChain<vk::SemaphoreCreateInfo, vk::SemaphoreTypeCreateInfo> sci{
+    {},
+    vk::SemaphoreTypeCreateInfo{
+      .semaphoreType = vk::SemaphoreType::eTimeline,
+      .initialValue = 1,
+    }};
+  com_end_ = dqi_->dev.createSemaphore(sci.get());
+  sci.get<vk::SemaphoreTypeCreateInfo>().initialValue = 0;
+  tx2com_ = dqi->dev.createSemaphore(sci.get());
+  dqi_->dev.signalSemaphore(vk::SemaphoreSignalInfo{.semaphore = com_end_, .value = count_});
 
   DescriptorSet0Layout l;
   auto dslci = l.CreateInfo();
@@ -58,6 +75,7 @@ VulkanRenderer::VulkanRenderer(detail::DeviceQueueInfo *dqi) : dqi_(dqi) {
 }
 
 void VulkanRenderer::doSomeRendering() {
+  // PRE-CONDITION: this->count_ == counter of tx2com_ == counter of com_end_
   vk::CommandBufferBeginInfo cbbi{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
   com_buffer_.begin(cbbi);
   tx_buffer_.begin(cbbi);
@@ -66,8 +84,33 @@ void VulkanRenderer::doSomeRendering() {
 
   tx_buffer_.end();
   com_buffer_.end();
-  vk::SubmitInfo si{.commandBufferCount = 1, .pCommandBuffers = &tx_buffer_};
-  dqi_->tx.submit(si);
+  uint64_t one = 1;
+  vk::PipelineStageFlags wait_dst = vk::PipelineStageFlagBits::eAllCommands;
+  vk::StructureChain<vk::SubmitInfo, vk::TimelineSemaphoreSubmitInfo> si{
+    vk::SubmitInfo{
+      .waitSemaphoreCount = 1,
+      .pWaitSemaphores = &com_end_,
+      .pWaitDstStageMask = &wait_dst,
+      .commandBufferCount = 1,
+      .pCommandBuffers = &tx_buffer_,
+      .signalSemaphoreCount = 1,
+      .pSignalSemaphores = &tx2com_,
+    },
+    vk::TimelineSemaphoreSubmitInfo{
+      .waitSemaphoreValueCount = 1,
+      .pWaitSemaphoreValues = &count_,
+      .signalSemaphoreValueCount = 1,
+      .pSignalSemaphoreValues = &one}};
+  dqi_->tx.submit(si.get());
+  count_ += 1;
+  // Swap wait and signal semaphores
+  // clang-format off
+  si.get() // How to make normal wrapping with clang-format?
+    .setPSignalSemaphores(&com_end_)
+    .setPWaitSemaphores(&tx2com_)
+    .setPCommandBuffers(&com_buffer_);
+  // clang-format on
+  dqi_->com.submit(si.get());
 }
 void VulkanRenderer::createCommandPoolBufs() {
   vk::CommandPoolCreateInfo cpci = {

@@ -1,19 +1,63 @@
 @startuml "Strahls Klassensdiagramm"
-package DTOs {
-    
-}
-
-package Abstractions {
-    interface BackendFactory {
+package VeryAbstractCore {
+    struct MeshCreateInfo {
+        TBD
+    }
+    class ResourceManager {
+        + CreateTexture(TextureCreateInfo* ci)
+        + CreateMaterial(MaterialCreateInfo* ci)
+        + CreateSphere(r)
+        + CreatePlane(normal)
+        + CreateMesh(MeshCreateInfo *ci)
+    }
+    class RayTracer {
+        + CreateScene()
+        + CreateSolver()
+        + GetResourceManager()
+    }
+    class SceneNode {
+        + Get/Set Rotation
+        + Get/Set Position
+    }
+    class Camera {}
+    class Geometry {
 
     }
-    interface BackendProvider {
-        + GetSceneGraph(): ISceneGraph
-        + GetRenderer(): IRenderer
+    class Body {}
+    SceneNode <|-- Body
+    SceneNode <|-- Camera
+    class Sphere {
+
     }
-    note "Concrete scene graph representation\nis an implementation detail" as n1
-    BackendProvider .. n1
-    
+    Body o-- "0..1" Geometry 
+    Body o-- "1" Material
+    class Plane {
+
+    }
+    class Mesh {
+
+    }
+    class Scene {
+        + AddCamera(): Camera*
+        + AddBody(Geometry*, Material*): Body*
+    }
+    Geometry <|-- Sphere
+    Geometry <|-- Plane
+    Geometry <|-- Mesh
+    class UVMap {
+
+    }
+    UVMap "0..1" -* Mesh
+    class Material {
+
+    }
+    class Solver {
+        + Render(Scene* s)
+    }
+    class Texture {
+        + Sample()
+    }
+    Material o- "0..*" Texture
 }
 
 @enduml

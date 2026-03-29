@@ -7,6 +7,7 @@ find_package(glm REQUIRED)
 add_subdirectory(abstractions)
 add_subdirectory(backend/cpu-raymarcher)
 add_subdirectory(backend/vulkan)
+add_subdirectory(backend/cpu)
 
 add_subdirectory(frontends/qt-gui)
 

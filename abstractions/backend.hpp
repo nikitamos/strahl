@@ -24,8 +24,13 @@ struct BackendOptions {
   int bounces = 2;
 };
 
+template <typename TScene>
+concept rt_scene = requires(TScene s) {
+  { s.AddSphere() } -> std::same_as<typename TScene::Sphere>;
+};
+
 template <typename TBackend, typename TScene>
-concept rt_backend = requires(TBackend b) {
+concept rt_backend = rt_scene<TScene> && requires(TBackend b) {
   { b.DoSomething() } -> std::same_as<TScene>;
 };
 
@@ -48,8 +53,7 @@ struct AbstractBackend {};
 template <typename TScene, rt_backend<TScene> TBackend>
 class BackendWrapper : public AbstractBackend {
  public:
-  BackendWrapper(TBackend &&backend)
-      : back_(std::make_unique(std::move(backend))) {}
+  BackendWrapper(TBackend &&backend) : back_(std::make_unique(std::move(backend))) {}
 
  private:
   std::unique_ptr<TBackend> back_;

@@ -26,16 +26,15 @@ int main(int argc, char **argv) {
   std::cout << "Strahl CLI\n"
             << "==========\n";
   auto back = CpuRaymarcherBackend();
-  auto *left = new Plane({0, 3, 0}, {1, -1, 0}, {{1.0, 0.0, 0.0}, 1, 0}),
+  auto *left = new Plane({0, 3, 0}, {1, -1, 0}, {{1.0, 0.0, 0.0}, 0.1, 0.9}),
        *right = new Plane({0, 3, 0}, {-1, -1, 0}, {{0.0, 1.0, 0.0}}),
-       *bottom = new Plane({0, 0, -2.0}, {0, 0, 1},
-                           {{1.0, 1.0, 1.0}, 0.8, 0.2, 0.0, 1.0});
-  auto *sphere = new Sphere({0, 1.5, 0}, 0.5, {{0.0, 0.0, 1.0}});
+       *bottom = new Plane({0, 0, -2.0}, {0, 0, 1}, {{1.0, 1.0, 1.0}, 0.3, 0.7, 0.0, 1.0});
+  auto *sphere = new Sphere({0, 1.5, 0}, 0.5, {{0.0, 0.0, 1.0}, 0.8, 0.2});
   CompositionNode composite{left, right, sphere, bottom};
   back.SetRoot(&composite);
   auto &opts = back.GetOptions();
-  opts.resolution = {1920, 1080};
-  opts.bounces = 16;
+  opts.resolution = {480, 360};
+  opts.bounces = 3;
 
   auto res = back.Render();
 

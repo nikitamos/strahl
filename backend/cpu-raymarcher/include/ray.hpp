@@ -28,16 +28,15 @@ public:
   glm::vec3 GetColor() const { return color_; }
 
 private:
-  void Reflect(glm::vec3 normal);
-  void MixColor(Material m, glm::vec3 light_dir, glm::vec3 eye,
-                glm::vec3 normal);
+ glm::vec3 Reflect(glm::vec3 normal, const Material &m) const;
+ void MixColor(Material m, glm::vec3 light_dir, glm::vec3 eye, glm::vec3 normal);
 
-  glm::vec3 cur_pos_;
-  glm::vec3 direction_;
-  glm::vec3 color_;
-  int bounces_ = 0;
-  float multiple_ = 1.0;
-  glm::vec3 cur_specular_;
-  const CpuRaymarcherBackendOptions &opts_;
+ glm::vec3 cur_pos_;
+ glm::vec3 direction_;
+ glm::vec3 color_;
+ int bounces_ = 0;
+ float multiple_ = 1.0;
+ glm::vec3 cur_specular_;
+ const CpuRaymarcherBackendOptions &opts_;
 };
 } // namespace strahl::cpu_raymarcher

@@ -6,6 +6,7 @@
 namespace strahl::cpu_raymarcher {
 struct CpuRaymarcherBackendOptions : BackendOptions {
     float epsilon = 1E-4;
+    int per_pixel_sample = 16;
     glm::vec3 camera = {1, 0, 0};
     glm::vec3 screen = {-1, 1.5, 0};
     glm::vec3 screen_right = {2, 1.5, 0};

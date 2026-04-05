@@ -1,5 +1,8 @@
 {
     "cSpell.words": [
+        "BSDF",
+        "Lambertian",
+        "raygen",
         "Raymarcher",
         "strahl"
     ]

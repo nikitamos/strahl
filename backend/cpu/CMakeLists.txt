@@ -1,4 +1,5 @@
 add_library(strahl_cpu SHARED
+    bsdf/lambertian.cc
     cpu-raytracer.cc
     geometry.cc
     material.cc

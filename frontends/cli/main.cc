@@ -19,17 +19,14 @@
 #include "rm-scene.hpp"
 
 // using namespace strahl;
-using namespace strahl::cpu_raymarcher;
 namespace gil = boost::gil;
 
-int main(int argc, char **argv) {
-  std::cout << "Strahl CLI\n"
-            << "==========\n";
+static void raymarch() {
+  using namespace strahl::cpu_raymarcher;
   auto back = CpuRaymarcherBackend();
-  auto *left = new Plane({0, 3, 0}, {1, -1, 0}, {{1.0, 0.0, 0.0}, 1, 0}),
-       *right = new Plane({0, 3, 0}, {-1, -1, 0}, {{0.0, 1.0, 0.0}}),
-       *bottom = new Plane({0, 0, -2.0}, {0, 0, 1},
-                           {{1.0, 1.0, 1.0}, 0.8, 0.2, 0.0, 1.0});
+  auto *left = new Plane({0, 3, 0}, {1, -1, 0}, {{1.0, 0.0, 0.0}, 1, 0});
+  auto *right = new Plane({0, 3, 0}, {-1, -1, 0}, {{0.0, 1.0, 0.0}});
+  auto *bottom = new Plane({0, 0, -2.0}, {0, 0, 1}, {{1.0, 1.0, 1.0}, 0.8, 0.2, 0.0, 1.0});
   auto *sphere = new Sphere({0, 1.5, 0}, 0.5, {{0.0, 0.0, 1.0}});
   CompositionNode composite{left, right, sphere, bottom};
   back.SetRoot(&composite);
@@ -39,6 +36,7 @@ int main(int argc, char **argv) {
 
   auto res = back.Render();
 
+  // NOLINTBEGIN
   gil::rgb32f_view_t data_view =
       gil::interleaved_view(opts.resolution.x, opts.resolution.y,
                             (gil::rgb32f_pixel_t *)res.image.data(),
@@ -52,4 +50,11 @@ int main(int argc, char **argv) {
                              x.at(std::integral_constant<int, 2>{}) * 255);
   });
   gil::write_view("render-boost.png", transformed_view, boost::gil::png_tag{});
+  // NOLINTEND
+}
+
+int main(int /*argc*/, char ** /*argv*/) {
+  std::cout << "Strahl CLI\n"
+            << "==========\n";
+  //
 }

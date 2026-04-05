@@ -1,4 +1,3 @@
-#pragma once
 #include "include/cpu-raytracer.hpp"
 
 namespace strahl::cpu {

@@ -1,0 +1,12 @@
+[package]
+name = "node"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = {version ="1.0.106"}
+quote = { version = "1.0.45" }
+syn = "2.0.117"

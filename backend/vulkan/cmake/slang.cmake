@@ -20,7 +20,7 @@ endfunction()
 # * PROFILE = <none> (profile for code generation (glsl_xxx, sm_x_x); may be required by some targets)
 function (add_slang_shader OUTPUT)
   # Check that slangc is present
-  set(SLANGC_EXECUTABLE "/usr/bin/slangc")
+  set(SLANGC_EXECUTABLE "/usr/local/bin/slangc")
   get_filename_component(TARGET_NAME ${OUTPUT} NAME_WLE)
 
   if (NOT DEFINED DEFAULT_SLANG_SHADER_TARGET)

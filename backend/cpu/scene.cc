@@ -1,5 +1,5 @@
 #include <scene.hpp>
 
-namespace strahl::cpu {
+#include "nodes.hpp"
 
-}
+namespace strahl::cpu {}

@@ -1,5 +1,8 @@
 #include "include/nodes.hpp"
 
+#include "detail/ray.hpp"
+#include "path.hpp"
+
 namespace strahl::cpu {
 std::span<detail::Ray> Camera::initRays() {
   if (!rays_.empty()) {
@@ -28,5 +31,11 @@ std::span<detail::Ray> Camera::initRays() {
   // <--- Raygen logic ends here
 
   return rays_;
+}
+std::optional<RayHit> Body::intersect(const detail::Ray &r) {
+  auto origin = world2local(r.origin);
+  auto local_ray = detail::Ray{origin, r.direction};
+  return geometry_->intersect(local_ray).transform(
+    [this](glm::vec3 isect) { return RayHit{&material_, geom2local(isect)}; });
 }
 }  // namespace strahl::cpu

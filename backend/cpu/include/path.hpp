@@ -5,11 +5,12 @@
 
 #include "detail/ray.hpp"
 #include "material.hpp"
-#include "nodes.hpp"
 
 namespace strahl::cpu {
-struct Interaction {
-  const Material& surface;
+class SceneNode;
+struct RayHit {
+  const Material* surface;
+  glm::vec3 point;  // Intersection point, in coordinates local to body
 };
 class Path {};
 

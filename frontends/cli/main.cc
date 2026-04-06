@@ -15,6 +15,7 @@
 #include <glm/glm.hpp>
 #include <type_traits>
 
+#include "../backend/cpu/include/scene.hpp"
 #include "raymarcher.hpp"
 #include "rm-scene.hpp"
 
@@ -51,6 +52,11 @@ static void raymarch() {
   });
   gil::write_view("render-boost.png", transformed_view, boost::gil::png_tag{});
   // NOLINTEND
+}
+
+static void f(strahl::cpu::Scene *s) {
+  auto *c = s->addCamera(
+    glm::vec<2, size_t>{600, 400}, glm::normalize(glm::vec3{-1, 1.5, 0}), glm::vec3{0, 1.0, 1.0});
 }
 
 int main(int /*argc*/, char ** /*argv*/) {

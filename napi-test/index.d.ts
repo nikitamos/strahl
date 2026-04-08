@@ -7,4 +7,10 @@ export declare class Hello {
   aaa(): void
 }
 
+export declare class StrahlState {
+
+}
+
 export declare function plus100(input: number): Hello
+
+export declare function wgpuInit(): Promise<StrahlState>

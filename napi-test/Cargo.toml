@@ -9,9 +9,12 @@ version = "0.1.0"
 crate-type = ["cdylib"]
 
 [dependencies]
-napi = "3.0.0"
+anyhow = "1.0.102"
+ash = "0.38.0"
+napi = {version="3.0.0",features = ["async"]}
 napi-derive = "3.0.0"
 node = {path = "../node"}
+wgpu = "29.0.1"
 
 [build-dependencies]
 napi-build = "2"

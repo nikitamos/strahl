@@ -1,10 +1,22 @@
 #![deny(clippy::all)]
 #![feature(try_blocks)]
+#![allow(dead_code)]
 
-use std::ptr::NonNull;
+use std::{
+  io::{Seek, Write},
+  os::{fd::AsRawFd, raw::c_uint},
+};
 
 use ash::vk;
 use napi_derive::napi;
+use nix::{
+  fcntl::OFlag,
+  sys::{
+    memfd::{memfd_create, MFdFlags},
+    mman,
+    stat::Mode,
+  },
+};
 use wgpu::hal::vulkan as wgvk;
 
 // mod texture_infos;
@@ -127,4 +139,45 @@ pub async fn wgpu_init() -> napi::Result<StrahlState> {
     StrahlState { i: instance }
   };
   r.map_err(|x| napi::Error::from_reason(x.to_string()))
+}
+
+#[napi]
+struct TexWrapper {
+  fd: std::os::fd::OwnedFd,
+  pub width: i32,
+  pub height: i32,
+}
+
+#[napi]
+impl TexWrapper {
+  #[napi(constructor)]
+  pub fn new() -> napi::Result<TexWrapper> {
+    let r: anyhow::Result<TexWrapper> = try {
+      println!(
+        "Rust PID: {} {}",
+        nix::unistd::gettid(),
+        nix::unistd::getpid()
+      );
+      let fd = memfd_create("name", MFdFlags::empty())?;
+      let mut f = std::fs::File::from(fd);
+      f.write(&[0xFF000088u32.to_be_bytes(); 400].as_flattened())?;
+      f.flush()?;
+      f.rewind()?;
+      TexWrapper {
+        fd: f.into(),
+        width: 20,
+        height: 20,
+      }
+    };
+    r.map_err(|err| napi::Error::from_reason(err.to_string()))
+  }
+  #[napi]
+  pub fn fd(&self) -> i32 {
+    self.fd.as_raw_fd()
+  }
+}
+
+#[napi]
+fn new_tex_wrapper() -> napi::Result<TexWrapper> {
+  TexWrapper::new()
 }

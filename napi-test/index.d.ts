@@ -11,6 +11,15 @@ export declare class StrahlState {
 
 }
 
+export declare class TexWrapper {
+  width: number
+  height: number
+  constructor()
+  fd(): number
+}
+
+export declare function newTexWrapper(): TexWrapper
+
 export declare function plus100(input: number): Hello
 
 export declare function wgpuInit(): Promise<StrahlState>

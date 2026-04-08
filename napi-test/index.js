@@ -578,5 +578,7 @@ if (!nativeBinding) {
 module.exports = nativeBinding
 module.exports.Hello = nativeBinding.Hello
 module.exports.StrahlState = nativeBinding.StrahlState
+module.exports.TexWrapper = nativeBinding.TexWrapper
+module.exports.newTexWrapper = nativeBinding.newTexWrapper
 module.exports.plus100 = nativeBinding.plus100
 module.exports.wgpuInit = nativeBinding.wgpuInit

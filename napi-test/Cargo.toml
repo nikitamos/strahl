@@ -13,6 +13,7 @@ anyhow = "1.0.102"
 ash = "0.38.0"
 napi = {version="3.0.0",features = ["async"]}
 napi-derive = "3.0.0"
+nix = { version = "0.31.2", features = ["mman", "fs", "process"] }
 node = {path = "../node"}
 wgpu = "29.0.1"
 

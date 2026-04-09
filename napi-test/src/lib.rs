@@ -2,21 +2,11 @@
 #![feature(try_blocks)]
 #![allow(dead_code)]
 
-use std::{
-  io::{Seek, Write},
-  os::{fd::AsRawFd, raw::c_uint},
-};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use ash::vk;
+use napi::bindgen_prelude::Uint8ArraySlice;
 use napi_derive::napi;
-use nix::{
-  fcntl::OFlag,
-  sys::{
-    memfd::{memfd_create, MFdFlags},
-    mman,
-    stat::Mode,
-  },
-};
 use wgpu::hal::vulkan as wgvk;
 
 // mod texture_infos;
@@ -142,42 +132,66 @@ pub async fn wgpu_init() -> napi::Result<StrahlState> {
 }
 
 #[napi]
-struct TexWrapper {
-  fd: std::os::fd::OwnedFd,
-  pub width: i32,
-  pub height: i32,
+struct CpuSwapchain {
+  buf: Vec<u8>,
+  used_blocks: AtomicU32,
+  pub width: u32,
+  pub height: u32,
+  pub channels: u32,
 }
 
 #[napi]
-impl TexWrapper {
+impl CpuSwapchain {
   #[napi(constructor)]
-  pub fn new() -> napi::Result<TexWrapper> {
-    let r: anyhow::Result<TexWrapper> = try {
-      println!(
-        "Rust PID: {} {}",
-        nix::unistd::gettid(),
-        nix::unistd::getpid()
-      );
-      let fd = memfd_create("name", MFdFlags::empty())?;
-      let mut f = std::fs::File::from(fd);
-      f.write(&[0xFF000088u32.to_be_bytes(); 400].as_flattened())?;
-      f.flush()?;
-      f.rewind()?;
-      TexWrapper {
-        fd: f.into(),
-        width: 20,
-        height: 20,
+  pub fn new() -> napi::Result<Self> {
+    let r: anyhow::Result<Self> = try {
+      let w = 20;
+      let h = 20;
+      let n = 1;
+      let c = 4;
+      let buf = vec![0xFF000088u32.to_be_bytes(); c * h * w * n].into_flattened();
+      Self {
+        buf,
+        used_blocks: AtomicU32::new(0),
+        width: w as u32,
+        height: h as u32,
+        channels: c as u32,
       }
     };
     r.map_err(|err| napi::Error::from_reason(err.to_string()))
   }
   #[napi]
-  pub fn fd(&self) -> i32 {
-    self.fd.as_raw_fd()
+  pub fn acquire_next_texture<'env>(
+    &'env mut self,
+    env: &'env napi::Env,
+  ) -> napi::Result<Uint8ArraySlice<'env>> {
+    if self.used_blocks.load(Ordering::Relaxed).count_ones() > 0 {
+      Err(napi::Error::from_reason("no free texture in the swapchain"))
+    } else {
+      self.used_blocks.fetch_and(0x01, Ordering::Acquire);
+      let tex_size = (self.width * self.height * self.channels) as usize;
+      let offset = 0 * tex_size;
+      let res = &mut self.buf[offset..(offset + tex_size)];
+
+      // SAFETY: for now, at most one such reference is allowed
+      unsafe {
+        Uint8ArraySlice::from_external(
+          env,
+          res.as_mut_ptr(),
+          res.len(),
+          (&self.used_blocks, 1),
+          |_, (blocks, blkid)| {
+            println!("slice freed");
+            blocks.fetch_and(!(0x01 << blkid), Ordering::Release);
+          },
+        )
+      }
+    }
   }
 }
 
 #[napi]
-fn new_tex_wrapper() -> napi::Result<TexWrapper> {
-  TexWrapper::new()
+#[deprecated(note = "Use constructor")]
+fn new_tex_wrapper() -> napi::Result<CpuSwapchain> {
+  CpuSwapchain::new()
 }

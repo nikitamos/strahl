@@ -4,6 +4,7 @@
         "Lambertian",
         "raygen",
         "Raymarcher",
-        "strahl"
+        "strahl",
+        "Swapchain"
     ]
 }

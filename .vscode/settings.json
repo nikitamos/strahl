@@ -1,6 +1,7 @@
 {
     "cSpell.words": [
         "BSDF",
+        "downcasting",
         "Lambertian",
         "raygen",
         "Raymarcher",

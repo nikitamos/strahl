@@ -5,11 +5,15 @@ use crate::{Castable, PointGlobal};
 /// Represents a ray with an origin and direction.
 #[derive(Debug, Clone, Default)]
 pub struct CameraRay {
-  origin:    Vec3,
+  origin:    PointGlobal,
   direction: Vec3,
 }
 
-impl Castable for CameraRay {}
+impl Castable for CameraRay {
+  fn pos(&self) -> PointGlobal { self.origin }
+
+  fn direction(&self) -> glam::Vec3 { self.direction.into() }
+}
 
 /// Camera type enumeration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,7 +82,7 @@ impl Camera {
         let point = top_left + (i as f32) * x_step + (j as f32) * y_step;
         let ray_direction = (point - cam_pos).normalize();
         self.rays.push(CameraRay {
-          origin:    point,
+          origin:    point.into(),
           direction: ray_direction,
         });
       }

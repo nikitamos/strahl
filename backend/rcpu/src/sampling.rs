@@ -18,3 +18,8 @@ impl<T, M> Sample<T, M> {
     }
   }
 }
+
+// TODO: determine scope of the trait
+trait Samplable<S> {
+  fn sample(&self, ctx: SampleState) -> Sample<S>;
+}

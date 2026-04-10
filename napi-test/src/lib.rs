@@ -5,61 +5,17 @@
 use core::slice;
 use std::{
   mem::ManuallyDrop,
-  ptr,
   sync::atomic::{AtomicU32, Ordering},
 };
 
-use ash::vk::{self, SampleCountFlags};
+use ash::vk;
 use napi::bindgen_prelude::Uint8ArraySlice;
 use napi_derive::napi;
-use wgpu::{
-  hal::{vulkan as wgvk, Device},
-  TextureDescriptor,
-};
+use wgpu::hal::vulkan as wgvk;
 
 use crate::gpu_alloc::Allocator;
 
-mod framebuffer;
 pub(crate) mod gpu_alloc;
-
-// mod texture_infos;
-
-// #[cfg_attr(feature = "node", napi)]
-#[napi]
-pub struct Hello {
-  pub x: u32,
-  pub path: String,
-}
-
-#[napi]
-impl Hello {
-  // #[node_export(constructor)]
-  #[napi(constructor)]
-  pub fn new(x: u32) -> Self {
-    Hello {
-      x,
-      path: "asdfasdf".to_string(),
-    }
-  }
-}
-
-#[napi]
-impl Hello {
-  #[napi]
-  pub fn aaa(&self) {}
-}
-
-#[napi]
-pub fn plus_100(input: u32) -> napi::Result<Hello> {
-  Ok(Hello {
-    x: input + 100,
-    path: std::env::current_dir()
-      .map_err(|a| napi::Error::from_reason(a.to_string()))?
-      .into_os_string()
-      .into_string()
-      .map_err(|_| napi::Error::from_reason("failed to convert path"))?,
-  })
-}
 
 #[napi]
 pub struct StrahlState {
@@ -75,7 +31,6 @@ impl Drop for StrahlState {
     unsafe {
       ManuallyDrop::drop(&mut self.raw_state);
     }
-    println!("strahl dies.");
   }
 }
 
@@ -95,10 +50,9 @@ pub async fn wgpu_init() -> napi::Result<StrahlState> {
           display: desc
             .display
             .as_ref()
-            .map(|dh| dh.display_handle().ok())
-            .flatten(),
+            .and_then(|dh| dh.display_handle().ok()),
         },
-        Some(Box::new(|opts| {})),
+        Some(Box::new(|_opts| {})),
       )?)
     };
 
@@ -193,7 +147,7 @@ async unsafe fn raw_wgpu_setup(
   let reqs = dq.device.raw_device().get_image_memory_requirements(img);
   let allocation = alloc
     .allocate(
-      reqs.size as u64,
+      reqs.size,
       vk::MemoryPropertyFlags::HOST_COHERENT,
       reqs.memory_type_bits,
       None::<&mut vk::DedicatedAllocationMemoryAllocateInfoNV>,
@@ -202,7 +156,7 @@ async unsafe fn raw_wgpu_setup(
   let mapped = dq
     .device
     .raw_device()
-    .map_memory(allocation, 0, reqs.size as u64, vk::MemoryMapFlags::empty())
+    .map_memory(allocation, 0, reqs.size, vk::MemoryMapFlags::empty())
     .unwrap()
     .cast();
 
@@ -299,10 +253,4 @@ impl CpuSwapchain {
       }
     }
   }
-}
-
-#[napi]
-#[deprecated(note = "Use constructor")]
-fn new_tex_wrapper() -> napi::Result<CpuSwapchain> {
-  CpuSwapchain::new()
 }

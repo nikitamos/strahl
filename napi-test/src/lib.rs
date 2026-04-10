@@ -2,12 +2,25 @@
 #![feature(try_blocks)]
 #![allow(dead_code)]
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use core::slice;
+use std::{
+  mem::ManuallyDrop,
+  ptr,
+  sync::atomic::{AtomicU32, Ordering},
+};
 
-use ash::vk;
+use ash::vk::{self, SampleCountFlags};
 use napi::bindgen_prelude::Uint8ArraySlice;
 use napi_derive::napi;
-use wgpu::hal::vulkan as wgvk;
+use wgpu::{
+  hal::{vulkan as wgvk, Device},
+  TextureDescriptor,
+};
+
+use crate::gpu_alloc::Allocator;
+
+mod framebuffer;
+pub(crate) mod gpu_alloc;
 
 // mod texture_infos;
 
@@ -51,18 +64,17 @@ pub fn plus_100(input: u32) -> napi::Result<Hello> {
 #[napi]
 pub struct StrahlState {
   i: wgpu::Instance,
-}
-
-pub trait From2<F, T> {
-  fn from(value: F) -> T;
-  // fn _inexistent() -> U
-  // where
-  //   Self: Sized;
+  dev: wgpu::Device,
+  queue: wgpu::Queue,
+  raw_state: ManuallyDrop<RawState>,
 }
 
 #[napi]
 impl Drop for StrahlState {
   fn drop(&mut self) {
+    unsafe {
+      ManuallyDrop::drop(&mut self.raw_state);
+    }
     println!("strahl dies.");
   }
 }
@@ -99,7 +111,7 @@ pub async fn wgpu_init() -> napi::Result<StrahlState> {
     let dev_desc = wgpu::DeviceDescriptor {
       ..Default::default()
     };
-    let (d, q) = unsafe {
+    let (raw, (dev, queue)) = unsafe {
       let i = instance.as_hal::<wgvk::Api>().unwrap();
       let hal_adapter = adapter.as_hal::<wgvk::Api>().unwrap();
       let phy = hal_adapter.raw_physical_device();
@@ -123,12 +135,110 @@ pub async fn wgpu_init() -> napi::Result<StrahlState> {
           opts.extensions.push(vk::EXT_EXTERNAL_MEMORY_DMA_BUF_NAME);
         })),
       )?;
-      adapter.create_device_from_hal(dq, &dev_desc)?
+      (
+        raw_wgpu_setup(i.shared_instance(), &dq, phy).await,
+        adapter.create_device_from_hal(dq, &dev_desc)?,
+      )
     };
 
-    StrahlState { i: instance }
+    // On wgpu shutdown device is dropped earlier than callback is called for some reason
+    StrahlState {
+      i: instance,
+      raw_state: ManuallyDrop::new(raw),
+      dev,
+      queue,
+    }
   };
   r.map_err(|x| napi::Error::from_reason(x.to_string()))
+}
+
+struct RawState {
+  swapchain: wgvk::Texture,
+  mapped: &'static [u8], // this is bad and unsound. must be rewritten somehow
+}
+
+// TODO: replace unwraps with proper error handling
+async unsafe fn raw_wgpu_setup(
+  instance: &wgvk::InstanceShared,
+  dq: &wgpu::hal::OpenDevice<wgvk::Api>,
+  phy: vk::PhysicalDevice,
+) -> RawState {
+  let extent = vk::Extent3D {
+    width: 1024,
+    height: 1024,
+    depth: 1,
+  };
+  let alloc = Allocator::new(phy, dq.device.raw_device(), instance.raw_instance());
+  let img = dq
+    .device
+    .raw_device()
+    .create_image(
+      &vk::ImageCreateInfo::default()
+        .array_layers(1) // Vulkan implementation must support at least 256 array layers
+        .extent(extent)
+        .flags(vk::ImageCreateFlags::ALIAS)
+        .format(vk::Format::R8G8B8A8_UINT)
+        .image_type(vk::ImageType::TYPE_2D)
+        .initial_layout(vk::ImageLayout::UNDEFINED)
+        .mip_levels(1)
+        .queue_family_indices(&[dq.device.queue_family_index()])
+        .samples(vk::SampleCountFlags::TYPE_1) // That's for multisampling, we don't use it (now)
+        .sharing_mode(vk::SharingMode::EXCLUSIVE)
+        .tiling(vk::ImageTiling::LINEAR) // Linear tiling for predictable memory layout
+        .usage(vk::ImageUsageFlags::TRANSFER_DST),
+      None,
+    )
+    .unwrap();
+  // TODO: proper offset/size calculation
+  let reqs = dq.device.raw_device().get_image_memory_requirements(img);
+  let allocation = alloc
+    .allocate(
+      reqs.size as u64,
+      vk::MemoryPropertyFlags::HOST_COHERENT,
+      reqs.memory_type_bits,
+      None::<&mut vk::DedicatedAllocationMemoryAllocateInfoNV>,
+    )
+    .unwrap(); // TODO: fallback to manual flushing
+  let mapped = dq
+    .device
+    .raw_device()
+    .map_memory(allocation, 0, reqs.size as u64, vk::MemoryMapFlags::empty())
+    .unwrap()
+    .cast();
+
+  let mapped = slice::from_raw_parts(mapped, reqs.size as usize);
+
+  dq.device
+    .raw_device()
+    .bind_image_memory(img, allocation, 0)
+    .unwrap();
+  let vk_device = dq.device.raw_device().clone();
+  let swapchain = dq.device.texture_from_raw(
+    img,
+    &wgpu::hal::TextureDescriptor {
+      label: Some("framebuffer"),
+      size: wgpu::Extent3d {
+        width: extent.width,
+        height: extent.height,
+        depth_or_array_layers: 1,
+      },
+      mip_level_count: 1,
+      sample_count: 1,
+      dimension: wgpu::TextureDimension::D2,
+      format: wgpu::TextureFormat::Rgba8Uint,
+      usage: wgpu::TextureUses::COPY_DST | wgpu::TextureUses::UNINITIALIZED,
+      view_formats: vec![],
+      memory_flags: wgpu::hal::MemoryFlags::PREFER_COHERENT, // I don't know what it exactly means, but it seems to be right
+    },
+    Some(Box::new(move || {
+      println!("drop callback!");
+      vk_device.unmap_memory(allocation);
+      vk_device.destroy_image(img, None);
+      vk_device.free_memory(allocation, None);
+    })),
+    wgvk::TextureMemory::External,
+  );
+  RawState { swapchain, mapped }
 }
 
 #[napi]
@@ -172,6 +282,7 @@ impl CpuSwapchain {
       let tex_size = (self.width * self.height * self.channels) as usize;
       let offset = 0 * tex_size;
       let res = &mut self.buf[offset..(offset + tex_size)];
+      let ptr = res.as_ptr();
 
       // SAFETY: for now, at most one such reference is allowed
       unsafe {
@@ -181,7 +292,7 @@ impl CpuSwapchain {
           res.len(),
           (&self.used_blocks, 1),
           |_, (blocks, blkid)| {
-            println!("slice freed");
+            println!("slice freed {}", ptr.add(1).read());
             blocks.fetch_and(!(0x01 << blkid), Ordering::Release);
           },
         )

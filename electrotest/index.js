@@ -1,4 +1,4 @@
-const { TexWrapper, newTexWrapper, CpuSwapchain } = require('napi-test')
+const { TexWrapper, newTexWrapper, CpuSwapchain, wgpuInit } = require('../napi-test/napi-test.node')
 const { app, BrowserWindow } = require('electron/main')
 const { sharedTexture } = require('electron/common')
 const { ipcMain } = require('electron')
@@ -8,6 +8,8 @@ async function getTexture() {
   try {
     let sc = new CpuSwapchain()
     let tex = sc.acquireNextTexture()
+    let g = await wgpuInit();
+    // g.
     // let tw = newTexWrapper()
     // let tex = sharedTexture.importSharedTexture(
     //   {

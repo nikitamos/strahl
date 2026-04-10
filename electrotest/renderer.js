@@ -4,6 +4,15 @@ document.getElementById("spam").innerText = "x";
 
 async function doStuff() {
     let tex = new Uint8ClampedArray((await eapi.acquireTexture()).buffer);
+    tex[1] = 255;
+    tex[5] = 255;
+    tex[9] = 255;
+    tex[13] = 255;
+    tex[17] = 255;
+    tex[21] = 255;
+    tex[25] = 255;
+    tex[29] = 255;
+
     const width = 20;
     const height = tex.length / (width * 4);
 

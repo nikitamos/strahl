@@ -1,14 +1,12 @@
 #![feature(assert_matches)]
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 mod points;
 use glam::{Mat4, Quat, USizeVec2, Vec3};
 pub use points::*;
 mod sampling;
-use rayon::iter::{
-  IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
-};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 pub use sampling::*;
 mod geometry;
 pub use geometry::*;
@@ -68,11 +66,11 @@ impl Solver {
       .iter()
       .filter_map(|b| {
         let ctx = IntersectionContext {
-          g2l: b.w2l_matrix(),
+            transform: b.transform(),
         };
         b.geometry
           .try_intersect(ctx, r)
-          .map(|hit| Interaction { hit, body: b })
+          .map(|hit| Interaction { body: b, hit })
       })
       .min_by(|a, b| a.hit.ray_distance.partial_cmp(&b.hit.ray_distance).unwrap())
   }
@@ -88,16 +86,17 @@ impl Material for Lambertian {}
 
 /// Represents a castable ray, usually originating from camera or light source.
 pub trait Castable {
-  /// Current position in global coordinates
+  /// Current position
   fn pos(&self) -> PointGlobal;
-  /// Current direction in **global** coordinates
-  fn direction(&self) -> glam::Vec3;
+  /// Current direction
+  fn direction(&self) -> VecGlobal;
 }
 #[derive(Debug)]
 pub struct SurfaceHit {
   pub point:        PointLocal,
   pub normal:       Vec3,
   pub ray_distance: f32,
+  pub transform:    Transform,
 }
 
 pub struct Interaction<'a> {
@@ -106,7 +105,31 @@ pub struct Interaction<'a> {
 }
 
 pub struct IntersectionContext {
-  g2l: glam::Mat4,
+  transform: Transform,
+}
+
+/// Transformation of coordinates
+#[non_exhaustive]
+#[derive(Clone, Debug)]
+pub struct Transform {
+  /// Transformation of world coordinates to local
+  pub w2l: Mat4,
+  /// Transformation of local coordinates to local
+  pub l2w: Mat4,
+}
+
+impl Transform {
+  /// Constructs Self from world-to-local transformation
+  pub fn from_w2l(w2l: Mat4) -> Self {
+    Self {
+      w2l,
+      l2w: w2l.inverse(),
+    }
+  }
+  pub fn p2world(&self, l: PointLocal) -> PointGlobal { self.l2w.transform_point3(l.into()).into() }
+  pub fn v2world(&self, l: VecLocal) -> VecGlobal { self.l2w.transform_vector3(l.into()).into() }
+  pub fn p2local(&self, g: PointGlobal) -> PointLocal { self.w2l.transform_point3(g.into()).into() }
+  pub fn v2local(&self, g: VecGlobal) -> VecLocal { self.w2l.transform_vector3(g.into()).into() }
 }
 
 // #[derive(Default)]
@@ -128,6 +151,13 @@ impl Body {
   }
   /// Returns matrix representing transform from local coordinates to world
   pub fn l2w_matrix(&self) -> Mat4 { self.w2l_matrix().inverse() }
+  /// Returns [`Transform`] that maps between local and world coordinates
+  pub fn transform(&self) -> Transform {
+    Transform {
+      w2l: self.w2l_matrix(),
+      l2w: self.l2w_matrix(),
+    }
+  }
 }
 
 /// For now each point of the source emits light in direction normal

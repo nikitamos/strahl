@@ -8,7 +8,7 @@ use crate::{
 
 pub trait Geometry: Sync + Send {
   fn sample_point(&self, state: SampleState) -> Sample<PointLocal>;
-  fn try_intersect(&self, ctx: IntersectionContext, ray: &dyn Castable) -> Option<SurfaceHit>;
+  fn try_intersect<'a>(&self, ctx: IntersectionContext, ray: &dyn Castable) -> Option<SurfaceHit>;
 }
 
 pub struct Sphere {
@@ -18,9 +18,8 @@ impl Geometry for Sphere {
   fn sample_point(&self, state: SampleState) -> Sample<PointLocal> { todo!() }
 
   fn try_intersect(&self, ctx: IntersectionContext, ray: &dyn Castable) -> Option<SurfaceHit> {
-    println!("try-isect");
-    let oc: Vec3 = ray.pos().into_local(ctx.g2l).into(); // Since sphere is at origin
-    let direction = ctx.g2l.transform_vector3(ray.direction());
+    let oc: Vec3 = ctx.transform.p2local(ray.pos()).into();
+    let direction: Vec3 = ctx.transform.v2local(ray.direction()).into();
 
     let a = direction.length_squared();
     let b = 2.0 * oc.dot(direction);
@@ -51,6 +50,7 @@ impl Geometry for Sphere {
       point:        intersection.into(),
       normal:       (intersection).normalize(),
       ray_distance: t,
+      transform:    ctx.transform,
     })
   }
 }

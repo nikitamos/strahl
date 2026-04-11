@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-use crate::{Castable, PointGlobal};
+use crate::{Castable, PointGlobal, VecGlobal};
 
 struct TestRay {
   origin: PointGlobal,
@@ -10,7 +10,7 @@ struct TestRay {
 impl Castable for TestRay {
   fn pos(&self) -> PointGlobal { self.origin }
 
-  fn direction(&self) -> glam::Vec3 { self.dir }
+  fn direction(&self) -> VecGlobal { self.dir.into() }
 }
 
 mod sphere {
@@ -18,9 +18,7 @@ mod sphere {
 
   use glam::{Mat4, Vec3, Vec4};
 
-  use crate::{
-    Geometry, PointLocal, Sphere, SurfaceHit, camera::CameraRay, test::geometry::TestRay,
-  };
+  use crate::{Geometry, PointLocal, Sphere, SurfaceHit, Transform, test::geometry::TestRay};
 
   #[test]
   fn direct_origin_collision() {
@@ -31,7 +29,7 @@ mod sphere {
     };
     let isect = s.try_intersect(
       crate::IntersectionContext {
-        g2l: Mat4::IDENTITY,
+        transform: Transform::from_w2l(Mat4::IDENTITY)
       },
       &ray,
     );
@@ -55,7 +53,7 @@ mod sphere {
     };
     let isect = s.try_intersect(
       crate::IntersectionContext {
-        g2l: Mat4::IDENTITY,
+        transform: Transform::from_w2l(Mat4::IDENTITY)
       },
       &ray,
     );
@@ -70,7 +68,7 @@ mod sphere {
     };
     let isect = s.try_intersect(
       crate::IntersectionContext {
-        g2l: Mat4::from_translation(Vec3::Y),
+        transform: Transform::from_w2l(Mat4::from_translation(Vec3::Y))
       },
       &ray,
     );
@@ -94,7 +92,7 @@ mod sphere {
     };
     let isect = s.try_intersect(
       crate::IntersectionContext {
-        g2l: Mat4::from_translation(Vec3::X),
+        transform: Transform::from_w2l(Mat4::from_translation(Vec3::X))
       },
       &ray,
     );

@@ -1,18 +1,19 @@
 use glam::Vec3;
 
-use crate::{Castable, PointGlobal};
+use crate::{Castable, PointGlobal, VecGlobal};
 
 /// Represents a ray with an origin and direction.
 #[derive(Debug, Clone, Default)]
 pub struct CameraRay {
   origin:    PointGlobal,
+  /// Current direction
   direction: Vec3,
 }
 
 impl Castable for CameraRay {
   fn pos(&self) -> PointGlobal { self.origin }
 
-  fn direction(&self) -> glam::Vec3 { self.direction.into() }
+  fn direction(&self) -> VecGlobal { self.direction.into() }
 }
 
 /// Camera type enumeration.

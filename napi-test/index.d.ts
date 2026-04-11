@@ -8,19 +8,9 @@ export declare class CpuSwapchain {
   acquireNextTexture(): Uint8Array
 }
 
-export declare class Hello {
-  x: number
-  path: string
-  constructor(x: number)
-  aaa(): void
-}
-
 export declare class StrahlState {
+  fillFramebuffer(): Promise<void>
 
 }
-
-export declare function newTexWrapper(): CpuSwapchain
-
-export declare function plus100(input: number): Hello
 
 export declare function wgpuInit(): Promise<StrahlState>

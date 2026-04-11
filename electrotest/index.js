@@ -9,6 +9,7 @@ async function getTexture() {
     let sc = new CpuSwapchain()
     let tex = sc.acquireNextTexture()
     let g = await wgpuInit();
+    await g.fillFramebuffer();
     // g.
     // let tw = newTexWrapper()
     // let tex = sharedTexture.importSharedTexture(

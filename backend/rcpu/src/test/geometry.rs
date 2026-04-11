@@ -70,7 +70,7 @@ mod sphere {
     };
     let isect = s.try_intersect(
       crate::IntersectionContext {
-        g2l: Mat4::from_translation(Vec3::NEG_Y),
+        g2l: Mat4::from_translation(Vec3::Y),
       },
       &ray,
     );
@@ -79,7 +79,31 @@ mod sphere {
       isect,
       Some(SurfaceHit {
         normal: Vec3::Y,
-        ray_distance: 1.0,
+        ray_distance: 2.0,
+        ..
+      })
+    );
+    assert_eq!(isect.unwrap().point, POINT, "wrong collision point");
+  }
+  #[test]
+  fn tangential_hit() {
+    let s = Sphere { radius: 1.0 };
+    let ray = TestRay {
+      origin: (2.0 * Vec3::Y).into(),
+      dir:    Vec3::NEG_Y,
+    };
+    let isect = s.try_intersect(
+      crate::IntersectionContext {
+        g2l: Mat4::from_translation(Vec3::X),
+      },
+      &ray,
+    );
+    const POINT: PointLocal = PointLocal::new(Vec4::new(1., 0., 0., 1.));
+    assert_matches!(
+      isect,
+      Some(SurfaceHit {
+        normal: Vec3::X,
+        ray_distance: 2.0,
         ..
       })
     );

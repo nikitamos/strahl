@@ -10,7 +10,7 @@ fn main() {
     (640, 80).into(),
     Vec3::Y,
     Vec3::X,
-    (5.0 * Vec3::NEG_X).into(),
+    (5.0 * Vec3::NEG_Y).into(),
     rcpu::camera::CameraType::Perspective,
   );
   solver.render(&scene, &mut cam);

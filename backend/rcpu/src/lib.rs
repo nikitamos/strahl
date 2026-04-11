@@ -14,6 +14,8 @@ pub use geometry::*;
 use crate::camera::CameraRay;
 pub mod camera;
 
+pub mod material;
+
 #[cfg(test)]
 mod test;
 
@@ -52,7 +54,7 @@ impl Solver {
       if let Some(intr) = Self::closest_hit(scene, x) {
         println!(
           "hit @ {:?}",
-          intr.hit.point.into_global(intr.body.l2w_matrix())
+          intr.hit.transform.p2world(intr.hit.point)
         )
         // TODO
         // Sample BSDF
@@ -76,13 +78,7 @@ impl Solver {
   }
 }
 
-trait Material: Send + Sync {}
 type Spectrum = Vec3;
-#[repr(transparent)]
-struct Lambertian {
-  pub s: Spectrum,
-}
-impl Material for Lambertian {}
 
 /// Represents a castable ray, usually originating from camera or light source.
 pub trait Castable {
@@ -97,6 +93,10 @@ pub struct SurfaceHit {
   pub normal:       Vec3,
   pub ray_distance: f32,
   pub transform:    Transform,
+}
+
+impl SurfaceHit {
+  pub fn point_global(&self) -> PointGlobal { self.transform.p2world(self.point) }
 }
 
 pub struct Interaction<'a> {
@@ -135,7 +135,7 @@ impl Transform {
 // #[derive(Default)]
 pub struct Body {
   geometry: Arc<dyn Geometry>,
-  material: Arc<dyn Material>,
+  material: Arc<dyn material::Material>,
   pos:      PointGlobal,
   rotation: glam::Quat,
 }
@@ -193,7 +193,7 @@ impl Scene {
   pub fn add_sphere(&mut self, radius: f32) -> &Body {
     self.bodies.push(Body {
       geometry: Arc::new(Sphere { radius }),
-      material: Arc::new(Lambertian { s: Vec3::X }),
+      material: Arc::new(material::bsdf::lambertian::Lambertian { s: Vec3::X }),
       pos:      Default::default(),
       rotation: Quat::IDENTITY,
     });

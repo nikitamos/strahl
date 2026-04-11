@@ -79,3 +79,8 @@ vec_wrapper! {
   /// Type-safe wrapper around vector in world coordinates
   VecGlobal => Vec3; glam::Vec3A,
 }
+
+vec_wrapper! {
+  /// Type-safe wrapper around vector in hit space
+  VecHit => Vec3; glam::Vec3A,
+}

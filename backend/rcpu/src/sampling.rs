@@ -1,6 +1,9 @@
-pub struct SampleState {
-  pub u:  f32,
-  pub uc: glam::Vec2,
+pub struct Sampler;
+
+pub struct SampleState<'a> {
+  pub u:        f32,
+  pub uc:       glam::Vec2,
+  pub producer: Option<&'a Sampler>,
 }
 
 pub struct Sample<T, M = ()> {

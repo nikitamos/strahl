@@ -1,4 +1,4 @@
-use crate::{Sample, SampleState, Spectrum, VecHit, VecLocal};
+use crate::{Sample, SampleState, Spectrum, VecHit};
 
 pub enum BSDFSampleContext {
   Camera,
@@ -19,15 +19,20 @@ pub struct BsdfMetadata {
 
 /// Bidirectional scattering distribution functions
 pub trait BSDF {
+  /// Evaluates the BSDF given incident and exitant direction
   fn bsdf(&self, out: VecHit, inc: VecHit, ctx: BSDFSampleContext) -> Spectrum;
+  /// Samples the BSDF given the exitant direction. It uses pre-generated state from a sampler
   fn sample_bsdf(
     &self,
     out: VecHit,
     u: SampleState,
     ctx: BSDFSampleContext,
   ) -> Option<Sample<Spectrum, BsdfMetadata>>;
+  /// Evaluates PDF for given directions.
+  ///
+  /// **This function may be deleted in future**
   fn pdf(&self, out: VecHit, inc: VecHit, ctx: BSDFSampleContext) -> f32;
-  /// TODO: what does it do?
+  /// Samples the BSDF multiple times, returning the average (what?)
   #[allow(unused)]
   fn rho(&self, out: VecHit, u: &[SampleState]) { todo!() }
 }

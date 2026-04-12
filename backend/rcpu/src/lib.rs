@@ -1,18 +1,22 @@
 #![feature(assert_matches)]
 
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 
 mod points;
 use glam::{Mat3, Mat4, Quat, USizeVec2, Vec3};
 pub use points::*;
 mod sampling;
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rayon::{
+  iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator},
+  vec,
+};
 pub use sampling::*;
 mod geometry;
 pub use geometry::*;
 
 use crate::{
   camera::CameraRay,
+  light::{LightSampleContext, LightSource},
   material::{ConcreteMaterial, bsdf::lambertian::Lambertian, medium::UniformMedium},
 };
 pub mod camera;
@@ -78,6 +82,7 @@ impl RayTracer {
   pub fn new() -> Self { Self {} }
   pub fn create_scene(&self) -> Scene { Scene::new() }
   pub fn create_solver(&self) -> Solver { Solver::new() }
+  pub fn create_sphere(&self, radius: f32) -> Arc<Sphere> { Arc::new(Sphere { radius }) }
 }
 
 pub struct Solver {
@@ -91,24 +96,46 @@ impl Solver {
   }
   pub fn render(&self, scene: &Scene, cam: &mut camera::Camera) {
     let rays = cam.init_rays();
-    let x = rays.into_par_iter().enumerate().for_each(|(i, ray)| {
-      if let Some(intr) = Self::closest_hit(scene, ray) {
-        let transform = glam::Quat::from_rotation_arc(intr.hit.normal, Vec3::Z);
-        let out_hit = (-transform.mul_vec3(intr.incoming.into())).into();
-        // println!("out+hit -> {:?}", out_hit);
-        let sample = intr.body.material.bsdf().sample_bsdf(
-          out_hit,
-          self.sampler.sample(),
-          material::bsdf::BSDFSampleContext::Camera,
-        );
-        if let Some(sample) = sample {
-          ray.color = sample.sample;
+    const SAMPLES: i32 = 16;
+    for i in 0..SAMPLES {
+      let x = rays.into_par_iter().enumerate().for_each(|(i, ray)| {
+        if let Some(intr) = Self::closest_hit(scene, ray) {
+          let local2hit = glam::Quat::from_rotation_arc(intr.hit.normal, Vec3::Z);
+          let out_hit = (-local2hit.mul_vec3(intr.incoming.into())).into();
+          // println!("out+hit -> {:?}", out_hit);
+          let sample = intr.body.material.bsdf().sample_bsdf(
+            out_hit,
+            self.sampler.sample(),
+            material::bsdf::BSDFSampleContext::Camera,
+          );
+          // Sample the BSDF
+          if let Some(bsdf) = sample {
+            let inc = intr.hit.transform.v2world(
+              (-local2hit.inverse().mul_vec3(bsdf.metadata.inc.into()))
+                .normalize()
+                .into(),
+            );
+            ray.direction = inc.into();
+            ray.origin = intr.hit.transform.p2world(intr.hit.point);
+            if let Some(ls) = self.sample_light(scene, ray) {
+              ray.color += bsdf.sample * ls;// * inc.dot(intr.hit.normal);
+            }
+          }
+          // Sample the light
+          // println!("{}", ray.color);
+          // cast a new ray, sample light
         }
-        // cast a new ray, sample light
-      }
-    });
+      });
+    }
   }
-  fn sample_light(scene: &Scene, pos: PointGlobal) -> Sample<Spectrum> { todo!() }
+  fn sample_light(&self, scene: &Scene, ray: &mut CameraRay) -> Option<Spectrum> {
+    let light = &scene.lights[0];
+    if let Some(hit) = light.try_intersect(ray) {
+      Some(light.spectrum.get())
+    } else {
+      None
+    }
+  }
   fn closest_hit<'a>(scene: &'a Scene, r: &mut CameraRay) -> Option<Interaction<'a>> {
     scene
       .bodies
@@ -142,6 +169,8 @@ pub struct SurfaceHit {
   /// Surface normal in local coordinates
   pub normal:       Vec3,
   pub ray_distance: f32,
+  /// Transform from global coordinates to the coordinates of the hit body.
+  /// Usually is taken from [`IntersectionContext::transform`]
   pub transform:    Transform,
 }
 
@@ -212,14 +241,12 @@ impl Body {
   }
 }
 
-/// For now each point of the source emits light in direction normal
-/// to the surface
-pub struct LightSource {
-  geometry: Option<Arc<dyn Geometry>>,
-}
+pub mod light;
 
 pub struct Scene {
+  // TODO: RWLock/mutex on body or lights?
   pub(crate) bodies: Vec<Body>,
+  pub(crate) lights: Vec<LightSource>,
   // Why does scene at all stores its cameras?
   cameras:           Vec<Arc<camera::Camera>>,
 }
@@ -229,6 +256,7 @@ impl Scene {
     Scene {
       bodies:  vec![],
       cameras: vec![],
+      lights:  vec![],
     }
   }
 
@@ -253,5 +281,38 @@ impl Scene {
       rotation: Quat::IDENTITY,
     });
     self.bodies.last().unwrap()
+  }
+  pub fn add_light(
+    &mut self,
+    geometry: Arc<dyn Geometry>,
+    spectrum: SurfaceProperty<Spectrum>,
+    dir: light::LightEmissionDirection,
+  ) -> &LightSource {
+    self.lights.push(LightSource::new(
+      geometry,
+      spectrum,
+      2.0 * glam::vec3(1.0, 1.0, 0.4),
+      dir,
+    ));
+    self.lights.last().unwrap()
+  }
+}
+
+pub struct Texture<T>(PhantomData<T>);
+pub enum SurfaceProperty<T> {
+  /// The same value for all points of the surface
+  Uniform(T),
+  /// The value for each point is read from the texture
+  Texture(Texture<T>),
+}
+
+impl<T> SurfaceProperty<T>
+where T: Clone
+{
+  pub fn get(&self) -> T {
+    match self {
+      SurfaceProperty::Uniform(x) => x.clone(),
+      SurfaceProperty::Texture(_texture) => unimplemented!(),
+    }
   }
 }

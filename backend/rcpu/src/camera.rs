@@ -5,10 +5,12 @@ use crate::{Castable, PointGlobal, Spectrum, VecGlobal};
 /// Represents a ray with an origin and direction.
 #[derive(Debug, Clone, Default)]
 pub struct CameraRay {
-  origin:    PointGlobal,
-  /// Current direction
-  direction: Vec3,
-  pub color: Spectrum,
+  pub origin:    PointGlobal,
+  /// Current direction (in global coordinates?)
+  // TODO: replace with VecGlobal
+  pub direction: Vec3,
+  /// Recorded color
+  pub color:     Spectrum,
 }
 
 impl Castable for CameraRay {

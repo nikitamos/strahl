@@ -1,11 +1,17 @@
 use glam::Vec3;
-use rcpu::{RayTracer, camera::Camera};
+use rcpu::{RayTracer, SurfaceProperty, camera::Camera, light::LightEmissionDirection};
 
 fn main() {
   let back = RayTracer::new();
   let mut scene = back.create_scene();
   let solver = back.create_solver();
   scene.add_sphere(2.0);
+  let g = back.create_sphere(1.0);
+  scene.add_light(
+    g,
+    SurfaceProperty::Uniform(Vec3::ONE),
+    LightEmissionDirection::Omni,
+  );
   let mut cam = Camera::new(
     (640, 480).into(),
     Vec3::Y,

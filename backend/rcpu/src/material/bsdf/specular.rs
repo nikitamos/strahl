@@ -2,9 +2,14 @@ use glam::Vec3;
 
 use crate::{Sample, Spectrum, VecHit, material::bsdf::BSDF};
 
+/// The specular reflection BSDF.
+///
+/// Specular BSDF reflects light in a deterministic fashion, so that
+/// * incidence angle is equal to the reflection angle;
+/// * surface normal, incident and reflected rays belong to the same plane.
 pub struct Specular {
-  pub r:   Spectrum,
-  pub dir: [VecHit],
+  /// Reflected spectrum
+  pub r: Spectrum,
 }
 
 impl BSDF for Specular {

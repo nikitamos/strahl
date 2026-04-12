@@ -1,6 +1,6 @@
 use glam::Mat4;
 
-use crate::{Castable, Geometry, IntersectionContext, Sample, SampleState, Spectrum, SurfaceHit, SurfaceProperty, Transform, VecGlobal, geometry};
+use crate::{Castable, Geometry, IntersectionContext, Sample, SampleState, Spectrum, SurfaceHit, SurfaceProperty, Transform, VecGlobal};
 use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug)]
@@ -31,8 +31,8 @@ impl LightSource {
     dir: LightEmissionDirection,
   ) -> Self{
     Self {
-        geometry: geometry,
-        spectrum: spectrum,
+        geometry,
+        spectrum,
         translation,
         dir,
     }

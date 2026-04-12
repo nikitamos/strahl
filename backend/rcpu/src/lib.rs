@@ -3,7 +3,7 @@
 use std::{marker::PhantomData, sync::Arc};
 
 mod points;
-use glam::{Mat3, Mat4, Quat, USizeVec2, Vec3};
+use glam::{Mat4, Quat, USizeVec2, Vec3};
 pub use points::*;
 mod sampling;
 
@@ -12,7 +12,7 @@ mod geometry;
 pub use geometry::*;
 
 use crate::{
-  light::{LightSampleContext, LightSource},
+  light::LightSource,
   material::{ConcreteMaterial, bsdf::lambertian::Lambertian, medium::UniformMedium},
 };
 pub mod camera;
@@ -73,6 +73,12 @@ macro_rules! with {
 }
 
 pub struct RayTracer {}
+
+impl Default for RayTracer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl RayTracer {
   pub fn new() -> Self { Self {} }
@@ -178,6 +184,12 @@ pub struct Scene {
   pub(crate) lights: Vec<LightSource>,
   // Why does scene at all stores its cameras?
   cameras:           Vec<Arc<camera::Camera>>,
+}
+
+impl Default for Scene {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Scene {

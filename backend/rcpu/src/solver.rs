@@ -3,7 +3,7 @@ use crate::{
   Castable, Sampler,
   camera::{self, CameraRay},
 };
-use glam::{Quat, Vec3};
+use glam::Vec3;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 
 pub struct Solver {

@@ -16,7 +16,7 @@ impl BSDF for Lambertian {
     if out.z * inc.z < 0.0 {
       Spectrum::ZERO
     } else {
-      return self.s * FRAC_1_PI;
+      self.s * FRAC_1_PI
     }
   }
 

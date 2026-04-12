@@ -61,7 +61,7 @@ impl Geometry for Sphere {
 
     Some(SurfaceHit {
       point:        intersection.into(),
-      normal:       (intersection).normalize().into(),
+      normal:       (intersection).normalize(),
       ray_distance: t,
       transform:    ctx.transform,
     })

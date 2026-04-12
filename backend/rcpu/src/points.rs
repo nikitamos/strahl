@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 use glam::{Vec3, Vec4Swizzles};
 
@@ -14,6 +14,9 @@ macro_rules! vec_wrapper {
     impl Deref for $name {
       type Target = $underlying;
       fn deref(&self) -> &Self::Target { &self.0 }
+    }
+    impl DerefMut for $name {
+      fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
     }
     impl $name {
       pub const fn new(value: $underlying) -> Self { Self(value) }

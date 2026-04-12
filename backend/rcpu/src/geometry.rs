@@ -6,9 +6,22 @@ use crate::{
   sampling::{Sample, SampleState},
 };
 
+pub struct UVMap {
+  uv: Vec<glam::Vec2>,
+}
+
+impl From<Vec<glam::Vec2>> for UVMap {
+  fn from(uv: Vec<glam::Vec2>) -> Self { Self { uv } }
+}
+
+impl UVMap {
+  pub fn new(uv: &[glam::Vec2]) -> Self { Self { uv: uv.into() } }
+}
+
 pub trait Geometry: Sync + Send {
   fn sample_point(&self, state: SampleState) -> Sample<PointLocal>;
   fn try_intersect<'a>(&self, ctx: IntersectionContext, ray: &dyn Castable) -> Option<SurfaceHit>;
+  fn uv(&self) -> Option<&UVMap> { None }
 }
 
 pub struct Sphere {

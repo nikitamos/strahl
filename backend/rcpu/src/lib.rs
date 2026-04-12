@@ -11,7 +11,10 @@ pub use sampling::*;
 mod geometry;
 pub use geometry::*;
 
-use crate::camera::CameraRay;
+use crate::{
+  camera::CameraRay,
+  material::{ConcreteMaterial, bsdf::lambertian::Lambertian, medium::UniformMedium},
+};
 pub mod camera;
 
 pub mod material;
@@ -20,6 +23,37 @@ pub mod material;
 mod test;
 
 #[macro_export]
+/// # Partial update of struct
+/// This macro allows partial update of structures, i.e. mutating
+/// values of one or more of its fields while keeping others unchanged.
+///
+/// Note that macro consumes the original value.
+/// ```
+/// #![feature(assert_matches)]
+/// use std::assert_matches::assert_matches;
+/// use rcpu::with;
+///
+/// #[derive(Debug)]
+/// struct Point {
+///   pub x: f32,
+///   pub y: f32,
+/// }
+///
+/// #[derive(Debug)]
+/// struct Rectangle {
+///   pub top_left:     Point,
+///   pub bottom_right: Point,
+/// }
+///
+/// let point = Point { x: 12.0, y: -0.3 };
+/// let point = with!(point: x = 5.0); // set x to be 5.0
+/// assert_matches!(point, Point {x: 5.0, y: -0.3});
+///
+/// let rect = Rectangle {top_left: point, bottom_right: Point {x: 6.0, y: -1.0} };
+/// // Mutating nested fields is done with the `=>` syntax.
+/// let rect = with!(rect => bottom_right.y = 0.0, top_left.y = 2.0);
+/// assert_matches!(rect, Rectangle { top_left: Point {x: 5.0, y: 2.0 }, bottom_right: Point{x: 6.0, y: 0.0}});
+/// ```
 macro_rules! with {
   ($x:ident: $($($fields:ident).* = $val: expr), *) => {
       {
@@ -52,10 +86,7 @@ impl Solver {
     let rays = cam.init_rays();
     rays.into_par_iter().enumerate().for_each(|(i, x)| {
       if let Some(intr) = Self::closest_hit(scene, x) {
-        println!(
-          "hit @ {:?}",
-          intr.hit.transform.p2world(intr.hit.point)
-        )
+        println!("hit @ {:?}", intr.hit.transform.p2world(intr.hit.point))
         // TODO
         // Sample BSDF
         // cast a new ray
@@ -68,7 +99,7 @@ impl Solver {
       .iter()
       .filter_map(|b| {
         let ctx = IntersectionContext {
-            transform: b.transform(),
+          transform: b.transform(),
         };
         b.geometry
           .try_intersect(ctx, r)
@@ -193,7 +224,10 @@ impl Scene {
   pub fn add_sphere(&mut self, radius: f32) -> &Body {
     self.bodies.push(Body {
       geometry: Arc::new(Sphere { radius }),
-      material: Arc::new(material::bsdf::lambertian::Lambertian { s: Vec3::X }),
+      material: Arc::new(ConcreteMaterial {
+        bsdf:   Lambertian { s: Vec3::X },
+        medium: UniformMedium { ior: 1.0 },
+      }),
       pos:      Default::default(),
       rotation: Quat::IDENTITY,
     });

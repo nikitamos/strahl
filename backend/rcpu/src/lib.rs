@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 mod points;
-use glam::{Mat4, Quat, USizeVec2, Vec3};
+use glam::{Mat3, Mat4, Quat, USizeVec2, Vec3};
 pub use points::*;
 mod sampling;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
@@ -77,22 +77,38 @@ pub struct RayTracer {}
 impl RayTracer {
   pub fn new() -> Self { Self {} }
   pub fn create_scene(&self) -> Scene { Scene::new() }
-  pub fn create_solver(&self) -> Solver { Solver {} }
+  pub fn create_solver(&self) -> Solver { Solver::new() }
 }
 
-pub struct Solver {}
+pub struct Solver {
+  sampler: Sampler,
+}
 impl Solver {
+  fn new() -> Self {
+    Self {
+      sampler: Sampler::default(),
+    }
+  }
   pub fn render(&self, scene: &Scene, cam: &mut camera::Camera) {
     let rays = cam.init_rays();
-    rays.into_par_iter().enumerate().for_each(|(i, x)| {
-      if let Some(intr) = Self::closest_hit(scene, x) {
-        println!("hit @ {:?}", intr.hit.transform.p2world(intr.hit.point))
-        // TODO
-        // Sample BSDF
-        // cast a new ray
+    let x = rays.into_par_iter().enumerate().for_each(|(i, ray)| {
+      if let Some(intr) = Self::closest_hit(scene, ray) {
+        let transform = glam::Quat::from_rotation_arc(intr.hit.normal, Vec3::Z);
+        let out_hit = (-transform.mul_vec3(intr.incoming.into())).into();
+        // println!("out+hit -> {:?}", out_hit);
+        let sample = intr.body.material.bsdf().sample_bsdf(
+          out_hit,
+          self.sampler.sample(),
+          material::bsdf::BSDFSampleContext::Camera,
+        );
+        if let Some(sample) = sample {
+          ray.color = sample.sample;
+        }
+        // cast a new ray, sample light
       }
     });
   }
+  fn sample_light(scene: &Scene, pos: PointGlobal) -> Sample<Spectrum> { todo!() }
   fn closest_hit<'a>(scene: &'a Scene, r: &mut CameraRay) -> Option<Interaction<'a>> {
     scene
       .bodies
@@ -101,9 +117,11 @@ impl Solver {
         let ctx = IntersectionContext {
           transform: b.transform(),
         };
-        b.geometry
-          .try_intersect(ctx, r)
-          .map(|hit| Interaction { body: b, hit })
+        b.geometry.try_intersect(ctx, r).map(|hit| Interaction {
+          body: b,
+          incoming: hit.transform.v2local(r.direction()),
+          hit,
+        })
       })
       .min_by(|a, b| a.hit.ray_distance.partial_cmp(&b.hit.ray_distance).unwrap())
   }
@@ -121,6 +139,7 @@ pub trait Castable {
 #[derive(Debug)]
 pub struct SurfaceHit {
   pub point:        PointLocal,
+  /// Surface normal in local coordinates
   pub normal:       Vec3,
   pub ray_distance: f32,
   pub transform:    Transform,
@@ -131,8 +150,10 @@ impl SurfaceHit {
 }
 
 pub struct Interaction<'a> {
-  pub hit:  SurfaceHit,
-  pub body: &'a Body,
+  pub hit:      SurfaceHit,
+  pub body:     &'a Body,
+  /// Normalized ray vector direction, pointing to the surface
+  pub incoming: VecLocal,
 }
 
 pub struct IntersectionContext {

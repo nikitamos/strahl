@@ -53,5 +53,5 @@ where
 {
   fn medium(&self) -> &dyn Medium { &self.medium }
 
-  fn bsdf(&self) -> &dyn BSDF { todo!() }
+  fn bsdf(&self) -> &dyn BSDF { &self.bsdf }
 }

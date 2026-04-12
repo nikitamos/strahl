@@ -1,7 +1,36 @@
+use rand_distr::{Distribution, Uniform};
+
 use crate::VecHit;
 use std::f32::consts::{FRAC_1_PI, TAU};
 
-pub struct Sampler;
+pub struct Sampler {
+  x: Uniform<f32>,
+  y: Uniform<f32>,
+  c: Uniform<f32>,
+}
+
+impl Default for Sampler {
+  fn default() -> Self { Self::new() }
+}
+
+impl Sampler {
+  pub fn new() -> Self {
+    Self {
+      x: Uniform::new(0.0, 1.0).unwrap(),
+      y: Uniform::new(0.0, 1.0).unwrap(),
+      c: Uniform::new(0.0, 1.0).unwrap(),
+    }
+  }
+  pub fn sample(&'_ self) -> SampleState<'_> {
+    // TODO: better generation of vectors
+    let mut rng = rand::rng();
+    SampleState {
+      uniform_1d: self.c.sample(&mut rng),
+      uniform_2d: glam::vec2(self.x.sample(&mut rng), self.y.sample(&mut rng)),
+      producer:   self,
+    }
+  }
+}
 
 pub struct SampleState<'a> {
   pub uniform_1d: f32,

@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-use crate::{Castable, PointGlobal, VecGlobal};
+use crate::{Castable, PointGlobal, Spectrum, VecGlobal};
 
 /// Represents a ray with an origin and direction.
 #[derive(Debug, Clone, Default)]
@@ -8,6 +8,7 @@ pub struct CameraRay {
   origin:    PointGlobal,
   /// Current direction
   direction: Vec3,
+  pub color: Spectrum,
 }
 
 impl Castable for CameraRay {
@@ -54,9 +55,17 @@ impl Camera {
     }
   }
 
-  /// Copies internally stored image to provided memory
-  pub fn acquire_image(&mut self, _image: &mut [Vec3]) {
-    unimplemented!("acquireImage is not defined in the original C++ code")
+  pub fn write_image(&self, img: &mut image::RgbImage) {
+    for x in 0..self.resolution.x {
+      for y in 0..self.resolution.y {
+        let color = self.rays[self.resolution.x * y + x].color * 255.0;
+        img.put_pixel(
+          x as u32,
+          y as u32,
+          [color.x as u8, color.y as u8, color.z as u8].into(),
+        );
+      }
+    }
   }
 
   /// Initializes the ray cache if empty and returns a slice to the rays.
@@ -83,8 +92,9 @@ impl Camera {
         let point = top_left + (i as f32) * x_step + (j as f32) * y_step;
         let ray_direction = (point - cam_pos).normalize();
         self.rays.push(CameraRay {
-          origin:    point.into(),
+          origin: point.into(),
           direction: ray_direction,
+          ..Default::default()
         });
       }
     }

@@ -1,6 +1,9 @@
 use glam::Mat4;
 
-use crate::{Castable, Geometry, IntersectionContext, Sample, SampleState, Spectrum, SurfaceHit, SurfaceProperty, Transform, VecGlobal};
+use crate::{
+  Castable, Geometry, GeometrySampleMetadata, IntersectionContext, PointGlobal, Sample,
+  SampleState, Spectrum, SurfaceHit, SurfaceProperty, Transform, VecGlobal,
+};
 use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug)]
@@ -10,17 +13,20 @@ pub enum LightEmissionDirection {
   Directed(VecGlobal),
 }
 
+/// The context passed to the light sampler
 pub struct LightSampleContext {
-
+  /// The point from which the light is sampled. It means
+  /// that the sampled ray **must** hit this point
+  pub dst: PointGlobal,
 }
 
 /// For now each point of the source emits light in direction normal
 /// to the surface
 pub struct LightSource {
-  pub(crate) geometry: Arc<dyn Geometry>,
-  pub(crate) spectrum: SurfaceProperty<Spectrum>,
-  pub(crate) dir:      LightEmissionDirection,
-  pub(crate) translation: glam::Vec3
+  pub(crate) geometry:    Arc<dyn Geometry>,
+  pub(crate) spectrum:    SurfaceProperty<Spectrum>,
+  pub(crate) dir:         LightEmissionDirection,
+  pub(crate) translation: glam::Vec3,
 }
 
 impl LightSource {
@@ -29,20 +35,41 @@ impl LightSource {
     spectrum: SurfaceProperty<Spectrum>,
     translation: glam::Vec3,
     dir: LightEmissionDirection,
-  ) -> Self{
+  ) -> Self {
     Self {
-        geometry,
-        spectrum,
-        translation,
-        dir,
+      geometry,
+      spectrum,
+      translation,
+      dir,
     }
   }
   pub fn try_intersect(&self, ray: &dyn Castable) -> Option<SurfaceHit> {
-    self.geometry.try_intersect(IntersectionContext {
+    self.geometry.try_intersect(
+      IntersectionContext {
         transform: Transform::from_w2l(Mat4::from_translation(-self.translation)),
-    }, ray)
+      },
+      ray,
+    )
   }
-  pub fn sample(&self, sample: SampleState, ctx: LightSampleContext) -> Sample<()> {
-    todo!()
+  pub fn sample(
+    &self,
+    state: SampleState,
+    ctx: LightSampleContext,
+  ) -> Option<Sample<Spectrum, GeometrySampleMetadata>> {
+    match self.dir {
+      LightEmissionDirection::Omni => {
+        Some(
+          // TODO: occlusion test!
+          self
+            .geometry
+            .sample_point(state)
+            .map(|point| match self.spectrum {
+              SurfaceProperty::Uniform(s) => s,
+              SurfaceProperty::Texture(_) => unimplemented!(),
+            }),
+        )
+      }
+      _ => unimplemented!(),
+    }
   }
 }

@@ -1,8 +1,9 @@
-use crate::{Sample, SampleState, Spectrum, VecHit};
+use crate::{Sample, SampleState, Spectrum, VecHit, material::medium::MediumInterface};
 
-pub enum BSDFSampleContext {
+pub enum BSDFSampleContext<'a> {
   Camera,
   Light,
+  Context(MediumInterface<'a, 'a>),
 }
 
 pub enum ScatteringEvent {

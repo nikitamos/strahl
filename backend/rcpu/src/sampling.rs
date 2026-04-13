@@ -1,6 +1,7 @@
+use rand::seq::IndexedRandom;
 use rand_distr::{Distribution, Uniform};
 
-use crate::VecHit;
+use crate::{VecHit, with};
 use std::f32::consts::{FRAC_1_PI, TAU};
 
 pub struct Sampler {
@@ -28,6 +29,17 @@ impl Sampler {
       uniform_1d: self.c.sample(&mut rng),
       uniform_2d: glam::vec2(self.x.sample(&mut rng), self.y.sample(&mut rng)),
       producer:   self,
+    }
+  }
+  /// Uniformly samples an element from non-empty slice.
+  /// # Panics
+  /// Panics if the `slice` is empty.
+  pub fn sample_element<'a, T>(&self, slice: &'a [T]) -> Sample<&'a T> {
+    let mut rng = rand::rng();
+    Sample {
+      sample:   slice.choose(&mut rng).unwrap(),
+      prob:     1.0 / (slice.len() as f32),
+      metadata: (),
     }
   }
 }
@@ -112,6 +124,11 @@ impl<T, M> Sample<T, M> {
       sample,
       metadata,
     }
+  }
+  pub fn compose<U, N>(self, mapper: impl Fn(T, M) -> Sample<U, N>) -> Sample<U, N> {
+    let mut m = mapper(self.sample, self.metadata);
+    m.prob *= self.prob;
+    m
   }
   pub fn replace<U>(self, replacement: U) -> Sample<U, M> {
     Sample {

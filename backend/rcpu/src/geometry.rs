@@ -1,7 +1,9 @@
+use std::ops::Deref;
+
 use glam::Vec3;
 
 use crate::{
-  Castable, IntersectionContext, SurfaceHit,
+  Castable, IntersectionContext, SurfaceHit, VecLocal,
   points::PointLocal,
   sampling::{Sample, SampleState},
 };
@@ -18,8 +20,13 @@ impl UVMap {
   pub fn new(uv: &[glam::Vec2]) -> Self { Self { uv: uv.into() } }
 }
 
+#[derive(Default)]
+pub struct GeometrySampleMetadata {
+  pub normal: VecLocal,
+}
+
 pub trait Geometry: Sync + Send {
-  fn sample_point(&self, state: SampleState) -> Sample<PointLocal>;
+  fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata>;
   fn try_intersect<'a>(&self, ctx: IntersectionContext, ray: &dyn Castable) -> Option<SurfaceHit>;
   fn uv(&self) -> Option<&UVMap> { None }
 }
@@ -28,7 +35,13 @@ pub struct Sphere {
   pub radius: f32,
 }
 impl Geometry for Sphere {
-  fn sample_point(&self, state: SampleState) -> Sample<PointLocal> { todo!() }
+  fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata> {
+    state.sphere_uniform().map_all(|x, _| {
+      ((x.deref() * self.radius).into(), GeometrySampleMetadata {
+        normal: (*x).into(),
+      })
+    })
+  }
 
   fn try_intersect(&self, ctx: IntersectionContext, ray: &dyn Castable) -> Option<SurfaceHit> {
     let oc: Vec3 = ctx.transform.p2local(ray.pos()).into();

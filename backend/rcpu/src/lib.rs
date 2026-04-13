@@ -75,9 +75,7 @@ macro_rules! with {
 pub struct RayTracer {}
 
 impl Default for RayTracer {
-    fn default() -> Self {
-        Self::new()
-    }
+  fn default() -> Self { Self::new() }
 }
 
 impl RayTracer {
@@ -187,9 +185,7 @@ pub struct Scene {
 }
 
 impl Default for Scene {
-    fn default() -> Self {
-        Self::new()
-    }
+  fn default() -> Self { Self::new() }
 }
 
 impl Scene {
@@ -236,6 +232,12 @@ impl Scene {
       dir,
     ));
     self.lights.last().unwrap()
+  }
+  /// Samples a light source present on the scene.
+  /// For now the sampling is uniform, that is, each light source has
+  /// equal probability to be sampled.
+  pub fn sample_light_source(&self, sampler: &Sampler, _dest: PointGlobal) -> Sample<&LightSource> {
+    sampler.sample_element(&self.lights)
   }
 }
 

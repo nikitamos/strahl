@@ -20,9 +20,9 @@ pub(crate) mod gpu_alloc;
 #[napi]
 pub struct StrahlState {
   i: wgpu::Instance,
-  dev: wgpu::Device,
   queue: wgpu::Queue,
-  raw_state: ManuallyDrop<RawState>,
+  dev: wgpu::Device,
+  raw_state: RawState,
 }
 
 #[napi]
@@ -74,17 +74,7 @@ impl StrahlState {
       submission_index: Some(idx),
       timeout: None,
     });
-    dbg!(res);
     println!("{:?}", &self.raw_state.mapped[0..8]);
-  }
-}
-
-#[napi]
-impl Drop for StrahlState {
-  fn drop(&mut self) {
-    unsafe {
-      ManuallyDrop::drop(&mut self.raw_state);
-    }
   }
 }
 
@@ -152,7 +142,7 @@ pub async fn wgpu_init() -> napi::Result<StrahlState> {
     // On wgpu shutdown device is dropped earlier than callback is called for some reason
     StrahlState {
       i: instance,
-      raw_state: ManuallyDrop::new(raw.into_hal(&dev)),
+      raw_state: raw.into_hal(&dev),
       dev,
       queue,
     }

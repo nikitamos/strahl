@@ -10,7 +10,6 @@ export declare class CpuSwapchain {
 
 export declare class StrahlState {
   fillFramebuffer(): Promise<void>
-
 }
 
 export declare function wgpuInit(): Promise<StrahlState>

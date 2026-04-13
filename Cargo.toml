@@ -1,3 +1,3 @@
 [workspace]
 resolver = "3"
-members = ["abstractions","backend/rcpu", "napi-test", "node"]
+members = ["abstractions","backend/rcpu", "napi-test", "node", "strahl-js"]

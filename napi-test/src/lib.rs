@@ -19,6 +19,17 @@ use nix::{
 };
 use wgpu::hal::vulkan as wgvk;
 
+#[napi(object)]
+pub struct Inner {
+  pub y: u32,
+}
+
+#[napi(object)]
+pub struct Outer {
+  pub x: u32,
+  pub i: Inner,
+}
+
 // mod texture_infos;
 
 // #[cfg_attr(feature = "node", napi)]
@@ -61,13 +72,6 @@ pub fn plus_100(input: u32) -> napi::Result<Hello> {
 #[napi]
 pub struct StrahlState {
   i: wgpu::Instance,
-}
-
-pub trait From2<F, T> {
-  fn from(value: F) -> T;
-  // fn _inexistent() -> U
-  // where
-  //   Self: Sized;
 }
 
 #[napi]

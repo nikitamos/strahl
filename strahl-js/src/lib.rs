@@ -151,9 +151,8 @@ pub struct BodyCreateInfo<'env> {
   /// relative to the world origin,
   /// i.e. the translation applied to the geometry.
   pub position: ArrayBuffer<'env>,
-  /// **TBD: quaternion or Euler angle?**
-  /// That shall represent rotation applied to the geometry in
-  /// its local coordinates
+  /// Rotation applied to the geometry in its local coordinates,
+  /// represented as Euler's angles.
   pub rotation: ArrayBuffer<'env>,
 }
 

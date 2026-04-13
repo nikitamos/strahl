@@ -93,9 +93,8 @@ export interface BodyCreateInfo {
    */
   position: ArrayBuffer
   /**
-   * **TBD: quaternion or Euler angle?**
-   * That shall represent rotation applied to the geometry in
-   * its local coordinates
+   * Rotation applied to the geometry in its local coordinates,
+   * represented as Euler's angles.
    */
   rotation: ArrayBuffer
 }

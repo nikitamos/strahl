@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 glam = "0.32.1"
-image = "0.25.10"
+image = {workspace = true}
 rand = "0.10.1"
 rand_distr = "0.6.0"
 rayon = "1.11.0"

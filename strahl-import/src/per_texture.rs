@@ -1,5 +1,5 @@
 #[derive(serde::Deserialize, serde::Serialize)]
-pub struct MaterialTextures<T> {
+pub struct PerTexture<T> {
   pub roughness: Option<T>,
   pub specular:  Option<T>,
   pub glossy:    Option<T>,
@@ -8,7 +8,7 @@ pub struct MaterialTextures<T> {
   pub normal:    Option<T>,
 }
 
-impl<T> Default for MaterialTextures<T> {
+impl<T> Default for PerTexture<T> {
   fn default() -> Self {
     Self {
       roughness: Default::default(),
@@ -21,9 +21,9 @@ impl<T> Default for MaterialTextures<T> {
   }
 }
 
-impl<T> MaterialTextures<T> {
-  pub fn map_all<U>(mut self, mapper: impl Fn(T) -> U) -> MaterialTextures<U> {
-    MaterialTextures {
+impl<T> PerTexture<T> {
+  pub fn map_all<U>(mut self, mapper: impl Fn(T) -> U) -> PerTexture<U> {
+    PerTexture {
       roughness: self.roughness.take().map(&mapper),
       specular:  self.specular.take().map(&mapper),
       glossy:    self.glossy.take().map(&mapper),
@@ -33,7 +33,7 @@ impl<T> MaterialTextures<T> {
     }
   }
   pub fn take(&mut self) -> Self {
-    MaterialTextures {
+    PerTexture {
       roughness: self.roughness.take(),
       specular:  self.specular.take(),
       glossy:    self.glossy.take(),
@@ -42,8 +42,8 @@ impl<T> MaterialTextures<T> {
       normal:    self.normal.take(),
     }
   }
-  pub fn map_named<U>(mut self, mut mapper: impl FnMut(&str, T) -> U) -> MaterialTextures<U> {
-    MaterialTextures {
+  pub fn map_named<U>(mut self, mut mapper: impl FnMut(&str, T) -> U) -> PerTexture<U> {
+    PerTexture {
       roughness: self.roughness.take().map(|x| mapper("roughness", x)),
       specular:  self.specular.take().map(|x| mapper("specular", x)),
       glossy:    self.glossy.take().map(|x| mapper("glossy", x)),
@@ -52,11 +52,8 @@ impl<T> MaterialTextures<T> {
       normal:    self.normal.take().map(|x| mapper("normal", x)),
     }
   }
-  pub fn and_then<U>(
-    mut self,
-    mut mapper: impl FnMut(&str, T) -> Option<U>,
-  ) -> MaterialTextures<U> {
-    MaterialTextures {
+  pub fn and_then<U>(mut self, mut mapper: impl FnMut(&str, T) -> Option<U>) -> PerTexture<U> {
+    PerTexture {
       roughness: self.roughness.take().and_then(|x| mapper("roughness", x)),
       specular:  self.specular.take().and_then(|x| mapper("specular", x)),
       glossy:    self.glossy.take().and_then(|x| mapper("glossy", x)),
@@ -66,7 +63,7 @@ impl<T> MaterialTextures<T> {
     }
   }
   pub fn or_else(mut self, mut fun: impl FnMut(&str) -> Option<T>) -> Self {
-    MaterialTextures {
+    PerTexture {
       roughness: self.roughness.take().or_else(|| fun("roughness")),
       specular:  self.specular.take().or_else(|| fun("specular")),
       glossy:    self.glossy.take().or_else(|| fun("glossy")),

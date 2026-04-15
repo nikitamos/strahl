@@ -6,12 +6,12 @@ use std::{
 };
 
 use clap::Parser;
-use strahl_import::{builder::MaterialFileBuilder, material_textures::MaterialTextures};
+use strahl_import::{builder::MaterialFileBuilder, per_texture::PerTexture};
 
 #[derive(serde::Deserialize)]
 struct MaterialPacker {
   /// Paths to corresponding textures
-  textures: MaterialTextures<String>,
+  textures: PerTexture<String>,
 }
 
 #[derive(clap::Parser)]

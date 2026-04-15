@@ -8,11 +8,11 @@ use anyhow::bail;
 use ktx2_rw::Ktx2Texture;
 use zip::write::FileOptions;
 
-use crate::{StoredTexture, TextureMetadata, material_textures::MaterialTextures};
+use crate::{StoredTexture, TextureMetadata, per_texture::PerTexture};
 
 #[derive(Default)]
 pub struct MaterialFileBuilder {
-  textures: MaterialTextures<File>,
+  textures: PerTexture<File>,
 }
 
 macro_rules! material_type_import {
@@ -35,7 +35,7 @@ const NO_COMPRESSION: FileOptions<'static, ()> = FileOptions::DEFAULT
 
 impl MaterialFileBuilder {
   pub fn new() -> Self { Default::default() }
-  pub fn textures(mut self, textures: MaterialTextures<File>) -> Self {
+  pub fn textures(mut self, textures: PerTexture<File>) -> Self {
     self.textures = textures;
     self
   }
@@ -45,7 +45,7 @@ impl MaterialFileBuilder {
     zip.add_directory("surface", NO_COMPRESSION)?;
     // TODO: parallelize image parsing!
     let taken = self.textures.take();
-    let meta: MaterialTextures<TextureMetadata> = taken
+    let meta: PerTexture<TextureMetadata> = taken
       .map_named(|n, f| match self.parse_image(f) {
         Ok(tex) => {
           zip.start_file(tex.append_ext(format!("surface/{n}")), NO_COMPRESSION)?;

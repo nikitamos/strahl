@@ -7,15 +7,7 @@ use serde::{Deserialize, Serialize};
 pub mod builder;
 pub mod reader;
 
-pub mod material_textures;
-
-#[allow(unused)]
-pub(crate) enum StoredTexture {
-  Image(image::DynamicImage),
-  /// Valid PNG file
-  File(File),
-  Ktx(Ktx2Texture),
-}
+pub mod per_texture;
 
 #[derive(Serialize, Deserialize)]
 pub enum TextureFormat {
@@ -42,6 +34,20 @@ impl Default for TextureMetadata {
   }
 }
 
+#[allow(unused)]
+pub(crate) enum StoredTexture {
+  Image(image::DynamicImage),
+  /// Valid PNG file
+  File(File),
+  Ktx(Ktx2Texture),
+  Rgba {
+    r: f32,
+    g: f32,
+    b: f32,
+    a: f32,
+  },
+}
+
 impl StoredTexture {
   fn write<W: Write>(self, w: &mut W) -> anyhow::Result<TextureMetadata> {
     match self {
@@ -64,13 +70,19 @@ impl StoredTexture {
           format: TextureFormat::Png,
         })
       }
+      Self::Rgba { r, g, b, a } => Ok(TextureMetadata {
+        format: TextureFormat::Rgba { r, g, b, a },
+      }),
     }
   }
   fn append_ext(&self, mut path: String) -> String {
     path.push_str(match self {
-      StoredTexture::Image(_) | StoredTexture::File(_) => "png",
-      StoredTexture::Ktx(_) => "ktx2",
+      StoredTexture::Image(_) | StoredTexture::File(_) => ".png",
+      StoredTexture::Ktx(_) => ".ktx2",
+      StoredTexture::Rgba { .. } => "",
     });
     path
   }
 }
+
+const MATERIAL_METADATA: &'static str = "metadata.toml";

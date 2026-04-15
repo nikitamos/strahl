@@ -1,39 +1,70 @@
-use std::{
-  fs::File,
-  io::Write,
-};
+use std::{fs::File, io::Write};
 
 use image::codecs::png::PngEncoder;
 use ktx2_rw::Ktx2Texture;
+use serde::{Deserialize, Serialize};
 
 pub mod builder;
+pub mod reader;
 
 pub mod material_textures;
 
-pub enum StoredTexture {
+#[allow(unused)]
+pub(crate) enum StoredTexture {
   Image(image::DynamicImage),
   /// Valid PNG file
   File(File),
   Ktx(Ktx2Texture),
 }
 
-pub struct TextureMetadata {}
+#[derive(Serialize, Deserialize)]
+pub enum TextureFormat {
+  Png,
+  Ktx2,
+  Rgba { r: f32, g: f32, b: f32, a: f32 },
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TextureMetadata {
+  pub format: TextureFormat,
+}
+
+impl Default for TextureMetadata {
+  fn default() -> Self {
+    Self {
+      format: TextureFormat::Rgba {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+      },
+    }
+  }
+}
 
 impl StoredTexture {
-  fn write<W: Write>(self, mut w: W) -> anyhow::Result<W> {
-    log::trace!("writing started");
+  fn write<W: Write>(self, w: &mut W) -> anyhow::Result<TextureMetadata> {
     match self {
       StoredTexture::Image(img) => {
-        let enc = PngEncoder::new(&mut w);
+        let enc = PngEncoder::new(w);
         img.write_with_encoder(enc)?;
+        Ok(TextureMetadata {
+          format: TextureFormat::Png,
+        })
       }
-      StoredTexture::Ktx(ktx) => w.write_all(&ktx.write_to_memory()?)?,
+      StoredTexture::Ktx(ktx) => {
+        w.write_all(&ktx.write_to_memory()?)?;
+        Ok(TextureMetadata {
+          format: TextureFormat::Ktx2,
+        })
+      }
       StoredTexture::File(mut f) => {
-        std::io::copy(&mut f, &mut w)?;
+        std::io::copy(&mut f, w)?;
+        Ok(TextureMetadata {
+          format: TextureFormat::Png,
+        })
       }
-    };
-    log::trace!("writing ended successfully");
-    Ok(w)
+    }
   }
   fn append_ext(&self, mut path: String) -> String {
     path.push_str(match self {

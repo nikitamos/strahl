@@ -52,7 +52,10 @@ impl<T> MaterialTextures<T> {
       normal:    self.normal.take().map(|x| mapper("normal", x)),
     }
   }
-  pub fn and_then<U>(mut self, mut mapper: impl FnMut(&str, T) -> Option<U>) -> MaterialTextures<U> {
+  pub fn and_then<U>(
+    mut self,
+    mut mapper: impl FnMut(&str, T) -> Option<U>,
+  ) -> MaterialTextures<U> {
     MaterialTextures {
       roughness: self.roughness.take().and_then(|x| mapper("roughness", x)),
       specular:  self.specular.take().and_then(|x| mapper("specular", x)),
@@ -60,6 +63,16 @@ impl<T> MaterialTextures<T> {
       diffuse:   self.diffuse.take().and_then(|x| mapper("diffuse", x)),
       emission:  self.emission.take().and_then(|x| mapper("emission", x)),
       normal:    self.normal.take().and_then(|x| mapper("normal", x)),
+    }
+  }
+  pub fn or_else(mut self, mut fun: impl FnMut(&str) -> Option<T>) -> Self {
+    MaterialTextures {
+      roughness: self.roughness.take().or_else(|| fun("roughness")),
+      specular:  self.specular.take().or_else(|| fun("specular")),
+      glossy:    self.glossy.take().or_else(|| fun("glossy")),
+      diffuse:   self.diffuse.take().or_else(|| fun("diffuse")),
+      emission:  self.emission.take().or_else(|| fun("emission")),
+      normal:    self.normal.take().or_else(|| fun("normal")),
     }
   }
 }

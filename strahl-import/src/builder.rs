@@ -1,6 +1,6 @@
 use std::{
   fs::File,
-  io::{BufReader, Seek},
+  io::{BufReader, Seek, Write},
   path::Path,
 };
 
@@ -29,6 +29,10 @@ macro_rules! material_type_import {
   };
 }
 
+const NO_COMPRESSION: FileOptions<'static, ()> = FileOptions::DEFAULT
+  .compression_level(None)
+  .compression_method(zip::CompressionMethod::Stored);
+
 impl MaterialFileBuilder {
   pub fn new() -> Self { Default::default() }
   pub fn textures(mut self, textures: MaterialTextures<File>) -> Self {
@@ -38,26 +42,29 @@ impl MaterialFileBuilder {
   material_type_import! {roughness,specular,glossy,diffuse,emission,normal,}
   pub fn write(mut self, output: impl AsRef<Path>) -> anyhow::Result<()> {
     let mut zip = zip::ZipWriter::new(File::create(output)?);
-    zip.add_directory("surface", FileOptions::DEFAULT)?;
+    zip.add_directory("surface", NO_COMPRESSION)?;
     // TODO: parallelize image parsing!
     let taken = self.textures.take();
-    let _texs: MaterialTextures<TextureMetadata> = taken
+    let meta: MaterialTextures<TextureMetadata> = taken
       .map_named(|n, f| match self.parse_image(f) {
         Ok(tex) => {
-          zip.start_file(tex.append_ext(format!("surface/{n}")), FileOptions::DEFAULT)?;
+          zip.start_file(tex.append_ext(format!("surface/{n}")), NO_COMPRESSION)?;
 
-          tex.write(&mut zip)?;
-          Ok(TextureMetadata {})
+          Ok(tex.write(&mut zip)?)
         }
         Err(e) => bail!(e),
       })
-      .and_then(|n, s| {
-        s.inspect_err(|e| eprintln!("failed to pack {n} texture: {e}; skipping"))
-          .ok()
-      });
+      .map_named(|n, s| {
+        s.inspect_err(|e| log::error!("skipping {n} texture due to an error: {e}"))
+          .unwrap_or_default()
+      }).or_else(|n| {
+        log::warn!("No {n} texture supplied. Writing default metadata.");
+        Some(Default::default())});
+    zip.start_file("metadata.toml", NO_COMPRESSION)?;
+    write!(zip, "{}", toml::to_string(&meta)?)?;
     Ok(())
   }
-  pub fn parse_image(&self, f: File) -> anyhow::Result<StoredTexture> {
+  fn parse_image(&self, f: File) -> anyhow::Result<StoredTexture> {
     // image::
     match image::ImageReader::new(BufReader::new(f))
       .with_guessed_format().map(|x| (x.format(),x,))
@@ -70,15 +77,15 @@ impl MaterialFileBuilder {
         Ok(StoredTexture::File(f))
       }
       Ok((Some(fmt), _rdr)) => {
-        log::debug!("transcoding of known image format required, ignoring");
-        unimplemented!("transcoding of {fmt:?} is not implemented?")
+        log::debug!("transcoding of {fmt:?} required, ignoring");
+        bail!("transcoding is not implemented yet")
       }
       Ok((None, _rdr)) => {
         // might be KTX
-        log::debug!("unknown image format, ignoring");
-        unimplemented!("unknown format");
+        log::error!("unknown image format, ignoring");
+        bail!("unknown format");
       }
-      Err(e) => anyhow::bail!(e),
+      Err(e) => bail!(e),
     }
   }
 }

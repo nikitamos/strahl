@@ -1,9 +1,9 @@
 use std::{
   fs::File,
-  io::{BufRead, Read, Seek, Write},
+  io::Write,
 };
 
-use image::codecs::png::{PngDecoder, PngEncoder};
+use image::codecs::png::PngEncoder;
 use ktx2_rw::Ktx2Texture;
 
 pub mod builder;

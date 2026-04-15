@@ -5,7 +5,6 @@ use std::{
 };
 
 use anyhow::bail;
-use image::codecs::png::PngEncoder;
 use ktx2_rw::Ktx2Texture;
 use zip::write::FileOptions;
 
@@ -61,8 +60,7 @@ impl MaterialFileBuilder {
   pub fn parse_image(&self, f: File) -> anyhow::Result<StoredTexture> {
     // image::
     match image::ImageReader::new(BufReader::new(f))
-      .with_guessed_format()
-      .and_then(|x| Ok((x.format(),x,)))
+      .with_guessed_format().map(|x| (x.format(),x,))
     {
       // Just copy the PNG.
       Ok((Some(image::ImageFormat::Png), rdr)) => {
@@ -71,11 +69,11 @@ impl MaterialFileBuilder {
         f.rewind()?;
         Ok(StoredTexture::File(f))
       }
-      Ok((Some(fmt), rdr)) => {
+      Ok((Some(fmt), _rdr)) => {
         log::debug!("transcoding of known image format required, ignoring");
         unimplemented!("transcoding of {fmt:?} is not implemented?")
       }
-      Ok((None, rdr)) => {
+      Ok((None, _rdr)) => {
         // might be KTX
         log::debug!("unknown image format, ignoring");
         unimplemented!("unknown format");

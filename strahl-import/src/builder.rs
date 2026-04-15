@@ -1,6 +1,11 @@
-use std::{fs::File, io::BufReader, path::Path};
+use std::{
+  fs::File,
+  io::{BufReader, Seek},
+  path::Path,
+};
 
 use anyhow::bail;
+use image::codecs::png::PngEncoder;
 use ktx2_rw::Ktx2Texture;
 use zip::write::FileOptions;
 
@@ -54,16 +59,26 @@ impl MaterialFileBuilder {
     Ok(())
   }
   pub fn parse_image(&self, f: File) -> anyhow::Result<StoredTexture> {
+    // image::
     match image::ImageReader::new(BufReader::new(f))
-      .with_guessed_format()?
-      .decode()
+      .with_guessed_format()
+      .and_then(|x| Ok((x.format(),x,)))
     {
-      Ok(img) => {
-        Ok(StoredTexture::Png(img))
-        // encode_to_ktx(img)
+      // Just copy the PNG.
+      Ok((Some(image::ImageFormat::Png), rdr)) => {
+        log::debug!("PNG image detected, copying");
+        let mut f = rdr.into_inner().into_inner();
+        f.rewind()?;
+        Ok(StoredTexture::File(f))
       }
-      Err(e @ image::ImageError::Unsupported(_)) => {
-        anyhow::bail!(e)
+      Ok((Some(fmt), rdr)) => {
+        log::debug!("transcoding of known image format required, ignoring");
+        unimplemented!("transcoding of {fmt:?} is not implemented?")
+      }
+      Ok((None, rdr)) => {
+        // might be KTX
+        log::debug!("unknown image format, ignoring");
+        unimplemented!("unknown format");
       }
       Err(e) => anyhow::bail!(e),
     }

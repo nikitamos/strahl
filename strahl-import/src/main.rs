@@ -31,6 +31,7 @@ enum Commands {
 }
 
 fn main() -> anyhow::Result<()> {
+  env_logger::init();
   let cli = Cli::parse();
   match cli.command {
     Commands::CreateMaterial { descriptor, output } => {
@@ -45,7 +46,6 @@ fn main() -> anyhow::Result<()> {
           File::open(abs_tex_path)
         })
         .and_then(|n, f| {
-          println!("{n}");
           f.inspect_err(|e| eprintln!("Failed to read '{n}' texture: {e}"))
             .ok()
         });

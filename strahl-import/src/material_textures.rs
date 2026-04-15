@@ -43,9 +43,8 @@ impl<T> MaterialTextures<T> {
     }
   }
   pub fn map_named<U>(mut self, mut mapper: impl FnMut(&str, T) -> U) -> MaterialTextures<U> {
-    dbg!(self.roughness.is_some());
     MaterialTextures {
-      roughness: self.roughness.take().map(|x| {dbg!("rough map");mapper("roughness", x)}),
+      roughness: self.roughness.take().map(|x| mapper("roughness", x)),
       specular:  self.specular.take().map(|x| mapper("specular", x)),
       glossy:    self.glossy.take().map(|x| mapper("glossy", x)),
       diffuse:   self.diffuse.take().map(|x| mapper("diffuse", x)),

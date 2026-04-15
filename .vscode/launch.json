@@ -42,6 +42,28 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug executable 'strahl-import'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=strahl-import",
+                    "--package=strahl-import"
+                ],
+                "filter": {
+                    "name": "strahl-import",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "create-material",
+                "assets/lava/material.toml",
+                "out.zip"
+            ],
+            "cwd": "${workspaceFolder}/strahl-import"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug executable 'rcpu'",
             "cargo": {
                 "args": [

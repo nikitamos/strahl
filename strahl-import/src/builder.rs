@@ -8,11 +8,11 @@ use anyhow::bail;
 use ktx2_rw::Ktx2Texture;
 use zip::write::FileOptions;
 
-use crate::{StoredTexture, TextureMetadata, per_texture::PerTexture};
+use crate::{MaterialComponentSource, TextureMetadata, per_texture::PerTexture};
 
 #[derive(Default)]
 pub struct MaterialFileBuilder {
-  textures: PerTexture<File>,
+  textures: PerTexture<MaterialComponentSource>,
 }
 
 macro_rules! material_type_import {
@@ -22,7 +22,7 @@ macro_rules! material_type_import {
     #[doc = stringify!($mat)]
     #[doc = r" material component from given file"]
     pub fn $mat(mut self, $mat: File) -> Self {
-      self.textures.$mat.replace($mat);
+      self.textures.$mat.replace(MaterialComponentSource::File($mat));
       self
     }
     )*
@@ -35,7 +35,7 @@ const NO_COMPRESSION: FileOptions<'static, ()> = FileOptions::DEFAULT
 
 impl MaterialFileBuilder {
   pub fn new() -> Self { Default::default() }
-  pub fn textures(mut self, textures: PerTexture<File>) -> Self {
+  pub fn textures(mut self, textures: PerTexture<MaterialComponentSource>) -> Self {
     self.textures = textures;
     self
   }
@@ -46,7 +46,7 @@ impl MaterialFileBuilder {
     // TODO: parallelize image parsing!
     let taken = self.textures.take();
     let meta: PerTexture<TextureMetadata> = taken
-      .map_named(|n, f| match self.parse_image(f) {
+      .map_named(|n, f| match self.parse_source(f) {
         Ok(tex) => {
           zip.start_file(tex.append_ext(format!("surface/{n}")), NO_COMPRESSION)?;
 
@@ -64,8 +64,10 @@ impl MaterialFileBuilder {
     write!(zip, "{}", toml::to_string(&meta)?)?;
     Ok(())
   }
-  fn parse_image(&self, f: File) -> anyhow::Result<StoredTexture> {
-    // image::
+  fn parse_source(&self, src: MaterialComponentSource) -> anyhow::Result<MaterialComponentSource> {
+    let MaterialComponentSource::File(f) = src else {
+      return Ok(src);
+    };
     match image::ImageReader::new(BufReader::new(f))
       .with_guessed_format().map(|x| (x.format(),x,))
     {
@@ -74,7 +76,7 @@ impl MaterialFileBuilder {
         log::debug!("PNG image detected, copying");
         let mut f = rdr.into_inner().into_inner();
         f.rewind()?;
-        Ok(StoredTexture::File(f))
+        Ok(MaterialComponentSource::File(f))
       }
       Ok((Some(fmt), _rdr)) => {
         log::debug!("transcoding of {fmt:?} required, ignoring");

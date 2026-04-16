@@ -57,3 +57,25 @@ cargo r -- create-material path/to/material.toml path/to/output.zip
 
 # Geometry
 Geometry, its UV map, vertex normals are stored in a glTF file.
+The glTF file must satisfy the following conditions:
+1. It has exactly one mesh.
+2. The `primitives` field of the mesh has the following form:
+```jsonc
+{
+    /* ... */
+    "primitives" : [
+        {
+            "attributes": {
+                "POSITION":   /* accessor of float3 */,
+                "NORMAL":     /* accessor of float3 */,
+                "TEXCOORD_0": /* accessor of float2 */
+                // other attributes are ignored, but not disallowed
+            },
+            "indices": /* accessor of scalar integral */
+        }
+    ],
+    /* ... */
+}
+```
+3. Used accessors are not sparse.
+3. All attributes are stored in the same buffer.

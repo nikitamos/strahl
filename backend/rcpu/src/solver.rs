@@ -58,7 +58,7 @@ impl Solver {
   ) -> Sample<Spectrum, GeometrySampleMetadata> {
     scene
       .sample_light_source(&self.sampler, dest)
-      .compose(|src, ()| src.sample(self.sampler.sample(), LightSampleContext { dst: dest }))
+      .compose(|src, ()| src.sample(self.sampler.sample(), LightSampleContext { dst: dest }).expect("TODO!"))
   }
   pub(crate) fn hit_light(&self, scene: &Scene, ray: &dyn Castable) -> Option<Spectrum> {
     let light = &scene.lights[0];

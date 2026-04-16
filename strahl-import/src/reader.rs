@@ -8,7 +8,7 @@ use anyhow::{anyhow, bail};
 use gltf::{
   Accessor,
   accessor::{DataType, Dimensions},
-  buffer::Target,
+  buffer::{self, Target},
 };
 use ktx2_rw::Ktx2Texture;
 use zip::ZipArchive;
@@ -70,9 +70,9 @@ pub struct GltfBufferView {
   pub count:  usize,
   /// Length of view in bytes
   pub length: usize,
-  /// Stride of the accessor
-  // TODO: replace with just `usize` and infer default value?
-  pub stride: Option<usize>,
+  /// Stride of the accessor. If glTF contains no value,
+  /// it is inferred using the size of buffer component.
+  pub stride: usize,
 }
 
 impl GltfBufferView {
@@ -95,7 +95,7 @@ impl GltfBufferView {
       offset: view.offset() + acc.offset(),
       count:  acc.count(),
       length: view.length(),
-      stride: view.stride(),
+      stride: view.stride().unwrap_or(acc.size()),
     })
   }
   fn new_validate_dim(
@@ -115,7 +115,7 @@ impl GltfBufferView {
       offset: view.offset(),
       count:  acc.count(),
       length: view.length(),
-      stride: view.stride(),
+      stride: view.stride().unwrap_or(acc.size()),
     })
   }
   fn validate_not_sparse(
@@ -157,11 +157,12 @@ impl GltfBufferView {
 
 #[derive(Debug)]
 pub struct GltfGeometry {
-  position:   GltfBufferView,
-  normals:    GltfBufferView,
-  uv:         GltfBufferView,
-  indices:    GltfBufferView,
-  index_size: u8,
+  pub position:   GltfBufferView,
+  pub normals:    GltfBufferView,
+  pub uv:         GltfBufferView,
+  pub indices:    GltfBufferView,
+  pub index_size: u8,
+  pub buffer:     Vec<u8>,
 }
 
 impl GltfGeometry {
@@ -175,9 +176,18 @@ impl GltfGeometry {
       );
       bail!("wrong count of meshes in gltf");
     }
-
     let mesh = doc.meshes().next().unwrap();
     let mesh_name = mesh.name().unwrap_or("<unnamed mesh>");
+
+    if buffers.len() != 0 {
+      log::error!(
+        "Mesh {mesh_name} contains {} meshes, expected 1",
+        buffers.len()
+      );
+      bail!("wrong count of buffers in gltf");
+    }
+    let buffer = buffers.into_iter().next().unwrap().0;
+
     log::info!(
       "Reading mesh {mesh_name} from {}",
       path.as_ref().to_string_lossy()
@@ -223,6 +233,7 @@ impl GltfGeometry {
       normals:    GltfBufferView::new(mesh_name, normals, Dimensions::Vec3, DataType::F32)?,
       uv:         GltfBufferView::new(mesh_name, uv, Dimensions::Vec2, DataType::F32)?,
       indices:    GltfBufferView::new_validate_dim(mesh_name, indices, Dimensions::Scalar)?,
+      buffer
     })
   }
 }

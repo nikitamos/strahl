@@ -6,12 +6,22 @@ use std::{
 };
 
 use clap::Parser;
-use strahl_import::{builder::MaterialFileBuilder, per_texture::PerTexture};
+use serde::Deserialize;
+use strahl_import::{
+  MaterialComponentSource, builder::MaterialFileBuilder, per_texture::PerTexture,
+};
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum BSDFSpec {
+  Path(String),
+  Color { r: u8, g: u8, b: u8, a: u8 },
+}
 
 #[derive(serde::Deserialize)]
 struct MaterialPacker {
   /// Paths to corresponding textures
-  textures: PerTexture<String>,
+  textures: PerTexture<BSDFSpec>,
 }
 
 #[derive(clap::Parser)]
@@ -31,21 +41,32 @@ enum Commands {
 }
 
 fn main() -> anyhow::Result<()> {
-  env_logger::init();
+  env_logger::builder()
+    .filter_module("strahl_import", log::LevelFilter::Info)
+    .format_timestamp(None)
+    .init();
   let cli = Cli::parse();
   match cli.command {
     Commands::CreateMaterial { descriptor, output } => {
       let packer: MaterialPacker = toml::from_str(&fs::read_to_string(&descriptor)?)?;
       let textures = packer
         .textures
-        .map_all(|tex_path| {
-          let abs_tex_path = path::absolute(&descriptor)?
-            .parent()
-            .unwrap()
-            .join(tex_path);
-          File::open(abs_tex_path)
+        .map_all(|bsdf| match bsdf {
+          BSDFSpec::Path(tex_path) => {
+            let abs_tex_path = path::absolute(&descriptor)?
+              .parent()
+              .unwrap()
+              .join(tex_path);
+            Ok(MaterialComponentSource::File(File::open(abs_tex_path)?))
+          }
+          BSDFSpec::Color { r, g, b, a } => Ok(MaterialComponentSource::Rgba {
+            r: r as f32 / 255.0,
+            g: g as f32 / 255.0,
+            b: b as f32 / 255.0,
+            a: a as f32 / 255.0,
+          }),
         })
-        .and_then(|n, f| {
+        .and_then(|n, f: std::io::Result<MaterialComponentSource>| {
           f.inspect_err(|e| eprintln!("Failed to read '{n}' texture: {e}"))
             .ok()
         });

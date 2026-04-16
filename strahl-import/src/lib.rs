@@ -9,6 +9,8 @@ pub mod reader;
 
 pub mod per_texture;
 
+pub type ImportedMaterial = reader::Material;
+
 #[derive(Serialize, Deserialize)]
 pub enum TextureFormat {
   Png,
@@ -34,8 +36,7 @@ impl Default for TextureMetadata {
   }
 }
 
-#[allow(unused)]
-pub(crate) enum StoredTexture {
+pub enum StoredTexture {
   Image(image::DynamicImage),
   /// Valid PNG file
   File(File),

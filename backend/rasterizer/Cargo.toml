@@ -9,3 +9,6 @@ wgpu = "29.0.1"
 strahl_types = {path = "../../strahl_types"}
 ash = "0.38.0"
 anyhow = "1.0.102"
+glam = {version = "0.32.1", features = ["zerocopy"]}
+strahl-import = { version = "0.1.0", path = "../../strahl-import" }
+zerocopy = { version = "0.8.48", features = ["derive"] }

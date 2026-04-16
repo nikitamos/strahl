@@ -61,4 +61,5 @@ impl Material {
       });
     Ok(Self { textures })
   }
+  pub fn textures(&self) -> &PerTexture<StoredTexture> { &self.textures }
 }

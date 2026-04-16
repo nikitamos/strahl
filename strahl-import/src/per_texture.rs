@@ -73,3 +73,21 @@ impl<T> PerTexture<T> {
     }
   }
 }
+
+impl<'a, T> IntoIterator for &'a PerTexture<T> {
+  type Item = Option<&'a T>;
+
+  type IntoIter = <[Self::Item; 6] as IntoIterator>::IntoIter;
+
+  fn into_iter(self) -> Self::IntoIter {
+    [
+      self.roughness.as_ref(),
+      self.specular.as_ref(),
+      self.glossy.as_ref(),
+      self.diffuse.as_ref(),
+      self.emission.as_ref(),
+      self.normal.as_ref(),
+    ]
+    .into_iter()
+  }
+}

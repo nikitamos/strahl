@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["backend/rcpu", "strahl_types", "strahl-import"]
+members = ["backend/rcpu", "strahl_types", "strahl-import", "backend/rasterizer"]
 
 [workspace.dependencies]
 image = "0.25.10"

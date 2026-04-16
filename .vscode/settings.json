@@ -3,6 +3,7 @@
         "BSDF",
         "downcasting",
         "Lambertian",
+        "Rasterizer",
         "raygen",
         "Raymarcher",
         "strahl"

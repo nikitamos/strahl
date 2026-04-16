@@ -3,9 +3,13 @@
         "BSDF",
         "downcasting",
         "Lambertian",
+        "multisampled",
         "Rasterizer",
         "raygen",
         "Raymarcher",
-        "strahl"
+        "strahl",
+        "Texel",
+        "Unorm",
+        "wgpu"
     ]
 }

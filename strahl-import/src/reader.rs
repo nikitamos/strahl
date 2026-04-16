@@ -62,10 +62,16 @@ impl Material {
   }
 }
 
+#[derive(Debug)]
 pub struct GltfBufferView {
+  /// Offset of the view within the buffer
   pub offset: usize,
+  /// Count of entries in the accessor
   pub count:  usize,
+  /// Length of view in bytes
   pub length: usize,
+  /// Stride of the accessor
+  // TODO: replace with just `usize` and infer default value?
   pub stride: Option<usize>,
 }
 
@@ -86,7 +92,7 @@ impl GltfBufferView {
     }
 
     Ok(Self {
-      offset: view.offset(),
+      offset: view.offset() + acc.offset(),
       count:  acc.count(),
       length: view.length(),
       stride: view.stride(),
@@ -149,6 +155,7 @@ impl GltfBufferView {
   }
 }
 
+#[derive(Debug)]
 pub struct GltfGeometry {
   position:   GltfBufferView,
   normals:    GltfBufferView,

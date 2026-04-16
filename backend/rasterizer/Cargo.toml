@@ -7,3 +7,5 @@ edition = "2024"
 log = "0.4.29"
 wgpu = "29.0.1"
 strahl_types = {path = "../../strahl_types"}
+ash = "0.38.0"
+anyhow = "1.0.102"

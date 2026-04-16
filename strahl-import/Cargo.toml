@@ -3,6 +3,10 @@ name = "strahl-import"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "test_reader"
+path = "src/test_reader.rs"
+
 [dependencies]
 ktx2-rw = "0.2.4"
 zip = "8.5.1"

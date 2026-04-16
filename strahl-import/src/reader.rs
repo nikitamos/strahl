@@ -2,24 +2,15 @@ use std::{
   fs::File,
   io::{BufReader, Read},
   path::Path,
-  process::{ExitCode, Termination},
 };
 
-use image::codecs::png::PngDecoder;
 use ktx2_rw::Ktx2Texture;
-use zip::{HasZipMetadata, ZipArchive, result::ZipResult};
+use zip::ZipArchive;
 
 use crate::{MATERIAL_METADATA, MaterialComponentSource, TextureMetadata, per_texture::PerTexture};
 
 pub struct Material {
   textures: PerTexture<MaterialComponentSource>,
-}
-
-impl Termination for Material {
-  fn report(self) -> std::process::ExitCode {
-    println!("ok?");
-    ExitCode::from(12)
-  }
 }
 
 impl Material {

@@ -85,4 +85,4 @@ impl MaterialComponentSource {
   }
 }
 
-const MATERIAL_METADATA: &'static str = "metadata.toml";
+const MATERIAL_METADATA: &str = "metadata.toml";

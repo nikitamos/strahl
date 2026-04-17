@@ -11,8 +11,7 @@ use material::Material;
 use wgpu::hal::vulkan as wgvk;
 
 use crate::{
-  geometry::Geometry, gpu_alloc::Allocator, scene::Scene,
-  shader_manager::ShaderManager,
+  geometry::Geometry, gpu_alloc::Allocator, scene::Scene, shader_manager::ShaderManager,
 };
 
 pub(crate) mod gpu_alloc;
@@ -25,6 +24,7 @@ pub struct Rasterizer {
   target:    limne::TextureProvider,
   drawer:    Option<limne::TextureDrawer>,
   manager:   Arc<ShaderManager>,
+  info:      RasterizerCreateInfo,
 }
 
 pub mod geometry;
@@ -33,8 +33,12 @@ pub mod material;
 pub mod scene;
 pub mod uniform;
 
+pub struct RasterizerCreateInfo {
+  pub viewport: glam::u32::UVec2,
+}
+
 impl Rasterizer {
-  pub async fn new() -> anyhow::Result<Rasterizer> {
+  pub async fn new(info: RasterizerCreateInfo) -> anyhow::Result<Rasterizer> {
     log::info!("Creating Rasterizer backend?");
     let r: anyhow::Result<Rasterizer> = try {
       let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
@@ -67,20 +71,20 @@ impl Rasterizer {
           features_wgpu:   wgpu::FeaturesWGPU::empty(),
           features_webgpu: wgpu::FeaturesWebGPU::IMMEDIATES,
         },
-        required_limits:   wgpu::Limits {
+        required_limits: wgpu::Limits {
           max_immediate_size: 256,
           ..Default::default()
         },
         ..Default::default()
       };
       let (raw, (dev, queue)) =
-        unsafe { create_presenter_dev_queue(&instance, adapter, dev_desc).await? };
+        unsafe { create_presenter_dev_queue(&instance, adapter, dev_desc, &info).await? };
 
       let target = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
         label:           Some(" a kind of render target".to_string()),
         size:            wgpu::Extent3d {
-          width:                 1024,
-          height:                1024,
+          width:                 info.viewport.x,
+          height:                info.viewport.y,
           depth_or_array_layers: 1,
         },
         mip_level_count: 1,
@@ -102,6 +106,7 @@ impl Rasterizer {
         dev,
         target,
         manager,
+        info,
       }
     };
     r.map_err(|x| anyhow::anyhow!(x))
@@ -175,8 +180,8 @@ impl Rasterizer {
         aspect:    wgpu::TextureAspect::All,
       },
       wgpu::Extent3d {
-        width:                 1024,
-        height:                1024,
+        width:                 self.info.viewport.x,
+        height:                self.info.viewport.y,
         depth_or_array_layers: 1,
       },
     );
@@ -187,6 +192,7 @@ async unsafe fn create_presenter_dev_queue(
   instance: &wgpu::Instance,
   adapter: wgpu::Adapter,
   dev_desc: wgpu::wgt::DeviceDescriptor<Option<&str>>,
+  info: &RasterizerCreateInfo,
 ) -> Result<(RawMappedPresenter, (wgpu::Device, wgpu::Queue)), anyhow::Error> {
   unsafe {
     let i = instance.as_hal::<wgvk::Api>().unwrap();
@@ -213,7 +219,14 @@ async unsafe fn create_presenter_dev_queue(
       })),
     )?;
     Ok((
-      raw_wgpu_setup(i.shared_instance(), &dq, phy).await,
+      raw_wgpu_setup(
+        i.shared_instance(),
+        &dq,
+        phy,
+        info.viewport.x,
+        info.viewport.y,
+      )
+      .await,
       adapter.create_device_from_hal(dq, &dev_desc)?,
     ))
   }
@@ -250,11 +263,13 @@ async unsafe fn raw_wgpu_setup(
   vk_instance: &wgvk::InstanceShared,
   dq: &wgpu::hal::OpenDevice<wgvk::Api>,
   phy: vk::PhysicalDevice,
+  width: u32,
+  height: u32,
 ) -> RawMappedPresenter {
   let extent = vk::Extent3D {
-    width:  1024,
-    height: 1024,
-    depth:  1,
+    width,
+    height,
+    depth: 1,
   };
   let alloc = Allocator::new(phy, dq.device.raw_device(), vk_instance.raw_instance());
   unsafe {

@@ -70,18 +70,23 @@ export declare class Sphere {
  */
 export declare class Strahl {
   /** Creates a new instance of `Strahl` */
-  constructor(info: StrahlCreateInfo)
+  static create(info: StrahlCreateInfo): Promise<Strahl>
   /** Creates an empty scene */
-  createScene(): Scene
+  createScene(): Promise<Scene>
   /** Loads material from given path */
-  loadMaterial(path: string): Material
+  loadMaterial(path: string): Promise<Material>
   /** Loads model geometry from given path */
-  loadModel(path: string): Geometry
+  loadModel(path: string): Promise<Geometry>
+  /** Loads glTF mesh from file */
+  loadMesh(path: string): Promise<Geometry>
   createPointGeometry(): Geometry
-  /** Renders the `scene` from `camera`'s point of view */
+  /**
+   * Renders the `scene` from `camera`'s point of view
+   * Returns a memory-mapped region containing RGBA texture.
+   */
   render(scene: Scene, cam: Camera): Promise<Uint8Array>
   /** Creates an instance of `Strahl` with default settings */
-  static default(): Strahl
+  static default(): Promise<Strahl>
 }
 
 /** Object aggregating information required to create a [`Body`] */
@@ -119,10 +124,10 @@ export type LightCreateInfo =
     /** Radiance of the light source in red, green and blue wavelength of spectrum. */
     color: Float32Array,
     /**
-     * Array of length 3 representing the position of the light source
-     * relative to the world origin,
-     * i.e. the translation applied to the geometry.
-     */
+   * Array of length 3 representing the position of the light source
+   * relative to the world origin,
+   * i.e. the translation applied to the geometry.
+   */
     position: Float32Array
   }
 

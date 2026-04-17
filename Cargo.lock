@@ -3068,6 +3068,10 @@ dependencies = [
 name = "strahl-js"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "env_logger",
+ "glam",
+ "log",
  "napi",
  "napi-build",
  "napi-derive",

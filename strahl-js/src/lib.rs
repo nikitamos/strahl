@@ -1,12 +1,16 @@
 #![deny(clippy::all)]
+#![feature(try_blocks)]
 
 mod erase;
 
-use std::sync::Arc;
+use std::{any, sync::Arc};
+
+use rasterizer::Rasterizer;
 
 use napi::{
   Env,
-  bindgen_prelude::{ArrayBuffer, Float32Array, Uint8Array},
+  bindgen_prelude::{ArrayBuffer, Float32Array, Uint8Array, Uint8ArraySlice},
+  tokio::{self, sync::RwLock},
 };
 use napi_derive::napi;
 
@@ -19,11 +23,21 @@ macro_rules! napi_todo {
   };
 }
 
+pub trait AnyhowIntoNapi<T> {
+  fn into_napi(self) -> napi::Result<T>;
+}
+
+impl<T> AnyhowIntoNapi<T> for anyhow::Result<T> {
+  fn into_napi(self) -> napi::Result<T> {
+    self.map_err(|e| napi::Error::from_reason(format!("{e}")))
+  }
+}
+
 /// The entry point to the `strahl`'s API.
 /// This class provides methods for creating scenes, managing resources and rendering.
 #[napi]
 pub struct Strahl {
-  backend: (),
+  backend: Arc<RwLock<Rasterizer>>,
 }
 
 /// Class wrapping a geometry. So far it doesn't have any methods exposed,
@@ -31,7 +45,7 @@ pub struct Strahl {
 ///
 /// Geometry in `strahl` is a generic shape that may be used by bodies or light sources.
 #[napi]
-pub struct Geometry {}
+pub struct Geometry(Arc<rasterizer::geometry::Geometry>);
 
 #[napi]
 impl Geometry {
@@ -95,15 +109,11 @@ pub struct Camera {
 /// Class wrapping a material. So far it doesn't have any methods exposed,
 /// so it may thought of as a kind of opaque handler.
 #[napi]
-pub struct Material(Arc<()>);
+pub struct Material(Arc<rasterizer::material::Material>);
 
 /// Anything that can be rendered
 #[napi]
-pub struct Body {
-  material: Arc<()>,
-  geometry: Arc<()>,
-  position: [f32; 3],
-}
+pub struct Body(Arc<rasterizer::scene::Body>);
 
 /// Represents geometry of a perfect sphere
 #[napi]
@@ -130,7 +140,8 @@ impl Body {
   /// Gets the position of the body relative to the world origin. Returns the array of length 3.
   #[napi(getter)]
   pub fn position(&self) -> Float32Array {
-    Float32Array::with_data_copied(self.position)
+    let rf = self.0.translation();
+    Float32Array::with_data_copied(rf.as_ref())
   }
   /// Sets the position of the body relative to the world origin. Expects an array of length 3.
   #[napi(setter)]
@@ -138,7 +149,7 @@ impl Body {
     if pos.len() != 3 {
       Err(napi::Error::from_reason("Expected a slice of length 3"))
     } else {
-      self.position.copy_from_slice(pos);
+      self.0.set_translation(glam::Vec3::from_slice(pos));
       Ok(())
     }
   }
@@ -165,7 +176,7 @@ pub struct LightSource {}
 /// So far it doesn't have any methods exposed,
 /// so it may thought of as a kind of opaque handler.
 #[napi]
-pub struct Scene {}
+pub struct Scene(rasterizer::scene::Scene);
 
 /// Object aggregating the information required to create [`LightSource`].
 /// The only supported light type so far is omnidirectional: each point
@@ -192,8 +203,12 @@ impl Scene {
     info: BodyCreateInfo<'env>,
     material: &'env Material,
     geometry: &'env Geometry,
-  ) -> napi::Result<Body> {
-    napi_todo!()
+  ) -> Body {
+    Body(
+      self
+        .0
+        .add_body(Arc::clone(&geometry.0), Arc::clone(&material.0)),
+    )
   }
 
   /// Adds a light source to the scene
@@ -210,45 +225,75 @@ impl Scene {
 #[napi]
 impl Strahl {
   /// Creates a new instance of `Strahl`
-  #[napi(constructor)]
-  pub fn new(info: StrahlCreateInfo) -> Self {
-    Self { backend: () }
+  #[napi(factory)]
+  pub async fn create(info: StrahlCreateInfo) -> napi::Result<Self> {
+    env_logger::builder()
+      .default_format()
+      .format_timestamp(None)
+      .filter_module("strahl_import", log::LevelFilter::Warn)
+      .filter_module("rasterizer", log::LevelFilter::Trace)
+      .filter_module("strahl_js", log::LevelFilter::Trace)
+      .parse_default_env()
+      .init();
+
+    Ok(Self {
+      backend: Arc::new(RwLock::new(Rasterizer::new().await.into_napi()?)),
+    })
   }
   /// Creates an empty scene
   #[napi]
-  pub fn create_scene(&self) -> Scene {
-    Scene {}
+  pub async fn create_scene(&self) -> Scene {
+    Scene(self.backend.read().await.create_scene())
   }
   /// Loads material from given path
   #[napi]
-  pub fn load_material(&self, path: String) -> napi::Result<Material> {
-    napi_todo!()
+  pub async fn load_material(&self, path: String) -> napi::Result<Material> {
+    let backend = Arc::clone(&self.backend);
+    tokio::spawn(async move { backend.read().await.load_material(&path).map(Material) })
+      .await
+      .map_err(|e| e.into())
+      .flatten()
+      .into_napi()
   }
   /// Loads model geometry from given path
   #[napi]
-  pub fn load_model(&self, path: String) -> napi::Result<Geometry> {
-    napi_todo!()
+  #[deprecated(note = "Use load_mesh instead")]
+  pub async fn load_model(&self, path: String) -> napi::Result<Geometry> {
+    self.load_mesh(path).await
+  }
+  /// Loads glTF mesh from file
+  #[napi]
+  pub async fn load_mesh(&self, path: String) -> napi::Result<Geometry> {
+    let backend = Arc::clone(&self.backend);
+    tokio::spawn(async move { backend.read().await.load_mesh(&path).map(Geometry) })
+      .await
+      .map_err(|e| e.into())
+      .flatten()
+      .into_napi()
   }
   #[napi]
   pub fn create_point_geometry(&self) -> napi::Result<Geometry> {
     napi_todo!()
   }
   /// Renders the `scene` from `camera`'s point of view
+  /// Returns a memory-mapped region containing RGBA texture.
   #[napi]
   pub async fn render(&self, scene: &Scene, cam: Camera) -> napi::Result<Uint8Array> {
-    napi_todo!()
+    let mut backend = self.backend.write().await;
+    let data = backend.render(&scene.0);
+    unsafe {
+      Ok(Uint8Array::with_external_data(
+        data.as_ptr().cast_mut(),
+        data.len(),
+        |_, _| log::info!("slice is utilized?"),
+      ))
+    }
   }
 
   /// Creates an instance of `Strahl` with default settings
   #[napi(factory, js_name = "default")]
-  pub fn default_node_workaround() -> Strahl {
-    Self::default()
-  }
-}
-
-impl Default for Strahl {
-  fn default() -> Self {
-    Strahl::new(StrahlCreateInfo::default())
+  pub async fn default_node_workaround() -> napi::Result<Strahl> {
+    Self::create(StrahlCreateInfo::default()).await
   }
 }
 
@@ -264,6 +309,10 @@ pub enum StrahlBackend {
 pub struct StrahlCreateInfo {
   /// Specifies the rendering backend
   pub backend: StrahlBackend,
+  /// Specifies the width of the viewport (in pixels)
+  pub width: u32,
+  /// Specified the height of the viewport
+  pub height: u32,
 }
 
 #[napi]
@@ -271,6 +320,8 @@ impl Default for StrahlCreateInfo {
   fn default() -> Self {
     Self {
       backend: StrahlBackend::Rasterize,
+      width: 1024,
+      height: 1024,
     }
   }
 }

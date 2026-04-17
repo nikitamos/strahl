@@ -8,7 +8,7 @@ use std::{path::Path, sync::Arc};
 
 use ash::vk;
 use material::Material;
-use wgpu::{TextureUsages, hal::vulkan as wgvk, wgt::TextureDescriptor};
+use wgpu::{FeaturesWGPU, TextureUsages, hal::vulkan as wgvk, wgt::TextureDescriptor};
 
 use crate::{
   geometry::Geometry, gpu_alloc::Allocator, limne::RenderTarget, scene::Scene,
@@ -114,6 +114,14 @@ impl Rasterizer {
         })
         .await?;
       let dev_desc = wgpu::DeviceDescriptor {
+        required_features: wgpu::Features {
+          features_wgpu:   wgpu::FeaturesWGPU::empty(),
+          features_webgpu: wgpu::FeaturesWebGPU::IMMEDIATES,
+        },
+        required_limits:   wgpu::Limits {
+          max_immediate_size: 256,
+          ..Default::default()
+        },
         ..Default::default()
       };
       let (raw, (dev, queue)) =
@@ -164,61 +172,42 @@ impl Rasterizer {
     Geometry::from_gltf(&self.dev, gltf).map(Arc::new)
   }
   pub fn render(&mut self, scene: &Scene) -> &[u8] {
-    if let Some(body) = scene.bodies().first() {
-      if let Some(ref view) = body.material().any_view {
-        let mut encoder = self
-          .dev
-          .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("zbuf_smoothing"),
-          });
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-          label: Some("zbuf_smoothing"),
-          color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view:           &self.target,
-            resolve_target: None,
-            ops:            wgpu::Operations {
-              load:  wgpu::LoadOp::DontCare(Default::default()),
-              store: wgpu::StoreOp::Store,
-            },
-            depth_slice:    None,
-          })],
-          depth_stencil_attachment: None,
-          timestamp_writes: None,
-          occlusion_query_set: None,
-          multiview_mask: None,
-        });
-        let drawer = self.drawer.get_or_insert(limne::TextureDrawer::new(
-          &self.dev,
-          &limne::TextureDrawerResources {
-            texture:     view,
-            bind_groups: &[],
+    let mut encoder = self
+      .dev
+      .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("zbuf_smoothing"),
+      });
+    {
+      let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("zbuf_smoothing"),
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+          view:           &self.target,
+          resolve_target: None,
+          ops:            wgpu::Operations {
+            load:  wgpu::LoadOp::DontCare(Default::default()),
+            store: wgpu::StoreOp::Store,
           },
-          &wgpu::TextureFormat::Rgba8Unorm,
-          limne::TextureDrawerInitRes {
-            stencil:         None,
-            fragment:        None,
-            layout:          &[],
-            unclipped_depth: false,
-          },
-        ));
-        drawer.render_into_pass(&mut pass, &limne::TextureDrawerResources {
-          texture:     view,
-          bind_groups: &[],
-        });
-        drop(pass);
-        self.copy_to_presenter(&mut encoder);
-        let index = self.queue.submit(std::iter::once(encoder.finish()));
-        log::trace!("work submitted to the GPU");
-        self.dev.poll(wgpu::wgt::PollType::Wait {
-          submission_index: Some(index),
-          timeout:          None,
-        });
-        log::trace!("complete");
-      } else {
-        log::error!("You are so boring, give a roughness texture!");
-        log::warn!("No image will be produced");
+          depth_slice:    None,
+        })],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+      });
+      pass.set_bind_group(0, self.manager.uniforms().bind_group(), &[]);
+      for body in scene.bodies() {
+        body.draw(&mut pass);
       }
     }
+    self.copy_to_presenter(&mut encoder);
+    let index = self.queue.submit(std::iter::once(encoder.finish()));
+    log::trace!("work submitted to the GPU");
+    // TODO: wait asynchronously
+    let _ = self.dev.poll(wgpu::wgt::PollType::Wait {
+      submission_index: Some(index),
+      timeout:          None,
+    });
+    log::trace!("complete");
     self.presenter.mapped
   }
 

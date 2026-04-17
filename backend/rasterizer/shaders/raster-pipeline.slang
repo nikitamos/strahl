@@ -96,8 +96,8 @@ struct VertexOutput {
 [shader("vertex")]
 VertexOutput MeshGeometryVS(
     float3 body_position: POSITION0,
-    float2 uv: POSITION1,
-    float3 normal: POSITION2
+    float3 normal: POSITION1,
+    float2 uv: POSITION2,
 ) {
     return VertexOutput(float4(body_position, 1.0), uv, normal);
 }

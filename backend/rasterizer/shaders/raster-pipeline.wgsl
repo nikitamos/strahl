@@ -32,12 +32,12 @@ fn VertexOutput_x24init_0( position_1 : vec4<f32>,  uv_1 : vec2<f32>,  vertex_no
 struct vertexInput_0
 {
     @location(0) body_position_0 : vec3<f32>,
-    @location(1) uv_2 : vec2<f32>,
-    @location(2) normal_1 : vec3<f32>,
+    @location(1) normal_1 : vec3<f32>,
+    @location(2) uv_2 : vec2<f32>,
 };
 
 @vertex
-fn VertexShader( _S2 : vertexInput_0) -> VertexOutput_0
+fn MeshGeometryVS( _S2 : vertexInput_0) -> VertexOutput_0
 {
     return VertexOutput_x24init_0(vec4<f32>(_S2.body_position_0, 1.0f), _S2.uv_2, _S2.normal_1);
 }
@@ -65,7 +65,7 @@ struct pixelInput_0
 };
 
 @fragment
-fn FragmentShader( _S3 : pixelInput_0, @builtin(position) position_2 : vec4<f32>) -> pixelOutput_0
+fn RasterizerPbrFS( _S3 : pixelInput_0, @builtin(position) position_2 : vec4<f32>) -> pixelOutput_0
 {
     var _S4 : pixelOutput_0 = pixelOutput_0( GetDiffuse_0(_S3.uv_4) );
     return _S4;

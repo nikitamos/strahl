@@ -1,9 +1,16 @@
 {
     "cSpell.words": [
         "BSDF",
+        "downcasting",
+        "gltf",
         "Lambertian",
+        "multisampled",
+        "Rasterizer",
         "raygen",
         "Raymarcher",
-        "strahl"
+        "strahl",
+        "Texel",
+        "Unorm",
+        "wgpu"
     ]
 }

@@ -8,8 +8,9 @@ version = "0.1.0"
 crate-type = ["cdylib"]
 
 [dependencies]
-napi = {version = "3.5.2", features = ["async"]}
+napi = { version = "3.5.2", features = ["async"] }
 napi-derive = "3.5.2"
+rasterizer = { path = "../backend/rasterizer" }
 
 [build-dependencies]
 napi-build = "2"

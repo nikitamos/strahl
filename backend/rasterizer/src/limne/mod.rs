@@ -1,0 +1,57 @@
+mod show_texture;
+mod texture_provider;
+
+pub use render_target::RenderTarget;
+pub use show_texture::*;
+pub use texture_provider::*;
+
+mod render_target {
+  use wgpu::{RenderPass, TextureFormat};
+
+  pub trait ExternalResources<'a> {
+    // fn update(&mut self, dt: f32, device: &wgpu::Device, queue: &wgpu::Queue) {}
+    // fn bind_group_layout(&self) -> Option<&wgpu::BindGroupLayout> {
+    //   None
+    // }
+  }
+
+  impl ExternalResources<'_> for () {}
+
+  pub trait RenderTarget<'a> {
+    type RenderResources: ExternalResources<'a>;
+    type InitResources = ();
+    type UpdateResources = Self::RenderResources;
+
+    #[deprecated = "Implement custom `new` function for every type"]
+    fn init(
+      _device: &wgpu::Device,
+      _queue: &wgpu::Queue,
+      _resources: &'a Self::RenderResources,
+      _format: &wgpu::TextureFormat,
+      _init_res: Self::InitResources,
+    ) -> Self
+    where
+      Self: Sized,
+    {
+      todo!()
+    }
+    /// Run per-frame update
+    fn update(
+      &mut self,
+      device: &wgpu::Device,
+      queue: &wgpu::Queue,
+      resources: &'a Self::UpdateResources,
+      encoder: &mut wgpu::CommandEncoder,
+    );
+    /// This function is called when the render target texture is resized
+    fn resized(
+      &mut self,
+      _device: &wgpu::Device,
+      _new_size: glam::Vec2,
+      _resources: &'a Self::UpdateResources,
+      _format: TextureFormat,
+    ) {
+    }
+    fn render_into_pass(&self, pass: &mut RenderPass, resources: &'a Self::RenderResources);
+  }
+}

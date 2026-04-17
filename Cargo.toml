@@ -1,3 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["abstractions","backend/rcpu", "napi-test", "node", "strahl-js"]
+members = ["backend/rcpu", "strahl_types", "strahl-import", "backend/rasterizer", "strahl-js"]
+
+[workspace.dependencies]
+image = "0.25.10"

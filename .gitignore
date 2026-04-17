@@ -5,3 +5,7 @@ build
 # Added by cargo
 
 /target
+
+# NAPI-RS and NodeJS artifacts
+*.node
+node_modules

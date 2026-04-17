@@ -19,6 +19,84 @@
             "program": "${workspaceFolder}/build/frontends/qt-gui/strahl-qui",
             "args": [],
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'rcpu'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=rcpu"
+                ],
+                "filter": {
+                    "name": "rcpu",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'strahl-import'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=strahl-import",
+                    "--package=strahl-import"
+                ],
+                "filter": {
+                    "name": "strahl-import",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "create-material",
+                "assets/lava/material.toml",
+                "out.zip"
+            ],
+            "cwd": "${workspaceFolder}/strahl-import"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'rcpu'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=rcpu",
+                    "--package=rcpu"
+                ],
+                "filter": {
+                    "name": "rcpu",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'strahl_types'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=strahl_types"
+                ],
+                "filter": {
+                    "name": "strahl_types",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

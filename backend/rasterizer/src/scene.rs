@@ -9,6 +9,12 @@ pub struct BodyPipeline {
   pipeline: wgpu::RenderPipeline,
 }
 
+impl Default for BodyPipeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BodyPipeline {
   pub fn new() -> Self { todo!() }
 }
@@ -31,6 +37,12 @@ impl Body {
 
 pub struct Scene {
   bodies: Vec<Arc<Body>>,
+}
+
+impl Default for Scene {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Scene {

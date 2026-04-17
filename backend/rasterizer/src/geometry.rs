@@ -1,10 +1,7 @@
-use std::{mem::MaybeUninit, sync::Arc};
-
 use strahl_import::reader::{GltfBufferView, GltfGeometry};
 use wgpu::{
   PipelineCompilationOptions, VertexBufferLayout,
   util::{BufferInitDescriptor, DeviceExt},
-  vertex_attr_array,
 };
 
 // #[derive(Clone)]
@@ -18,11 +15,7 @@ pub enum Geometry {
 }
 
 impl Geometry {
-  pub fn from_gltf(
-    dev: &wgpu::Device,
-    queue: &wgpu::Queue,
-    gltf: GltfGeometry,
-  ) -> anyhow::Result<Self> {
+  pub fn from_gltf(dev: &wgpu::Device, gltf: GltfGeometry) -> anyhow::Result<Self> {
     get_gltf_index_format(&gltf).ok_or(anyhow::anyhow!(
       "bad index format: expected 8-bit or 16-bit"
     ))?;
@@ -49,10 +42,10 @@ impl Geometry {
       }
     }
   }
-  pub fn vertex_state<'a, 'b>(
+  pub fn vertex_state<'b>(
     &self,
     attrs: &'b mut [wgpu::VertexAttribute; 3],
-    layout: &'a mut [wgpu::VertexBufferLayout<'b>; 3],
+    layout: &mut [wgpu::VertexBufferLayout<'b>; 3],
   ) -> wgpu::VertexState<'_> {
     if let Self::Mesh { buf: _buf, gltf } = self {
       *layout = Self::buffer_layout(gltf, attrs);

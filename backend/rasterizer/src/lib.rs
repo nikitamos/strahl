@@ -3,13 +3,12 @@
 #![allow(dead_code)]
 
 use core::slice;
-use std::{alloc::Layout, mem::MaybeUninit, sync::Arc};
 
 use ash::vk;
-use wgpu::{TextureUsages, VertexState, hal::vulkan as wgvk};
+use wgpu::{TextureUsages, hal::vulkan as wgvk};
 
 use crate::{
-  geometry::Geometry, gpu_alloc::Allocator, scene::Scene, uniform::GlobalUniformsWrapper,
+  gpu_alloc::Allocator, scene::Scene,
 };
 
 pub(crate) mod gpu_alloc;
@@ -69,7 +68,7 @@ impl Rasterizer {
     });
     drop(pass);
     let idx = self.queue.submit([encoder.finish()]);
-    let res = self.dev.poll(wgpu::wgt::PollType::Wait {
+    let _res = self.dev.poll(wgpu::wgt::PollType::Wait {
       submission_index: Some(idx),
       timeout:          None,
     });
@@ -152,7 +151,7 @@ impl Rasterizer {
   pub fn create_scene(&self) -> Scene { Scene::new() }
   pub fn create_material(&self) {}
   pub fn create_geometry(&self) {}
-  pub fn render(&self, scene: &Scene) -> &[u8] { todo!() }
+  pub fn render(&self, _scene: &Scene) -> &[u8] { todo!() }
 }
 
 struct RawState {

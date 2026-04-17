@@ -114,7 +114,7 @@ impl Material {
             resource: wgpu::BindingResource::TextureView(view.as_ref().unwrap()),
           });
         }
-        Some(MaterialComponentSource::Ktx(ktx)) => todo!(),
+        Some(MaterialComponentSource::Ktx(_ktx)) => todo!(),
         Some(MaterialComponentSource::Rgba { r, g, b, a }) => {
           color |= 0x01 << i;
           colors.0[i] = glam::vec4(*r, *g, *b, *a);

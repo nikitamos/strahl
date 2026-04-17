@@ -8,11 +8,11 @@ use std::{path::Path, sync::Arc};
 
 use ash::vk;
 use material::Material;
-use wgpu::{FeaturesWGPU, TextureUsages, hal::vulkan as wgvk, wgt::TextureDescriptor};
+use wgpu::hal::vulkan as wgvk;
 
 use crate::{
-  geometry::Geometry, gpu_alloc::Allocator, limne::RenderTarget, scene::Scene,
-  shader_manager::ShaderManager, uniform::GlobalUniformsWrapper,
+  geometry::Geometry, gpu_alloc::Allocator, scene::Scene,
+  shader_manager::ShaderManager,
 };
 
 pub(crate) mod gpu_alloc;
@@ -32,57 +32,6 @@ mod limne;
 pub mod material;
 pub mod scene;
 pub mod uniform;
-
-impl Rasterizer {
-  #[deprecated]
-  pub async fn fill_framebuffer(&self) {
-    let mut encoder = self
-      .dev
-      .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("filler-encoder"),
-      });
-    let pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-      label: Some("clear pass"),
-      color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-        view:           &self.presenter.present_texture.create_view(
-          &wgpu::wgt::TextureViewDescriptor {
-            label:             None,
-            format:            None,
-            dimension:         None,
-            usage:             Some(TextureUsages::RENDER_ATTACHMENT),
-            aspect:            wgpu::TextureAspect::All,
-            base_mip_level:    0,
-            mip_level_count:   Some(1),
-            base_array_layer:  0,
-            array_layer_count: Some(1),
-          },
-        ),
-        depth_slice:    None,
-        resolve_target: None,
-        ops:            wgpu::Operations {
-          load:  wgpu::LoadOp::Clear(wgpu::Color {
-            r: 1.0,
-            g: 45.0,
-            b: 0.0,
-            a: 255.0,
-          }),
-          store: wgpu::StoreOp::Store,
-        },
-      })],
-      depth_stencil_attachment: None,
-      timestamp_writes: None,
-      occlusion_query_set: None,
-      multiview_mask: None,
-    });
-    drop(pass);
-    let idx = self.queue.submit([encoder.finish()]);
-    let _res = self.dev.poll(wgpu::wgt::PollType::Wait {
-      submission_index: Some(idx),
-      timeout:          None,
-    });
-    println!("{:?}", &self.presenter.mapped[0..8]);
-  }
-}
 
 impl Rasterizer {
   pub async fn new() -> anyhow::Result<Rasterizer> {

@@ -1,6 +1,5 @@
 use anyhow::anyhow;
 use image::Rgba;
-use rasterizer::material::Material;
 pub use rasterizer::*;
 
 pub fn main() -> anyhow::Result<()> {
@@ -23,7 +22,7 @@ pub async fn true_main() -> anyhow::Result<()> {
   let geometry = strahl.load_mesh("../../../strahl-import/assets/lava/Lava.gltf")?;
   let mut scene = strahl.create_scene();
   let body = scene.add_body(geometry, material);
-  let test = strahl.render(&mut scene);
+  let test = strahl.render(&scene);
   let buf = image::ImageBuffer::<Rgba<u8>, _>::from_raw(1024, 1024, test).ok_or_else(|| {
     log::error!("failed to import image");
     anyhow!("failed to import image")

@@ -5,6 +5,7 @@ mod erase;
 
 use std::{any, sync::Arc};
 
+use glam::{Mat4, Vec3};
 use rasterizer::Rasterizer;
 
 use napi::{
@@ -237,7 +238,13 @@ impl Strahl {
       .init();
 
     Ok(Self {
-      backend: Arc::new(RwLock::new(Rasterizer::new().await.into_napi()?)),
+      backend: Arc::new(RwLock::new(
+        Rasterizer::new(rasterizer::RasterizerCreateInfo {
+          viewport: glam::uvec2(info.width, info.height),
+        })
+        .await
+        .into_napi()?,
+      )),
     })
   }
   /// Creates an empty scene
@@ -280,7 +287,41 @@ impl Strahl {
   #[napi]
   pub async fn render(&self, scene: &Scene, cam: Camera) -> napi::Result<Uint8Array> {
     let mut backend = self.backend.write().await;
-    let data = backend.render(&scene.0);
+    let projection = match cam.projection {
+      Projection::Ortho {
+        left,
+        right,
+        bottom,
+        top,
+        near,
+        far,
+      } => Mat4::orthographic_lh(
+        left as f32,
+        right as f32,
+        bottom as f32,
+        top as f32,
+        near as f32,
+        far as f32,
+      ),
+      Projection::Perspective {
+        fovy,
+        aspect,
+        z_near,
+        z_far,
+      } => Mat4::perspective_lh(fovy as f32, aspect as f32, z_near as f32, z_far as f32),
+    };
+    let view = glam::Mat4::look_at_rh(
+      Vec3::from_slice(&cam.location),
+      Vec3::from_slice(&cam.look_at),
+      (Vec3::Y),
+    );
+    let data = backend.render(
+      &scene.0,
+      &rasterizer::Camera {
+        camera: view,
+        projection,
+      },
+    );
     unsafe {
       Ok(Uint8Array::with_external_data(
         data.as_ptr().cast_mut(),

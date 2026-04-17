@@ -176,4 +176,8 @@ export declare const enum StrahlBackend {
 export interface StrahlCreateInfo {
   /** Specifies the rendering backend */
   backend: StrahlBackend
+  /** Specifies the width of the viewport (in pixels) */
+  width: number
+  /** Specified the height of the viewport */
+  height: number
 }

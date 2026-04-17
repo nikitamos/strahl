@@ -10,7 +10,7 @@ use rasterizer::Rasterizer;
 
 use napi::{
   Env,
-  bindgen_prelude::{ArrayBuffer, Float32Array, Uint8Array, Uint8ArraySlice},
+  bindgen_prelude::{ArrayBuffer, Float32Array, Float32ArraySlice, Uint8Array, Uint8ArraySlice},
   tokio::{self, sync::RwLock},
 };
 use napi_derive::napi;
@@ -162,10 +162,10 @@ pub struct BodyCreateInfo<'env> {
   /// Array of length 3 representing the position of the body
   /// relative to the world origin,
   /// i.e. the translation applied to the geometry.
-  pub position: ArrayBuffer<'env>,
+  pub position: Float32ArraySlice<'env>,
   /// Rotation applied to the geometry in its local coordinates,
   /// represented as Euler's angles.
-  pub rotation: ArrayBuffer<'env>,
+  pub rotation: Float32ArraySlice<'env>,
 }
 
 /// Class representing a light source

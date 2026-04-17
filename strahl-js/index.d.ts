@@ -101,7 +101,7 @@ export interface BodyCreateInfo {
    * Rotation applied to the geometry in its local coordinates,
    * represented as Euler's angles.
    */
-  rotation: ArrayBuffer
+  rotation: Float32Array
 }
 
 export interface Camera {

@@ -1,5 +1,6 @@
 #![deny(clippy::all)]
 #![feature(try_blocks)]
+#![feature(associated_type_defaults)]
 #![allow(dead_code)]
 
 use core::slice;
@@ -23,6 +24,7 @@ pub struct Rasterizer {
 }
 
 pub mod geometry;
+mod limne;
 pub mod material;
 pub mod scene;
 pub mod uniform;

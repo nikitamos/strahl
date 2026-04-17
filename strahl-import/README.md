@@ -71,7 +71,7 @@ The glTF file must satisfy the following conditions:
                 "TEXCOORD_0": /* accessor of float2 */
                 // other attributes are ignored, but not disallowed
             },
-            "indices": /* accessor of scalar integral */
+            "indices": /* accessor of scalar uint16_t or uint32_t */
         }
     ],
     /* ... */

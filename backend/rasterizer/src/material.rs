@@ -1,6 +1,6 @@
 use std::num::NonZero;
 
-use strahl_import::{ImportedMaterial, StoredTexture};
+use strahl_import::{ImportedMaterial, MaterialComponentSource};
 use wgpu::{BindGroupDescriptor, ShaderStages, util::DeviceExt};
 use zerocopy::IntoBytes;
 
@@ -56,7 +56,7 @@ impl Material {
       .zip(texture_views.iter_mut())
     {
       match tex {
-        Some(StoredTexture::Image(img)) => {
+        Some(MaterialComponentSource::Image(img)) => {
           layout.push(wgpu::BindGroupLayoutEntry {
             binding:    (i + 1) as u32,
             visibility: ShaderStages::FRAGMENT,
@@ -114,8 +114,8 @@ impl Material {
             resource: wgpu::BindingResource::TextureView(view.as_ref().unwrap()),
           });
         }
-        Some(StoredTexture::Ktx(ktx)) => todo!(),
-        Some(StoredTexture::Rgba { r, g, b, a }) => {
+        Some(MaterialComponentSource::Ktx(ktx)) => todo!(),
+        Some(MaterialComponentSource::Rgba { r, g, b, a }) => {
           color |= 0x01 << i;
           colors.0[i] = glam::vec4(*r, *g, *b, *a);
         }

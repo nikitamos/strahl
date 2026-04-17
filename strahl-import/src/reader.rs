@@ -1,6 +1,7 @@
 use std::{
   fs::File,
   io::{BufReader, Read},
+  ops::{Bound, RangeBounds},
   path::Path,
 };
 
@@ -66,14 +67,15 @@ impl Material {
 #[derive(Debug)]
 pub struct GltfBufferView {
   /// Offset of the view within the buffer
-  pub offset: usize,
+  pub offset:  usize,
   /// Count of entries in the accessor
-  pub count:  usize,
+  pub count:   usize,
   /// Length of view in bytes
-  pub length: usize,
+  pub length:  usize,
   /// Stride of the accessor. If glTF contains no value,
   /// it is inferred using the size of buffer component.
-  pub stride: usize,
+  pub stride:  usize,
+  upper_bound: usize,
 }
 
 impl GltfBufferView {
@@ -92,11 +94,13 @@ impl GltfBufferView {
       log::warn!("Accessor's view doesn't have a binding target");
     }
 
+    let offset = view.offset() + acc.offset();
     Ok(Self {
-      offset: view.offset() + acc.offset(),
-      count:  acc.count(),
+      offset,
+      count: acc.count(),
       length: view.length(),
       stride: view.stride().unwrap_or(acc.size()),
+      upper_bound: offset + view.length(),
     })
   }
   fn new_validate_dim(
@@ -112,11 +116,13 @@ impl GltfBufferView {
       log::warn!("Accessor's view doesn't have a binding target");
     }
 
+    let offset = view.offset() + acc.offset();
     Ok(Self {
-      offset: view.offset(),
-      count:  acc.count(),
-      length: view.length(),
-      stride: view.stride().unwrap_or(acc.size()),
+      offset:      offset,
+      count:       acc.count(),
+      length:      view.length(),
+      stride:      view.stride().unwrap_or(acc.size()),
+      upper_bound: offset + view.length(),
     })
   }
   fn validate_not_sparse(
@@ -153,6 +159,26 @@ impl GltfBufferView {
       anyhow::bail!("invalid accessor data type");
     }
     Ok(())
+  }
+}
+
+impl RangeBounds<usize> for GltfBufferView {
+  fn start_bound(&self) -> std::ops::Bound<&usize> { Bound::Included(&self.offset) }
+
+  fn end_bound(&self) -> std::ops::Bound<&usize> { Bound::Excluded(&self.upper_bound) }
+}
+
+#[cfg(target_pointer_width = "64")]
+impl RangeBounds<u64> for GltfBufferView {
+  // SAFETY: on 64-bit targets sizeof(usize) == sizeof(u64)
+  // Proper alignment is ensured by the assertion below.
+  fn start_bound(&self) -> std::ops::Bound<&u64> {
+    const _: () = assert!(std::mem::align_of::<u64>() == std::mem::align_of::<usize>());
+    unsafe { Bound::Included(std::mem::transmute(&self.offset)) }
+  }
+
+  fn end_bound(&self) -> std::ops::Bound<&u64> {
+    unsafe { Bound::Excluded(std::mem::transmute(&self.upper_bound)) }
   }
 }
 
@@ -230,11 +256,11 @@ impl GltfGeometry {
 
     Ok(Self {
       index_size: indices.size() as u8,
-      position:   GltfBufferView::new(mesh_name, position, Dimensions::Vec3, DataType::F32)?,
-      normals:    GltfBufferView::new(mesh_name, normals, Dimensions::Vec3, DataType::F32)?,
-      uv:         GltfBufferView::new(mesh_name, uv, Dimensions::Vec2, DataType::F32)?,
-      indices:    GltfBufferView::new_validate_dim(mesh_name, indices, Dimensions::Scalar)?,
-      buffer
+      position: GltfBufferView::new(mesh_name, position, Dimensions::Vec3, DataType::F32)?,
+      normals: GltfBufferView::new(mesh_name, normals, Dimensions::Vec3, DataType::F32)?,
+      uv: GltfBufferView::new(mesh_name, uv, Dimensions::Vec2, DataType::F32)?,
+      indices: GltfBufferView::new_validate_dim(mesh_name, indices, Dimensions::Scalar)?,
+      buffer,
     })
   }
 }

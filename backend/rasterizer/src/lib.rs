@@ -8,9 +8,11 @@ use std::{path::Path, sync::Arc};
 
 use ash::vk;
 use material::Material;
-use wgpu::{TextureUsages, hal::vulkan as wgvk, wgt::TextureDescriptor};
+use wgpu::hal::vulkan as wgvk;
 
-use crate::{geometry::Geometry, gpu_alloc::Allocator, limne::RenderTarget, scene::Scene};
+use crate::{
+  geometry::Geometry, gpu_alloc::Allocator, scene::Scene, shader_manager::ShaderManager,
+};
 
 pub(crate) mod gpu_alloc;
 
@@ -21,6 +23,8 @@ pub struct Rasterizer {
   presenter: MappedPresenter,
   target:    limne::TextureProvider,
   drawer:    Option<limne::TextureDrawer>,
+  manager:   Arc<ShaderManager>,
+  info:      RasterizerCreateInfo,
 }
 
 pub mod geometry;
@@ -29,58 +33,19 @@ pub mod material;
 pub mod scene;
 pub mod uniform;
 
-impl Rasterizer {
-  pub async fn fill_framebuffer(&self) {
-    let mut encoder = self
-      .dev
-      .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("filler-encoder"),
-      });
-    let pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-      label: Some("clear pass"),
-      color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-        view:           &self.presenter.present_texture.create_view(
-          &wgpu::wgt::TextureViewDescriptor {
-            label:             None,
-            format:            None,
-            dimension:         None,
-            usage:             Some(TextureUsages::RENDER_ATTACHMENT),
-            aspect:            wgpu::TextureAspect::All,
-            base_mip_level:    0,
-            mip_level_count:   Some(1),
-            base_array_layer:  0,
-            array_layer_count: Some(1),
-          },
-        ),
-        depth_slice:    None,
-        resolve_target: None,
-        ops:            wgpu::Operations {
-          load:  wgpu::LoadOp::Clear(wgpu::Color {
-            r: 1.0,
-            g: 45.0,
-            b: 0.0,
-            a: 255.0,
-          }),
-          store: wgpu::StoreOp::Store,
-        },
-      })],
-      depth_stencil_attachment: None,
-      timestamp_writes: None,
-      occlusion_query_set: None,
-      multiview_mask: None,
-    });
-    drop(pass);
-    let idx = self.queue.submit([encoder.finish()]);
-    let _res = self.dev.poll(wgpu::wgt::PollType::Wait {
-      submission_index: Some(idx),
-      timeout:          None,
-    });
-    println!("{:?}", &self.presenter.mapped[0..8]);
-  }
+pub struct RasterizerCreateInfo {
+  pub viewport: glam::u32::UVec2,
+}
+
+#[derive(zerocopy::KnownLayout, zerocopy::IntoBytes, zerocopy::Immutable, Default, Clone)]
+#[repr(C)]
+pub struct Camera {
+  pub projection: glam::Mat4,
+  pub camera:     glam::Mat4,
 }
 
 impl Rasterizer {
-  pub async fn new() -> anyhow::Result<Rasterizer> {
+  pub async fn new(info: RasterizerCreateInfo) -> anyhow::Result<Rasterizer> {
     log::info!("Creating Rasterizer backend?");
     let r: anyhow::Result<Rasterizer> = try {
       let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
@@ -109,16 +74,24 @@ impl Rasterizer {
         })
         .await?;
       let dev_desc = wgpu::DeviceDescriptor {
+        required_features: wgpu::Features {
+          features_wgpu:   wgpu::FeaturesWGPU::empty(),
+          features_webgpu: wgpu::FeaturesWebGPU::IMMEDIATES,
+        },
+        required_limits: wgpu::Limits {
+          max_immediate_size: 256,
+          ..Default::default()
+        },
         ..Default::default()
       };
       let (raw, (dev, queue)) =
-        unsafe { create_presenter_dev_queue(&instance, adapter, dev_desc).await? };
+        unsafe { create_presenter_dev_queue(&instance, adapter, dev_desc, &info).await? };
 
       let target = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
         label:           Some(" a kind of render target".to_string()),
         size:            wgpu::Extent3d {
-          width:                 1024,
-          height:                1024,
+          width:                 info.viewport.x,
+          height:                info.viewport.y,
           depth_or_array_layers: 1,
         },
         mip_level_count: 1,
@@ -129,6 +102,8 @@ impl Rasterizer {
         view_formats:    vec![wgpu::TextureFormat::Rgba8Unorm],
       });
 
+      let manager = Arc::new(ShaderManager::new(dev.clone()));
+
       // On wgpu shutdown device is dropped earlier than callback is called for some reason
       Rasterizer {
         i: instance,
@@ -137,12 +112,14 @@ impl Rasterizer {
         drawer: None,
         dev,
         target,
+        manager,
+        info,
       }
     };
     r.map_err(|x| anyhow::anyhow!(x))
   }
 
-  pub fn create_scene(&self) -> Scene { Scene::new() }
+  pub fn create_scene(&self) -> Scene { Scene::new(Arc::clone(&self.manager)) }
   pub fn load_material(&self, path: impl AsRef<Path>) -> anyhow::Result<Arc<Material>> {
     let imported = strahl_import::reader::Material::read(path)?;
     Ok(Arc::new(Material::from_imported(
@@ -155,81 +132,69 @@ impl Rasterizer {
     let gltf = strahl_import::reader::GltfGeometry::import_validate(path)?;
     Geometry::from_gltf(&self.dev, gltf).map(Arc::new)
   }
-  pub fn render(&mut self, scene: &Scene) -> &[u8] {
-    if let Some(body) = scene.bodies().first() {
-      if let Some(ref view) = body.material().any_view {
-        let mut encoder = self
-          .dev
-          .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("zbuf_smoothing"),
-          });
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-          label: Some("zbuf_smoothing"),
-          color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view:           &self.target,
-            resolve_target: None,
-            ops:            wgpu::Operations {
-              load:  wgpu::LoadOp::DontCare(Default::default()),
-              store: wgpu::StoreOp::Store,
-            },
-            depth_slice:    None,
-          })],
-          depth_stencil_attachment: None,
-          timestamp_writes: None,
-          occlusion_query_set: None,
-          multiview_mask: None,
-        });
-        let drawer = self.drawer.get_or_insert(limne::TextureDrawer::new(
-          &self.dev,
-          &limne::TextureDrawerResources {
-            texture:     view,
-            bind_groups: &[],
+  pub fn render(&mut self, scene: &Scene, camera: &Camera) -> &[u8] {
+    self.manager.uniforms_mut().camera = camera.clone();
+    self.manager.uniforms_mut().viewport_size = self.info.viewport;
+    self.manager.uniforms().upload(&self.queue);
+    let mut encoder = self
+      .dev
+      .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("zbuf_smoothing"),
+      });
+    {
+      let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("zbuf_smoothing"),
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+          view:           &self.target,
+          resolve_target: None,
+          ops:            wgpu::Operations {
+            load:  wgpu::LoadOp::DontCare(Default::default()),
+            store: wgpu::StoreOp::Store,
           },
-          &wgpu::TextureFormat::Rgba8Unorm,
-          limne::TextureDrawerInitRes {
-            stencil:         None,
-            fragment:        None,
-            layout:          &[],
-            unclipped_depth: false,
-          },
-        ));
-        drawer.render_into_pass(&mut pass, &limne::TextureDrawerResources {
-          texture:     view,
-          bind_groups: &[],
-        });
-        drop(pass);
-        encoder.copy_texture_to_texture(
-          wgpu::TexelCopyTextureInfo {
-            texture:   self.target.texture(),
-            mip_level: 0,
-            origin:    wgpu::Origin3d { x: 0, y: 0, z: 0 },
-            aspect:    wgpu::TextureAspect::All,
-          },
-          wgpu::TexelCopyTextureInfo {
-            texture:   &self.presenter.present_texture,
-            mip_level: 0,
-            origin:    wgpu::Origin3d { x: 0, y: 0, z: 0 },
-            aspect:    wgpu::TextureAspect::All,
-          },
-          wgpu::Extent3d {
-            width:                 1024,
-            height:                1024,
-            depth_or_array_layers: 1,
-          },
-        );
-        let index = self.queue.submit(std::iter::once(encoder.finish()));
-        log::trace!("work submitted to the GPU");
-        self.dev.poll(wgpu::wgt::PollType::Wait {
-          submission_index: Some(index),
-          timeout:          None,
-        });
-        log::trace!("complete");
-      } else {
-        log::error!("You are so boring, give a roughness texture!");
-        log::warn!("No image will be produced");
+          depth_slice:    None,
+        })],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+      });
+      pass.set_bind_group(0, self.manager.uniforms().bind_group(), &[]);
+      for body in scene.bodies() {
+        body.draw(&mut pass);
       }
     }
+    self.copy_to_presenter(&mut encoder);
+    let index = self.queue.submit(std::iter::once(encoder.finish()));
+    log::trace!("work submitted to the GPU");
+    // TODO: wait asynchronously
+    let _ = self.dev.poll(wgpu::wgt::PollType::Wait {
+      submission_index: Some(index),
+      timeout:          None,
+    });
+    log::trace!("complete");
     self.presenter.mapped
+  }
+
+  fn copy_to_presenter(&mut self, encoder: &mut wgpu::CommandEncoder) {
+    encoder.copy_texture_to_texture(
+      wgpu::TexelCopyTextureInfo {
+        texture:   self.target.texture(),
+        mip_level: 0,
+        origin:    wgpu::Origin3d { x: 0, y: 0, z: 0 },
+        aspect:    wgpu::TextureAspect::All,
+      },
+      wgpu::TexelCopyTextureInfo {
+        texture:   &self.presenter.present_texture,
+        mip_level: 0,
+        origin:    wgpu::Origin3d { x: 0, y: 0, z: 0 },
+        aspect:    wgpu::TextureAspect::All,
+      },
+      wgpu::Extent3d {
+        width:                 self.info.viewport.x,
+        height:                self.info.viewport.y,
+        depth_or_array_layers: 1,
+      },
+    );
   }
 }
 
@@ -237,6 +202,7 @@ async unsafe fn create_presenter_dev_queue(
   instance: &wgpu::Instance,
   adapter: wgpu::Adapter,
   dev_desc: wgpu::wgt::DeviceDescriptor<Option<&str>>,
+  info: &RasterizerCreateInfo,
 ) -> Result<(RawMappedPresenter, (wgpu::Device, wgpu::Queue)), anyhow::Error> {
   unsafe {
     let i = instance.as_hal::<wgvk::Api>().unwrap();
@@ -263,7 +229,14 @@ async unsafe fn create_presenter_dev_queue(
       })),
     )?;
     Ok((
-      raw_wgpu_setup(i.shared_instance(), &dq, phy).await,
+      raw_wgpu_setup(
+        i.shared_instance(),
+        &dq,
+        phy,
+        info.viewport.x,
+        info.viewport.y,
+      )
+      .await,
       adapter.create_device_from_hal(dq, &dev_desc)?,
     ))
   }
@@ -300,11 +273,13 @@ async unsafe fn raw_wgpu_setup(
   vk_instance: &wgvk::InstanceShared,
   dq: &wgpu::hal::OpenDevice<wgvk::Api>,
   phy: vk::PhysicalDevice,
+  width: u32,
+  height: u32,
 ) -> RawMappedPresenter {
   let extent = vk::Extent3D {
-    width:  1024,
-    height: 1024,
-    depth:  1,
+    width,
+    height,
+    depth: 1,
   };
   let alloc = Allocator::new(phy, dq.device.raw_device(), vk_instance.raw_instance());
   unsafe {

@@ -1,3 +1,16 @@
+struct _MatrixStorage_float4x4std140_0
+{
+    @align(16) data_0 : array<vec4<f32>, i32(4)>,
+};
+
+struct Globals_std140_0
+{
+    @align(16) projection_0 : _MatrixStorage_float4x4std140_0,
+    @align(16) camera_0 : _MatrixStorage_float4x4std140_0,
+    @align(16) viewport_size_0 : vec2<u32>,
+};
+
+@binding(0) @group(0) var<uniform> global_0 : Globals_std140_0;
 struct Colors_std140_0
 {
     @align(16) roughness_0 : vec4<f32>,
@@ -31,15 +44,15 @@ fn VertexOutput_x24init_0( position_1 : vec4<f32>,  uv_1 : vec2<f32>,  vertex_no
 
 struct vertexInput_0
 {
-    @location(0) body_position_0 : vec3<f32>,
-    @location(1) uv_2 : vec2<f32>,
-    @location(2) normal_1 : vec3<f32>,
+    @location(0) vertex_local_pos_0 : vec3<f32>,
+    @location(1) normal_1 : vec3<f32>,
+    @location(2) uv_2 : vec2<f32>,
 };
 
 @vertex
-fn VertexShader( _S2 : vertexInput_0) -> VertexOutput_0
+fn MeshGeometryVS( _S2 : vertexInput_0) -> VertexOutput_0
 {
-    return VertexOutput_x24init_0(vec4<f32>(_S2.body_position_0, 1.0f), _S2.uv_2, _S2.normal_1);
+    return VertexOutput_x24init_0(((((((mat4x4<f32>(mat4x4<f32>(global_0.projection_0.data_0[i32(0)][i32(0)], global_0.projection_0.data_0[i32(0)][i32(1)], global_0.projection_0.data_0[i32(0)][i32(2)], global_0.projection_0.data_0[i32(0)][i32(3)], global_0.projection_0.data_0[i32(1)][i32(0)], global_0.projection_0.data_0[i32(1)][i32(1)], global_0.projection_0.data_0[i32(1)][i32(2)], global_0.projection_0.data_0[i32(1)][i32(3)], global_0.projection_0.data_0[i32(2)][i32(0)], global_0.projection_0.data_0[i32(2)][i32(1)], global_0.projection_0.data_0[i32(2)][i32(2)], global_0.projection_0.data_0[i32(2)][i32(3)], global_0.projection_0.data_0[i32(3)][i32(0)], global_0.projection_0.data_0[i32(3)][i32(1)], global_0.projection_0.data_0[i32(3)][i32(2)], global_0.projection_0.data_0[i32(3)][i32(3)]))) * (mat4x4<f32>(mat4x4<f32>(global_0.camera_0.data_0[i32(0)][i32(0)], global_0.camera_0.data_0[i32(0)][i32(1)], global_0.camera_0.data_0[i32(0)][i32(2)], global_0.camera_0.data_0[i32(0)][i32(3)], global_0.camera_0.data_0[i32(1)][i32(0)], global_0.camera_0.data_0[i32(1)][i32(1)], global_0.camera_0.data_0[i32(1)][i32(2)], global_0.camera_0.data_0[i32(1)][i32(3)], global_0.camera_0.data_0[i32(2)][i32(0)], global_0.camera_0.data_0[i32(2)][i32(1)], global_0.camera_0.data_0[i32(2)][i32(2)], global_0.camera_0.data_0[i32(2)][i32(3)], global_0.camera_0.data_0[i32(3)][i32(0)], global_0.camera_0.data_0[i32(3)][i32(1)], global_0.camera_0.data_0[i32(3)][i32(2)], global_0.camera_0.data_0[i32(3)][i32(3)])))))) * (vec4<f32>(_S2.vertex_local_pos_0, 1.0f)))), _S2.uv_2, _S2.normal_1);
 }
 
 @id(0) override COLORS_0 : u32;
@@ -65,7 +78,7 @@ struct pixelInput_0
 };
 
 @fragment
-fn FragmentShader( _S3 : pixelInput_0, @builtin(position) position_2 : vec4<f32>) -> pixelOutput_0
+fn RasterizerPbrFS( _S3 : pixelInput_0, @builtin(position) position_2 : vec4<f32>) -> pixelOutput_0
 {
     var _S4 : pixelOutput_0 = pixelOutput_0( GetDiffuse_0(_S3.uv_4) );
     return _S4;

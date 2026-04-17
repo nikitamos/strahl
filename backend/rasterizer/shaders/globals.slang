@@ -1,7 +1,9 @@
 module globals;
 
 public struct Globals {
-    public float4x4 camera;
+    public row_major float4x4 projection;
+    public row_major float4x4 camera;
+    public uint32_t2 viewport_size;
 };
 
 [vk::binding(0,0)]

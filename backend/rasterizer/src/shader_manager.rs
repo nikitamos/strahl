@@ -1,5 +1,8 @@
 use crate::{geometry::Geometry, uniform::GlobalUniformsWrapper};
-use std::{mem::MaybeUninit, sync::Arc};
+use std::{
+  mem::MaybeUninit,
+  sync::{Arc, RwLock},
+};
 use wgpu::include_wgsl;
 
 pub(crate) struct ShaderEntryPoint {
@@ -11,6 +14,7 @@ pub(crate) struct ShaderManager {
   mesh_vert: ShaderEntryPoint,
   pbr_frag:  ShaderEntryPoint,
   dev:       wgpu::Device,
+  uniforms:  RwLock<GlobalUniformsWrapper>,
 }
 
 impl ShaderManager {
@@ -28,6 +32,7 @@ impl ShaderManager {
       entry_point: Some("RasterizerPbrFS".to_string()),
     };
     Self {
+      uniforms: RwLock::new(GlobalUniformsWrapper::new(&dev)),
       mesh_vert,
       pbr_frag,
       dev,
@@ -37,7 +42,6 @@ impl ShaderManager {
   pub fn pbr_fragment(&self) -> &ShaderEntryPoint { &self.pbr_frag }
   pub fn create_pipeline_for_mesh_geometry<'a>(
     &self,
-    uniforms: &GlobalUniformsWrapper,
     material: &crate::material::Material,
     geometry: &Geometry,
   ) -> wgpu::RenderPipeline {
@@ -45,6 +49,7 @@ impl ShaderManager {
     // (0) -> global (camera, time?) (or should it be a push constant?)
     // (1) -> material-specific
     // (2) -> geometry-specific
+    // (vertex attributes) -> geometry-specific
 
     // (push consts) -> body-specific (transforms, etc.)
 
@@ -53,7 +58,7 @@ impl ShaderManager {
       .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label:              Some("material"),
         bind_group_layouts: &[
-          Some(uniforms.bind_group_layout()),
+          Some(self.uniforms.read().unwrap().bind_group_layout()),
           Some(material.bind_group_layout()),
           geometry.bind_group_layout(),
         ],
@@ -101,5 +106,12 @@ impl ShaderManager {
     };
     // TODO: caching
     self.dev.create_render_pipeline(&desc)
+  }
+
+  pub(crate) fn uniforms(&self) -> std::sync::RwLockReadGuard<'_, GlobalUniformsWrapper> {
+    self.uniforms.read().unwrap()
+  }
+  pub(crate) fn uniforms_mut(&self) -> std::sync::RwLockWriteGuard<'_, GlobalUniformsWrapper> {
+    self.uniforms.write().unwrap()
   }
 }

@@ -48,7 +48,8 @@ impl TextureDrawer {
     device: &Device,
     tex: &TextureView,
   ) -> BindGroup {
-    let bg = device.create_bind_group(&BindGroupDescriptor {
+    
+    device.create_bind_group(&BindGroupDescriptor {
       label: None,
       layout,
       entries: &[
@@ -61,8 +62,7 @@ impl TextureDrawer {
           resource: wgpu::BindingResource::Sampler(sampler),
         },
       ],
-    });
-    bg
+    })
   }
   pub fn resized(&mut self, device: &Device, texture: &TextureView) {
     self.bg = Self::create_bg(&self.layout, &self.sampler, device, texture);

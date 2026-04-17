@@ -48,6 +48,15 @@ impl Geometry {
       }
     }
   }
+
+  pub fn dispatch_draw(&self, pass: &mut wgpu::RenderPass) {
+    if let Self::Mesh { gltf, .. } = self {
+      pass.draw_indexed(0..(gltf.indices.count as u32), 0, 0..1);
+    } else {
+      unreachable!()
+    }
+  }
+
   pub(crate) fn vertex_state<'b>(
     &self,
     attrs: &'b mut [wgpu::VertexAttribute; 3],

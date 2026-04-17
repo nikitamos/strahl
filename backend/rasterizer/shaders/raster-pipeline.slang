@@ -37,13 +37,12 @@ uniform Texture2D normalTex;
 [vk::binding(7,1)]
 ConstantBuffer<Colors> colors;
 
-struct BodyStuff {
+struct Body {
     float4x4 body2world;
-    float4 scale;
 };
 
-[vk::binding(0,2)]
-ConstantBuffer<BodyStuff> body;
+[vk::push_constant]
+ConstantBuffer<Body> body;
 
 float4 GetRoughness(float2 uv) {
     if (COLORS & ROUGHNESS) {
@@ -95,11 +94,15 @@ struct VertexOutput {
 
 [shader("vertex")]
 VertexOutput MeshGeometryVS(
-    float3 body_position: POSITION0,
-    float2 uv: POSITION1,
-    float3 normal: POSITION2
+    float3 vertex_local_pos: POSITION0,
+    float3 normal: POSITION1,
+    float2 uv: POSITION2,
 ) {
-    return VertexOutput(float4(body_position, 1.0), uv, normal);
+    var transform = mul(global.camera, global.projection);
+    var position = mul(float4(vertex_local_pos, 1.0),
+                   transform
+    );
+    return VertexOutput(position, uv, normal);
 }
 
 [shader("fragment")]

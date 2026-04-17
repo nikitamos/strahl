@@ -179,9 +179,9 @@ impl GltfGeometry {
     let mesh = doc.meshes().next().unwrap();
     let mesh_name = mesh.name().unwrap_or("<unnamed mesh>");
 
-    if buffers.len() != 0 {
+    if buffers.len() != 1 {
       log::error!(
-        "Mesh {mesh_name} contains {} meshes, expected 1",
+        "Mesh {mesh_name} contains {} buffers, expected 1",
         buffers.len()
       );
       bail!("wrong count of buffers in gltf");

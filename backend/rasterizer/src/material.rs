@@ -11,6 +11,7 @@ pub struct Material {
   group:         wgpu::BindGroup,
   layout:        wgpu::BindGroupLayout,
   color:         u32,
+  pub any_view:  Option<wgpu::TextureView>,
 }
 
 const MATERIAL_COMPONENTS: usize = 6;
@@ -41,7 +42,7 @@ impl Material {
       label: None,
       address_mode_u: wgpu::AddressMode::ClampToEdge,
       address_mode_v: wgpu::AddressMode::ClampToEdge,
-      address_mode_w: wgpu::AddressMode::ClampToBorder,
+      address_mode_w: wgpu::AddressMode::ClampToEdge,
       ..Default::default()
     });
     descriptors.push(wgpu::BindGroupEntry {
@@ -57,6 +58,7 @@ impl Material {
     {
       match tex {
         Some(MaterialComponentSource::Image(img)) => {
+          log::trace!("importing component {i} of the material");
           layout.push(wgpu::BindGroupLayoutEntry {
             binding:    (i + 1) as u32,
             visibility: ShaderStages::FRAGMENT,
@@ -161,6 +163,11 @@ impl Material {
       group,
       layout,
       color,
+      any_view: if color & 0x01 == 0 {
+        texture_views[0].clone()
+      } else {
+        None
+      },
     }
   }
 

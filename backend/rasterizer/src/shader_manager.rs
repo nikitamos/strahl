@@ -8,9 +8,9 @@ pub(crate) struct ShaderEntryPoint {
 }
 
 pub(crate) struct ShaderManager {
-  pub(crate) mesh_vert: ShaderEntryPoint,
-  pub(crate) pbr_frag:  ShaderEntryPoint,
-  pub(crate) dev:       wgpu::Device,
+  mesh_vert: ShaderEntryPoint,
+  pbr_frag:  ShaderEntryPoint,
+  dev:       wgpu::Device,
 }
 
 impl ShaderManager {
@@ -39,7 +39,7 @@ impl ShaderManager {
     &self,
     uniforms: &GlobalUniformsWrapper,
     material: &crate::material::Material,
-    geometry: Geometry,
+    geometry: &Geometry,
   ) -> wgpu::RenderPipeline {
     // We have the following layout:
     // (0) -> global (camera, time?) (or should it be a push constant?)
@@ -67,7 +67,7 @@ impl ShaderManager {
     let desc = wgpu::RenderPipelineDescriptor {
       label:          Some("material"),
       layout:         Some(&layout),
-      vertex:         geometry.vertex_state(&mut attrs, &mut attr_layout),
+      vertex:         geometry.vertex_state(&mut attrs, &mut attr_layout, self),
       primitive:      wgpu::PrimitiveState {
         topology:           wgpu::PrimitiveTopology::TriangleList,
         strip_index_format: None,

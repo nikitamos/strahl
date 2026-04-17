@@ -1,5 +1,10 @@
-pub mod show_texture;
-pub mod texture_provider;
+mod show_texture;
+mod texture_provider;
+
+pub use render_target::RenderTarget;
+pub use show_texture::*;
+pub use texture_provider::*;
+
 mod render_target {
   use wgpu::{RenderPass, TextureFormat};
 

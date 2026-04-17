@@ -4,6 +4,8 @@ use wgpu::{
   util::{BufferInitDescriptor, DeviceExt},
 };
 
+use crate::shader_manager::ShaderManager;
+
 // #[derive(Clone)]
 #[non_exhaustive]
 pub enum Geometry {
@@ -16,9 +18,13 @@ pub enum Geometry {
 
 impl Geometry {
   pub fn from_gltf(dev: &wgpu::Device, gltf: GltfGeometry) -> anyhow::Result<Self> {
-    get_gltf_index_format(&gltf).ok_or(anyhow::anyhow!(
-      "bad index format: expected 8-bit or 16-bit"
-    ))?;
+    get_gltf_index_format(&gltf).ok_or_else(|| {
+      log::error!(
+        "bad index format in glTF: expected 2 or 4-byte indices, got {}",
+        gltf.index_size
+      );
+      anyhow::anyhow!("bad index format: expected 2 or 4-byte indices")
+    })?;
     let buf = dev.create_buffer_init(&BufferInitDescriptor {
       label:    None,
       contents: &gltf.buffer,
@@ -42,16 +48,18 @@ impl Geometry {
       }
     }
   }
-  pub fn vertex_state<'b>(
+  pub(crate) fn vertex_state<'b>(
     &self,
     attrs: &'b mut [wgpu::VertexAttribute; 3],
-    layout: &mut [wgpu::VertexBufferLayout<'b>; 3],
-  ) -> wgpu::VertexState<'_> {
+    layout: &'b mut [wgpu::VertexBufferLayout<'b>; 3],
+    mgr: &'b ShaderManager,
+  ) -> wgpu::VertexState<'b> {
     if let Self::Mesh { buf: _buf, gltf } = self {
       *layout = Self::buffer_layout(gltf, attrs);
+      let shader = mgr.mesh_vertex();
       wgpu::VertexState {
-        module:              todo!(),
-        entry_point:         todo!(),
+        module:              &shader.module,
+        entry_point:         shader.entry_point.as_deref(),
         compilation_options: PipelineCompilationOptions {
           constants: &[],
           zero_initialize_workgroup_memory: false,
@@ -99,8 +107,8 @@ impl Geometry {
 
 fn get_gltf_index_format(gltf: &GltfGeometry) -> Option<wgpu::IndexFormat> {
   match gltf.index_size {
-    16 => Some(wgpu::IndexFormat::Uint16),
-    32 => Some(wgpu::IndexFormat::Uint32),
+    2 => Some(wgpu::IndexFormat::Uint16),
+    4 => Some(wgpu::IndexFormat::Uint32),
     _ => None,
   }
 }

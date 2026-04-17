@@ -4,15 +4,13 @@
 #![allow(dead_code)]
 
 use core::slice;
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 use ash::vk;
 use material::Material;
-use wgpu::{TextureUsages, hal::vulkan as wgvk};
+use wgpu::{TextureUsages, hal::vulkan as wgvk, wgt::TextureDescriptor};
 
-use crate::{
-  gpu_alloc::Allocator, scene::Scene,
-};
+use crate::{geometry::Geometry, gpu_alloc::Allocator, limne::RenderTarget, scene::Scene};
 
 pub(crate) mod gpu_alloc;
 
@@ -20,7 +18,9 @@ pub struct Rasterizer {
   i:         wgpu::Instance,
   queue:     wgpu::Queue,
   dev:       wgpu::Device,
-  raw_state: RawState,
+  presenter: MappedPresenter,
+  target:    limne::TextureProvider,
+  drawer:    Option<limne::TextureDrawer>,
 }
 
 pub mod geometry;
@@ -39,10 +39,8 @@ impl Rasterizer {
     let pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
       label: Some("clear pass"),
       color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-        view:           &self
-          .raw_state
-          .swapchain
-          .create_view(&wgpu::wgt::TextureViewDescriptor {
+        view:           &self.presenter.present_texture.create_view(
+          &wgpu::wgt::TextureViewDescriptor {
             label:             None,
             format:            None,
             dimension:         None,
@@ -52,7 +50,8 @@ impl Rasterizer {
             mip_level_count:   Some(1),
             base_array_layer:  0,
             array_layer_count: Some(1),
-          }),
+          },
+        ),
         depth_slice:    None,
         resolve_target: None,
         ops:            wgpu::Operations {
@@ -76,12 +75,13 @@ impl Rasterizer {
       submission_index: Some(idx),
       timeout:          None,
     });
-    println!("{:?}", &self.raw_state.mapped[0..8]);
+    println!("{:?}", &self.presenter.mapped[0..8]);
   }
 }
 
 impl Rasterizer {
   pub async fn new() -> anyhow::Result<Rasterizer> {
+    log::info!("Creating Rasterizer backend?");
     let r: anyhow::Result<Rasterizer> = try {
       let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
       desc.backends = wgpu::Backends::VULKAN;
@@ -111,73 +111,186 @@ impl Rasterizer {
       let dev_desc = wgpu::DeviceDescriptor {
         ..Default::default()
       };
-      let (raw, (dev, queue)) = unsafe {
-        let i = instance.as_hal::<wgvk::Api>().unwrap();
-        let hal_adapter = adapter.as_hal::<wgvk::Api>().unwrap();
-        let phy = hal_adapter.raw_physical_device();
-        let dev_version = i
-          .shared_instance()
-          .raw_instance()
-          .get_physical_device_properties(phy)
-          .api_version;
-        println!(
-          "Device's API version: {dev_version} ({}.{}.{}.{})",
-          vk::api_version_major(dev_version),
-          vk::api_version_minor(dev_version),
-          vk::api_version_patch(dev_version),
-          vk::api_version_variant(dev_version)
-        );
-        let dq = hal_adapter.open_with_callback(
-          dev_desc.required_features,
-          &dev_desc.required_limits,
-          &dev_desc.memory_hints,
-          Some(Box::new(|opts| {
-            opts.extensions.push(vk::EXT_EXTERNAL_MEMORY_DMA_BUF_NAME);
-          })),
-        )?;
-        (
-          raw_wgpu_setup(i.shared_instance(), &dq, phy).await,
-          adapter.create_device_from_hal(dq, &dev_desc)?,
-        )
-      };
+      let (raw, (dev, queue)) =
+        unsafe { create_presenter_dev_queue(&instance, adapter, dev_desc).await? };
+
+      let target = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
+        label:           Some(" a kind of render target".to_string()),
+        size:            wgpu::Extent3d {
+          width:                 1024,
+          height:                1024,
+          depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count:    1,
+        dimension:       wgpu::TextureDimension::D2,
+        format:          wgpu::TextureFormat::Rgba8Unorm,
+        usage:           wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats:    vec![wgpu::TextureFormat::Rgba8Unorm],
+      });
 
       // On wgpu shutdown device is dropped earlier than callback is called for some reason
       Rasterizer {
         i: instance,
-        raw_state: raw.into_hal(&dev),
-        dev,
+        presenter: raw.into_hal(&dev),
         queue,
+        drawer: None,
+        dev,
+        target,
       }
     };
     r.map_err(|x| anyhow::anyhow!(x))
   }
 
   pub fn create_scene(&self) -> Scene { Scene::new() }
-  pub fn create_material(&self, path: impl AsRef<Path>) -> anyhow::Result<Material> {
+  pub fn load_material(&self, path: impl AsRef<Path>) -> anyhow::Result<Arc<Material>> {
     let imported = strahl_import::reader::Material::read(path)?;
-    Ok(Material::from_imported(&self.dev, &self.queue, imported))
+    Ok(Arc::new(Material::from_imported(
+      &self.dev,
+      &self.queue,
+      imported,
+    )))
   }
-  pub fn create_geometry(&self) {}
-  pub fn render(&self, _scene: &Scene) -> &[u8] { todo!() }
+  pub fn load_mesh(&self, path: impl AsRef<Path>) -> anyhow::Result<Arc<Geometry>> {
+    let gltf = strahl_import::reader::GltfGeometry::import_validate(path)?;
+    Geometry::from_gltf(&self.dev, gltf).map(Arc::new)
+  }
+  pub fn render(&mut self, scene: &Scene) -> &[u8] {
+    if let Some(body) = scene.bodies().first() {
+      if let Some(ref view) = body.material().any_view {
+        let mut encoder = self
+          .dev
+          .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("zbuf_smoothing"),
+          });
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+          label: Some("zbuf_smoothing"),
+          color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            view:           &self.target,
+            resolve_target: None,
+            ops:            wgpu::Operations {
+              load:  wgpu::LoadOp::DontCare(Default::default()),
+              store: wgpu::StoreOp::Store,
+            },
+            depth_slice:    None,
+          })],
+          depth_stencil_attachment: None,
+          timestamp_writes: None,
+          occlusion_query_set: None,
+          multiview_mask: None,
+        });
+        let drawer = self.drawer.get_or_insert(limne::TextureDrawer::new(
+          &self.dev,
+          &limne::TextureDrawerResources {
+            texture:     view,
+            bind_groups: &[],
+          },
+          &wgpu::TextureFormat::Rgba8Unorm,
+          limne::TextureDrawerInitRes {
+            stencil:         None,
+            fragment:        None,
+            layout:          &[],
+            unclipped_depth: false,
+          },
+        ));
+        drawer.render_into_pass(&mut pass, &limne::TextureDrawerResources {
+          texture:     view,
+          bind_groups: &[],
+        });
+        drop(pass);
+        encoder.copy_texture_to_texture(
+          wgpu::TexelCopyTextureInfo {
+            texture:   self.target.texture(),
+            mip_level: 0,
+            origin:    wgpu::Origin3d { x: 0, y: 0, z: 0 },
+            aspect:    wgpu::TextureAspect::All,
+          },
+          wgpu::TexelCopyTextureInfo {
+            texture:   &self.presenter.present_texture,
+            mip_level: 0,
+            origin:    wgpu::Origin3d { x: 0, y: 0, z: 0 },
+            aspect:    wgpu::TextureAspect::All,
+          },
+          wgpu::Extent3d {
+            width:                 1024,
+            height:                1024,
+            depth_or_array_layers: 1,
+          },
+        );
+        let index = self.queue.submit(std::iter::once(encoder.finish()));
+        log::trace!("work submitted to the GPU");
+        self.dev.poll(wgpu::wgt::PollType::Wait {
+          submission_index: Some(index),
+          timeout:          None,
+        });
+        log::trace!("complete");
+      } else {
+        log::error!("You are so boring, give a roughness texture!");
+        log::warn!("No image will be produced");
+      }
+    }
+    self.presenter.mapped
+  }
 }
 
-struct RawState {
-  swapchain: wgpu::Texture,
-  mapped:    &'static [u8], // this is bad and unsound. must be rewritten somehow
-}
-struct RawStateVk {
-  swapchain:     wgvk::Texture,
-  wgpu_tex_desc: wgpu::TextureDescriptor<'static>,
-  mapped:        &'static [u8], // this is bad and unsound. must be rewritten somehow
+async unsafe fn create_presenter_dev_queue(
+  instance: &wgpu::Instance,
+  adapter: wgpu::Adapter,
+  dev_desc: wgpu::wgt::DeviceDescriptor<Option<&str>>,
+) -> Result<(RawMappedPresenter, (wgpu::Device, wgpu::Queue)), anyhow::Error> {
+  unsafe {
+    let i = instance.as_hal::<wgvk::Api>().unwrap();
+    let hal_adapter = adapter.as_hal::<wgvk::Api>().unwrap();
+    let phy = hal_adapter.raw_physical_device();
+    let dev_version = i
+      .shared_instance()
+      .raw_instance()
+      .get_physical_device_properties(phy)
+      .api_version;
+    println!(
+      "Device's API version: {dev_version} ({}.{}.{}.{})",
+      vk::api_version_major(dev_version),
+      vk::api_version_minor(dev_version),
+      vk::api_version_patch(dev_version),
+      vk::api_version_variant(dev_version)
+    );
+    let dq = hal_adapter.open_with_callback(
+      dev_desc.required_features,
+      &dev_desc.required_limits,
+      &dev_desc.memory_hints,
+      Some(Box::new(|opts| {
+        opts.extensions.push(vk::EXT_EXTERNAL_MEMORY_DMA_BUF_NAME);
+      })),
+    )?;
+    Ok((
+      raw_wgpu_setup(i.shared_instance(), &dq, phy).await,
+      adapter.create_device_from_hal(dq, &dev_desc)?,
+    ))
+  }
 }
 
-impl RawStateVk {
-  pub fn into_hal(self, dev: &wgpu::Device) -> RawState {
-    RawState {
-      swapchain: unsafe {
-        dev.create_texture_from_hal::<wgvk::Api>(self.swapchain, &self.wgpu_tex_desc)
+struct MappedPresenter {
+  present_texture: wgpu::Texture,
+  mapped:          &'static [u8], // this is bad and unsound. must be rewritten somehow
+}
+
+impl MappedPresenter {
+  pub fn texture_view(&self) -> wgpu::TextureView { todo!() }
+}
+
+struct RawMappedPresenter {
+  present_texture: wgvk::Texture,
+  wgpu_tex_desc:   wgpu::TextureDescriptor<'static>,
+  mapped:          &'static [u8], // this is bad and unsound. must be rewritten somehow
+}
+
+impl RawMappedPresenter {
+  pub fn into_hal(self, dev: &wgpu::Device) -> MappedPresenter {
+    MappedPresenter {
+      present_texture: unsafe {
+        dev.create_texture_from_hal::<wgvk::Api>(self.present_texture, &self.wgpu_tex_desc)
       },
-      mapped:    self.mapped,
+      mapped:          self.mapped,
     }
   }
 }
@@ -187,7 +300,7 @@ async unsafe fn raw_wgpu_setup(
   vk_instance: &wgvk::InstanceShared,
   dq: &wgpu::hal::OpenDevice<wgvk::Api>,
   phy: vk::PhysicalDevice,
-) -> RawStateVk {
+) -> RawMappedPresenter {
   let extent = vk::Extent3D {
     width:  1024,
     height: 1024,
@@ -203,7 +316,7 @@ async unsafe fn raw_wgpu_setup(
           .array_layers(1) // Vulkan implementation must support at least 256 array layers
           .extent(extent)
           .flags(vk::ImageCreateFlags::empty())
-          .format(vk::Format::R8G8B8A8_UINT)
+          .format(vk::Format::R8G8B8A8_UNORM)
           .image_type(vk::ImageType::TYPE_2D)
           .initial_layout(vk::ImageLayout::UNDEFINED)
           .mip_levels(1)
@@ -249,7 +362,7 @@ async unsafe fn raw_wgpu_setup(
       mip_level_count: 1,
       sample_count:    1,
       dimension:       wgpu::TextureDimension::D2,
-      format:          wgpu::TextureFormat::Rgba8Uint,
+      format:          wgpu::TextureFormat::Rgba8Unorm,
       // TODO: Is it initial usage or all allowed usages
       usage:           wgpu::TextureUses::COPY_DST
         | wgpu::TextureUses::UNINITIALIZED
@@ -267,7 +380,7 @@ async unsafe fn raw_wgpu_setup(
       mip_level_count: 1,
       sample_count:    1,
       dimension:       wgpu::TextureDimension::D2,
-      format:          wgpu::TextureFormat::Rgba8Uint,
+      format:          wgpu::TextureFormat::Rgba8Unorm,
       usage:           wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::RENDER_ATTACHMENT,
       view_formats:    &[],
     };
@@ -282,8 +395,8 @@ async unsafe fn raw_wgpu_setup(
       })),
       wgvk::TextureMemory::External,
     );
-    RawStateVk {
-      swapchain,
+    RawMappedPresenter {
+      present_texture: swapchain,
       wgpu_tex_desc,
       mapped,
     }

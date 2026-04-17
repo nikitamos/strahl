@@ -185,9 +185,9 @@ impl TextureDrawer {
 
     let sampler = device.create_sampler(&SamplerDescriptor {
       label: None,
-      address_mode_u: AddressMode::ClampToBorder,
-      address_mode_v: AddressMode::ClampToBorder,
-      address_mode_w: AddressMode::ClampToBorder,
+      address_mode_u: AddressMode::ClampToEdge,
+      address_mode_v: AddressMode::ClampToEdge,
+      address_mode_w: AddressMode::ClampToEdge,
       mag_filter: FilterMode::Linear,
       min_filter: FilterMode::Linear,
       mipmap_filter: wgpu::MipmapFilterMode::Nearest,

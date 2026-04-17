@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use crate::{geometry::Geometry, material::Material};
+use crate::{geometry::Geometry, material::Material, shader_manager::ShaderManager};
 
 #[repr(C)]
 #[derive(Clone, zerocopy::IntoBytes, zerocopy::KnownLayout, zerocopy::Immutable)]
@@ -14,13 +14,15 @@ pub struct BodyData {
 pub struct Body {
   geometry: Arc<Geometry>,
   material: Arc<Material>,
+  pipeline: wgpu::RenderPipeline,
   // TODO: determine which RwLock should be used hare
   data:     RwLock<BodyData>,
 }
 
 impl Body {
-  pub fn new(geometry: Arc<Geometry>, material: Arc<Material>) -> Self {
+  pub fn new(geometry: Arc<Geometry>, material: Arc<Material>, manager: &ShaderManager) -> Self {
     Self {
+      pipeline: manager.create_pipeline_for_mesh_geometry(&material, &geometry),
       geometry,
       material,
       data: RwLock::new(BodyData {
@@ -30,6 +32,17 @@ impl Body {
         translation: glam::Vec3::ZERO,
       }),
     }
+  }
+
+  /// Renders the body into provided render pass.
+  /// This function assumes that the global uniform buffer
+  /// (group 0) is already bound by caller.
+  pub fn draw(&self, pass: &mut wgpu::RenderPass<'_>) {
+    pass.set_pipeline(&self.pipeline);
+    pass.set_bind_group(1, self.material.bind_group(), &[]);
+    pass.set_bind_group(2, self.geometry.bind_group(), &[]);
+    self.geometry.setup_attributes(pass);
+    self.geometry.dispatch_draw(pass);
   }
 
   pub fn rotation(&self) -> glam::Quat { self.data.read().unwrap().rotation }
@@ -48,17 +61,19 @@ impl Body {
 }
 
 pub struct Scene {
-  bodies: Vec<Arc<Body>>,
-}
-
-impl Default for Scene {
-  fn default() -> Self { Self::new() }
+  bodies:  Vec<Arc<Body>>,
+  manager: Arc<ShaderManager>,
 }
 
 impl Scene {
-  pub fn new() -> Self { Self { bodies: vec![] } }
+  pub(crate) fn new(manager: Arc<ShaderManager>) -> Self {
+    Self {
+      bodies: vec![],
+      manager,
+    }
+  }
   pub fn add_body(&mut self, geometry: Arc<Geometry>, material: Arc<Material>) -> Arc<Body> {
-    let res = Arc::new(Body::new(geometry, material));
+    let res = Arc::new(Body::new(geometry, material, &self.manager));
     self.bodies.push(res.clone());
     res
   }

@@ -10,7 +10,10 @@ use ash::vk;
 use material::Material;
 use wgpu::{TextureUsages, hal::vulkan as wgvk, wgt::TextureDescriptor};
 
-use crate::{geometry::Geometry, gpu_alloc::Allocator, limne::RenderTarget, scene::Scene};
+use crate::{
+  geometry::Geometry, gpu_alloc::Allocator, limne::RenderTarget, scene::Scene,
+  shader_manager::ShaderManager, uniform::GlobalUniformsWrapper,
+};
 
 pub(crate) mod gpu_alloc;
 
@@ -21,6 +24,7 @@ pub struct Rasterizer {
   presenter: MappedPresenter,
   target:    limne::TextureProvider,
   drawer:    Option<limne::TextureDrawer>,
+  manager:   Arc<ShaderManager>,
 }
 
 pub mod geometry;
@@ -30,6 +34,7 @@ pub mod scene;
 pub mod uniform;
 
 impl Rasterizer {
+  #[deprecated]
   pub async fn fill_framebuffer(&self) {
     let mut encoder = self
       .dev
@@ -129,6 +134,8 @@ impl Rasterizer {
         view_formats:    vec![wgpu::TextureFormat::Rgba8Unorm],
       });
 
+      let manager = Arc::new(ShaderManager::new(dev.clone()));
+
       // On wgpu shutdown device is dropped earlier than callback is called for some reason
       Rasterizer {
         i: instance,
@@ -137,12 +144,13 @@ impl Rasterizer {
         drawer: None,
         dev,
         target,
+        manager,
       }
     };
     r.map_err(|x| anyhow::anyhow!(x))
   }
 
-  pub fn create_scene(&self) -> Scene { Scene::new() }
+  pub fn create_scene(&self) -> Scene { Scene::new(Arc::clone(&self.manager)) }
   pub fn load_material(&self, path: impl AsRef<Path>) -> anyhow::Result<Arc<Material>> {
     let imported = strahl_import::reader::Material::read(path)?;
     Ok(Arc::new(Material::from_imported(
@@ -198,25 +206,7 @@ impl Rasterizer {
           bind_groups: &[],
         });
         drop(pass);
-        encoder.copy_texture_to_texture(
-          wgpu::TexelCopyTextureInfo {
-            texture:   self.target.texture(),
-            mip_level: 0,
-            origin:    wgpu::Origin3d { x: 0, y: 0, z: 0 },
-            aspect:    wgpu::TextureAspect::All,
-          },
-          wgpu::TexelCopyTextureInfo {
-            texture:   &self.presenter.present_texture,
-            mip_level: 0,
-            origin:    wgpu::Origin3d { x: 0, y: 0, z: 0 },
-            aspect:    wgpu::TextureAspect::All,
-          },
-          wgpu::Extent3d {
-            width:                 1024,
-            height:                1024,
-            depth_or_array_layers: 1,
-          },
-        );
+        self.copy_to_presenter(&mut encoder);
         let index = self.queue.submit(std::iter::once(encoder.finish()));
         log::trace!("work submitted to the GPU");
         self.dev.poll(wgpu::wgt::PollType::Wait {
@@ -230,6 +220,28 @@ impl Rasterizer {
       }
     }
     self.presenter.mapped
+  }
+
+  fn copy_to_presenter(&mut self, encoder: &mut wgpu::CommandEncoder) {
+    encoder.copy_texture_to_texture(
+      wgpu::TexelCopyTextureInfo {
+        texture:   self.target.texture(),
+        mip_level: 0,
+        origin:    wgpu::Origin3d { x: 0, y: 0, z: 0 },
+        aspect:    wgpu::TextureAspect::All,
+      },
+      wgpu::TexelCopyTextureInfo {
+        texture:   &self.presenter.present_texture,
+        mip_level: 0,
+        origin:    wgpu::Origin3d { x: 0, y: 0, z: 0 },
+        aspect:    wgpu::TextureAspect::All,
+      },
+      wgpu::Extent3d {
+        width:                 1024,
+        height:                1024,
+        depth_or_array_layers: 1,
+      },
+    );
   }
 }
 

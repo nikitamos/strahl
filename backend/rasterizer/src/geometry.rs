@@ -12,55 +12,68 @@ use wgpu::{
 pub enum Geometry {
   #[non_exhaustive]
   Mesh {
-    buf:        wgpu::Buffer,
-    gltf:       GltfGeometry,
-    attributes: [wgpu::VertexAttribute; 3],
+    buf:  wgpu::Buffer,
+    gltf: GltfGeometry,
   },
 }
 
 impl Geometry {
-  pub fn from_gltf(dev: &wgpu::Device, queue: &wgpu::Queue, gltf: GltfGeometry) -> Self {
+  pub fn from_gltf(
+    dev: &wgpu::Device,
+    queue: &wgpu::Queue,
+    gltf: GltfGeometry,
+  ) -> anyhow::Result<Self> {
+    get_gltf_index_format(&gltf).ok_or(anyhow::anyhow!(
+      "bad index format: expected 8-bit or 16-bit"
+    ))?;
     let buf = dev.create_buffer_init(&BufferInitDescriptor {
       label:    None,
       contents: &gltf.buffer,
       usage:    wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDEX,
     });
 
-    let res = Self::Mesh {
-      buf,
-      gltf,
-      attributes: unsafe { MaybeUninit::uninit().assume_init() },
-    };
-    res
+    Ok(Self::Mesh { buf, gltf })
   }
 
+  /// Sets vector attributes for rendering the mesh in given `RenderPass`
   pub fn setup_attributes(&self, pass: &mut wgpu::RenderPass) {
     match self {
       Self::Mesh { buf, gltf, .. } => {
-        pass.set_index_buffer(buf.slice(gltf.indices), todo!());
-        pass.set_vertex_buffer(0, buf.slice(gltf));
-        pass.set_vertex_buffer(1, buf.slice(gltf));
-        pass.set_vertex_buffer(2, buf.slice(gltf));
+        pass.set_index_buffer(
+          buf.slice(&gltf.indices),
+          get_gltf_index_format(gltf).unwrap(),
+        );
+        pass.set_vertex_buffer(0, buf.slice(&gltf.position));
+        pass.set_vertex_buffer(1, buf.slice(&gltf.normals));
+        pass.set_vertex_buffer(2, buf.slice(&gltf.uv));
       }
     }
   }
-  pub fn vertex_state(&self) -> wgpu::VertexState<'_> {
-    wgpu::VertexState {
-      module:              todo!(),
-      entry_point:         todo!(),
-      compilation_options: PipelineCompilationOptions {
-        constants: &[],
-        zero_initialize_workgroup_memory: false,
-      },
-      buffers:             &self.buffer_layout(),
+  pub fn vertex_state<'a, 'b>(
+    &self,
+    attrs: &'b mut [wgpu::VertexAttribute; 3],
+    layout: &'a mut [wgpu::VertexBufferLayout<'b>; 3],
+  ) -> wgpu::VertexState<'_> {
+    if let Self::Mesh { buf: _buf, gltf } = self {
+      *layout = Self::buffer_layout(gltf, attrs);
+      wgpu::VertexState {
+        module:              todo!(),
+        entry_point:         todo!(),
+        compilation_options: PipelineCompilationOptions {
+          constants: &[],
+          zero_initialize_workgroup_memory: false,
+        },
+        buffers:             layout
+      }
+    } else {
+      unreachable!()
     }
   }
-  pub fn buffer_layout<'a>(&'a mut self) -> [wgpu::VertexBufferLayout<'a>; 3] {
-    let Geometry::Mesh {
-      buf: _buf,
-      gltf,
-      attributes: attrs,
-    } = self;
+
+  pub fn buffer_layout<'a>(
+    gltf: &GltfGeometry,
+    attrs: &'a mut [wgpu::VertexAttribute; 3],
+  ) -> [wgpu::VertexBufferLayout<'a>; 3] {
     let (first, cons) = attrs.split_at_mut(1);
     let (second, third) = cons.split_at_mut(1);
     [
@@ -70,7 +83,7 @@ impl Geometry {
     ]
   }
   fn layout_for<'a>(
-    gltf_buf: &'a GltfBufferView,
+    gltf_buf: &GltfBufferView,
     loc: wgpu::ShaderLocation,
     fmt: wgpu::VertexFormat,
     attrs: &'a mut [wgpu::VertexAttribute],
@@ -86,6 +99,9 @@ impl Geometry {
       attributes:   attrs,
     }
   }
+
+  pub fn bind_group_layout(&self) -> Option<&wgpu::BindGroupLayout> { None }
+  pub fn bind_group(&self) -> Option<&wgpu::BindGroup> { None }
 }
 
 fn get_gltf_index_format(gltf: &GltfGeometry) -> Option<wgpu::IndexFormat> {

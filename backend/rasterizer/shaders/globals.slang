@@ -1,8 +1,8 @@
-module transforms;
+module globals;
 
-struct Transforms {
-    float4x4 world_to_body;
+public struct Globals {
+    public float4x4 camera;
 };
 
 [vk::binding(0,0)]
-ConstantBuffer<Transforms> transforms;
+public ConstantBuffer<Globals> global;

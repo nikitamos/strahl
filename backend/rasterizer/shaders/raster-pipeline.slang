@@ -37,6 +37,14 @@ uniform Texture2D normalTex;
 [vk::binding(7,1)]
 ConstantBuffer<Colors> colors;
 
+struct BodyStuff {
+    float4x4 body2world;
+    float4 scale;
+};
+
+[vk::binding(0,2)]
+ConstantBuffer<BodyStuff> body;
+
 float4 GetRoughness(float2 uv) {
     if (COLORS & ROUGHNESS) {
         return colors.roughness;
@@ -86,7 +94,7 @@ struct VertexOutput {
 };
 
 [shader("vertex")]
-VertexOutput VertexShader(
+VertexOutput MeshGeometryVS(
     float3 body_position: POSITION0,
     float2 uv: POSITION1,
     float3 normal: POSITION2
@@ -95,6 +103,6 @@ VertexOutput VertexShader(
 }
 
 [shader("fragment")]
-float4 FragmentShader(VertexOutput in) : SV_Target {
+float4 RasterizerPbrFS(VertexOutput in) : SV_Target {
     return GetDiffuse(in.uv);
 }

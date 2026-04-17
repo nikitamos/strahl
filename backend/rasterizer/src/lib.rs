@@ -3,11 +3,14 @@
 #![allow(dead_code)]
 
 use core::slice;
+use std::{alloc::Layout, mem::MaybeUninit, sync::Arc};
 
 use ash::vk;
-use wgpu::{TextureUsages, hal::vulkan as wgvk};
+use wgpu::{TextureUsages, VertexState, hal::vulkan as wgvk};
 
-use crate::{gpu_alloc::Allocator, scene::Scene};
+use crate::{
+  geometry::Geometry, gpu_alloc::Allocator, scene::Scene, uniform::GlobalUniformsWrapper,
+};
 
 pub(crate) mod gpu_alloc;
 
@@ -21,6 +24,7 @@ pub struct Rasterizer {
 pub mod geometry;
 pub mod material;
 pub mod scene;
+pub mod uniform;
 
 impl Rasterizer {
   pub async fn fill_framebuffer(&self) {
@@ -279,3 +283,5 @@ async unsafe fn raw_wgpu_setup(
     }
   }
 }
+
+pub mod shader_manager;

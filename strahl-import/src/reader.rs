@@ -182,6 +182,20 @@ impl RangeBounds<u64> for GltfBufferView {
   }
 }
 
+#[cfg(target_pointer_width = "64")]
+impl RangeBounds<u64> for &GltfBufferView {
+  // SAFETY: on 64-bit targets sizeof(usize) == sizeof(u64)
+  // Proper alignment is ensured by the assertion below.
+  fn start_bound(&self) -> std::ops::Bound<&u64> {
+    const _: () = assert!(std::mem::align_of::<u64>() == std::mem::align_of::<usize>());
+    unsafe { Bound::Included(std::mem::transmute(&self.offset)) }
+  }
+
+  fn end_bound(&self) -> std::ops::Bound<&u64> {
+    unsafe { Bound::Excluded(std::mem::transmute(&self.upper_bound)) }
+  }
+}
+
 #[derive(Debug)]
 pub struct GltfGeometry {
   pub position:   GltfBufferView,

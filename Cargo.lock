@@ -2420,10 +2420,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ash",
+ "env_logger",
  "glam",
  "log",
  "strahl-import",
  "strahl_types",
+ "tokio",
  "wgpu",
  "zerocopy",
 ]

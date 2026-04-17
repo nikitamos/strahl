@@ -3,8 +3,10 @@
 #![allow(dead_code)]
 
 use core::slice;
+use std::path::Path;
 
 use ash::vk;
+use material::Material;
 use wgpu::{TextureUsages, hal::vulkan as wgvk};
 
 use crate::{
@@ -149,7 +151,10 @@ impl Rasterizer {
   }
 
   pub fn create_scene(&self) -> Scene { Scene::new() }
-  pub fn create_material(&self) {}
+  pub fn create_material(&self, path: impl AsRef<Path>) -> anyhow::Result<Material> {
+    let imported = strahl_import::reader::Material::read(path)?;
+    Ok(Material::from_imported(&self.dev, &self.queue, imported))
+  }
   pub fn create_geometry(&self) {}
   pub fn render(&self, _scene: &Scene) -> &[u8] { todo!() }
 }

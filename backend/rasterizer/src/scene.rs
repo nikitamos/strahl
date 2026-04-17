@@ -1,12 +1,14 @@
 use std::sync::{Arc, RwLock};
 
+use glam::Mat4;
+use zerocopy::IntoBytes;
+
 use crate::{geometry::Geometry, material::Material, shader_manager::ShaderManager};
 
 #[repr(C)]
-#[derive(Clone, zerocopy::IntoBytes, zerocopy::KnownLayout, zerocopy::Immutable)]
+#[derive(Clone)]
 pub struct BodyData {
   pub rotation:    glam::Quat,
-  pub mat:         glam::Mat4,
   pub translation: glam::Vec3,
   pub scale:       f32,
 }
@@ -20,14 +22,17 @@ pub struct Body {
 }
 
 impl Body {
-  pub fn new(geometry: Arc<Geometry>, material: Arc<Material>, manager: &ShaderManager) -> Self {
+  pub(crate) fn new(
+    geometry: Arc<Geometry>,
+    material: Arc<Material>,
+    manager: &ShaderManager,
+  ) -> Self {
     Self {
       pipeline: manager.create_pipeline_for_mesh_geometry(&material, &geometry),
       geometry,
       material,
       data: RwLock::new(BodyData {
         scale:       1.0,
-        mat:         glam::Mat4::IDENTITY,
         rotation:    glam::Quat::IDENTITY,
         translation: glam::Vec3::ZERO,
       }),
@@ -41,6 +46,10 @@ impl Body {
     pass.set_pipeline(&self.pipeline);
     pass.set_bind_group(1, self.material.bind_group(), &[]);
     pass.set_bind_group(2, self.geometry.bind_group(), &[]);
+    let transform = Mat4::from_translation(self.translation())
+      * Mat4::from_quat(self.rotation())
+      * Mat4::from_scale(glam::Vec3::splat(self.scale()));
+    pass.set_immediates(0, transform.as_bytes());
     self.geometry.setup_attributes(pass);
     self.geometry.dispatch_draw(pass);
   }

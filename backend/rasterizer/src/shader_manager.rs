@@ -1,5 +1,8 @@
 use crate::{geometry::Geometry, uniform::GlobalUniformsWrapper};
-use std::{mem::MaybeUninit, sync::Arc};
+use std::{
+  mem::MaybeUninit,
+  sync::{Arc, RwLock},
+};
 use wgpu::include_wgsl;
 
 pub(crate) struct ShaderEntryPoint {
@@ -11,7 +14,7 @@ pub(crate) struct ShaderManager {
   mesh_vert: ShaderEntryPoint,
   pbr_frag:  ShaderEntryPoint,
   dev:       wgpu::Device,
-  uniforms:  GlobalUniformsWrapper,
+  uniforms:  RwLock<GlobalUniformsWrapper>,
 }
 
 impl ShaderManager {
@@ -29,7 +32,7 @@ impl ShaderManager {
       entry_point: Some("RasterizerPbrFS".to_string()),
     };
     Self {
-      uniforms: GlobalUniformsWrapper::new(&dev),
+      uniforms: RwLock::new(GlobalUniformsWrapper::new(&dev)),
       mesh_vert,
       pbr_frag,
       dev,
@@ -55,7 +58,7 @@ impl ShaderManager {
       .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label:              Some("material"),
         bind_group_layouts: &[
-          Some(self.uniforms.bind_group_layout()),
+          Some(self.uniforms.read().unwrap().bind_group_layout()),
           Some(material.bind_group_layout()),
           geometry.bind_group_layout(),
         ],
@@ -105,6 +108,10 @@ impl ShaderManager {
     self.dev.create_render_pipeline(&desc)
   }
 
-  pub(crate) fn uniforms(&self) -> &GlobalUniformsWrapper { &self.uniforms }
-  pub(crate) fn uniforms_mut(&mut self) -> &mut GlobalUniformsWrapper { &mut self.uniforms }
+  pub(crate) fn uniforms(&self) -> std::sync::RwLockReadGuard<'_, GlobalUniformsWrapper> {
+    self.uniforms.read().unwrap()
+  }
+  pub(crate) fn uniforms_mut(&self) -> std::sync::RwLockWriteGuard<'_, GlobalUniformsWrapper> {
+    self.uniforms.write().unwrap()
+  }
 }

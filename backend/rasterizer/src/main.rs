@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use glam::Mat4;
 use image::Rgba;
 pub use rasterizer::*;
 
@@ -23,7 +24,15 @@ pub async fn true_main() -> anyhow::Result<()> {
   let geometry = strahl.load_mesh("../../../strahl-import/assets/lava/Lava.gltf")?;
   let mut scene = strahl.create_scene();
   let body = scene.add_body(geometry, material);
-  let test = strahl.render(&scene);
+  let camera = Camera {
+    projection: dbg!(Mat4::orthographic_lh(-1.0, 1.0, -1.0, 1.0, 0.0, 3.0)),
+    camera:     dbg!(Mat4::look_at_lh(
+      glam::vec3(0.0, 1.0, 0.0),
+      glam::Vec3::ZERO,
+      glam::Vec3::Z
+    )),
+  };
+  let test = strahl.render(&scene, &camera);
   let buf = image::ImageBuffer::<Rgba<u8>, _>::from_raw(size.x, size.y, test).ok_or_else(|| {
     log::error!("failed to import image");
     anyhow!("failed to import image")

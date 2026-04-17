@@ -6,7 +6,9 @@ use zerocopy::IntoBytes;
 #[derive(zerocopy::KnownLayout, zerocopy::IntoBytes, zerocopy::Immutable, Default)]
 #[repr(C)]
 pub struct GlobalUniforms {
-  pub camera: glam::Mat4,
+  pub camera:        crate::Camera,
+  pub viewport_size: glam::UVec2,
+  _padding:          [u8; 8],
 }
 
 pub struct GlobalUniformsWrapper {

@@ -37,6 +37,13 @@ pub struct RasterizerCreateInfo {
   pub viewport: glam::u32::UVec2,
 }
 
+#[derive(zerocopy::KnownLayout, zerocopy::IntoBytes, zerocopy::Immutable, Default, Clone)]
+#[repr(C)]
+pub struct Camera {
+  pub projection: glam::Mat4,
+  pub camera:     glam::Mat4,
+}
+
 impl Rasterizer {
   pub async fn new(info: RasterizerCreateInfo) -> anyhow::Result<Rasterizer> {
     log::info!("Creating Rasterizer backend?");
@@ -125,7 +132,10 @@ impl Rasterizer {
     let gltf = strahl_import::reader::GltfGeometry::import_validate(path)?;
     Geometry::from_gltf(&self.dev, gltf).map(Arc::new)
   }
-  pub fn render(&mut self, scene: &Scene) -> &[u8] {
+  pub fn render(&mut self, scene: &Scene, camera: &Camera) -> &[u8] {
+    self.manager.uniforms_mut().camera = camera.clone();
+    self.manager.uniforms_mut().viewport_size = self.info.viewport;
+    self.manager.uniforms().upload(&self.queue);
     let mut encoder = self
       .dev
       .create_command_encoder(&wgpu::CommandEncoderDescriptor {

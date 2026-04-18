@@ -103,6 +103,10 @@ VertexOutput MeshGeometryVS(
                    transform
     );
     var up = float3(0.0, 1.0, 0.0);
+    // TODO: a dirty hack that only works, if the mesh is a sphere
+    if (abs(normal.y) > 0.999) {
+        up = float3(1.0, 0.0, 0.0);
+    }
     float3 bitangent = normalize(cross(up, normal));
     float3 tangent = normalize(cross(normal, bitangent));
     float3x3 TBN = float3x3(tangent, cross(normal, tangent), normal);

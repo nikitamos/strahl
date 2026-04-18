@@ -2,9 +2,10 @@
 #![feature(try_blocks)]
 #![feature(associated_type_defaults)]
 #![allow(dead_code)]
+#![feature(duration_millis_float)]
 
 use core::slice;
-use std::{path::Path, sync::Arc};
+use std::{path::Path, sync::Arc, time::SystemTime};
 
 use ash::vk;
 use material::Material;
@@ -132,7 +133,7 @@ impl Rasterizer {
         target,
         manager,
         info,
-        depth
+        depth,
       }
     };
     r.map_err(|x| anyhow::anyhow!(x))
@@ -152,6 +153,7 @@ impl Rasterizer {
     Geometry::from_gltf(&self.dev, gltf).map(Arc::new)
   }
   pub fn render(&mut self, scene: &Scene, camera: &Camera) -> &[u8] {
+    let begin = SystemTime::now();
     self.manager.uniforms_mut().camera = camera.clone();
     self.manager.uniforms_mut().viewport_size = self.info.viewport;
     self.manager.uniforms().upload(&self.queue);
@@ -167,7 +169,7 @@ impl Rasterizer {
           view:           &self.target,
           resolve_target: None,
           ops:            wgpu::Operations {
-            load:  wgpu::LoadOp::DontCare(Default::default()),
+            load:  wgpu::LoadOp::Clear(wgpu::Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }),
             store: wgpu::StoreOp::Store,
           },
           depth_slice:    None,
@@ -197,7 +199,9 @@ impl Rasterizer {
       submission_index: Some(index),
       timeout:          None,
     });
-    log::trace!("complete");
+    let end = SystemTime::now();
+    let dur = end.duration_since(begin).unwrap().as_millis_f32();
+    log::trace!("finished in {dur:.2}ms, ~{:.0} draw/second", 1000.0 / dur);
     self.presenter.mapped
   }
 

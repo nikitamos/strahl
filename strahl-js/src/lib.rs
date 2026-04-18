@@ -3,14 +3,14 @@
 
 mod erase;
 
-use std::{any, sync::Arc};
+use std::sync::Arc;
 
-use glam::{Mat4, Vec3};
+use glam::Mat4;
 use rasterizer::Rasterizer;
 
 use napi::{
   Env,
-  bindgen_prelude::{ArrayBuffer, Float32Array, Float32ArraySlice, Uint8Array, Uint8ArraySlice},
+  bindgen_prelude::{Float32Array, Float32ArraySlice, Uint8Array},
   tokio::{self, sync::RwLock},
 };
 use napi_derive::napi;
@@ -105,6 +105,8 @@ pub struct Camera {
   pub look_at: Float32Array,
   /// The location of the camera (array of length 3)
   pub location: Float32Array,
+  /// Vector corresponding to the up direction in the camera space
+  pub up: Float32Array,
 }
 
 /// Class wrapping a material. So far it doesn't have any methods exposed,
@@ -201,7 +203,7 @@ impl Scene {
   pub fn add_body<'env>(
     &mut self,
     _env: &'env Env,
-    info: BodyCreateInfo<'env>,
+    _info: BodyCreateInfo<'env>,
     material: &'env Material,
     geometry: &'env Geometry,
   ) -> Body {
@@ -216,8 +218,8 @@ impl Scene {
   #[napi]
   pub fn add_light_source(
     &mut self,
-    info: LightCreateInfo,
-    geometry: &Geometry,
+    _info: LightCreateInfo,
+    _geometry: &Geometry,
   ) -> napi::Result<LightSource> {
     napi_todo!()
   }
@@ -236,6 +238,11 @@ impl Strahl {
       .filter_module("strahl_js", log::LevelFilter::Trace)
       .parse_default_env()
       .init();
+    log::info!(
+      "Creating strahl backend with w={}, h={}",
+      info.width,
+      info.height
+    );
 
     Ok(Self {
       backend: Arc::new(RwLock::new(
@@ -261,12 +268,6 @@ impl Strahl {
       .map_err(|e| e.into())
       .flatten()
       .into_napi()
-  }
-  /// Loads model geometry from given path
-  #[napi]
-  #[deprecated(note = "Use load_mesh instead")]
-  pub async fn load_model(&self, path: String) -> napi::Result<Geometry> {
-    self.load_mesh(path).await
   }
   /// Loads glTF mesh from file
   #[napi]
@@ -295,7 +296,7 @@ impl Strahl {
         top,
         near,
         far,
-      } => Mat4::orthographic_lh(
+      } => Mat4::orthographic_rh(
         left as f32,
         right as f32,
         bottom as f32,
@@ -308,25 +309,22 @@ impl Strahl {
         aspect,
         z_near,
         z_far,
-      } => Mat4::perspective_lh(fovy as f32, aspect as f32, z_near as f32, z_far as f32),
+      } => Mat4::perspective_rh(fovy as f32, aspect as f32, z_near as f32, z_far as f32),
     };
-    let view = glam::Mat4::look_at_rh(
-      Vec3::from_slice(&cam.location),
-      Vec3::from_slice(&cam.look_at),
-      (Vec3::Y),
-    );
-    let data = backend.render(
-      &scene.0,
-      &rasterizer::Camera {
-        camera: view,
-        projection,
-      },
-    );
+    let backend_camera = rasterizer::Camera {
+      projection, // (Mat4::orthographic_lh(-1.0, 1.0, -1.0, 1.0, 0.0, 3.0)),
+      camera: (Mat4::look_at_rh(
+        glam::Vec3::from_slice(&cam.location),
+        glam::Vec3::from_slice(&cam.look_at),
+        glam::Vec3::from_slice(&cam.up),
+      )),
+    };
+    let data = backend.render(&scene.0, &backend_camera);
     unsafe {
       Ok(Uint8Array::with_external_data(
         data.as_ptr().cast_mut(),
         data.len(),
-        |_, _| log::info!("slice is utilized?"),
+        |_, _| {},
       ))
     }
   }

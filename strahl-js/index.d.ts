@@ -75,8 +75,6 @@ export declare class Strahl {
   createScene(): Promise<Scene>
   /** Loads material from given path */
   loadMaterial(path: string): Promise<Material>
-  /** Loads model geometry from given path */
-  loadModel(path: string): Promise<Geometry>
   /** Loads glTF mesh from file */
   loadMesh(path: string): Promise<Geometry>
   createPointGeometry(): Geometry
@@ -96,7 +94,7 @@ export interface BodyCreateInfo {
    * relative to the world origin,
    * i.e. the translation applied to the geometry.
    */
-  position: ArrayBuffer
+  position: Float32Array
   /**
    * Rotation applied to the geometry in its local coordinates,
    * represented as Euler's angles.
@@ -111,6 +109,8 @@ export interface Camera {
   lookAt: Float32Array
   /** The location of the camera (array of length 3) */
   location: Float32Array
+  /** Vector corresponding to the up direction in the camera space */
+  up: Float32Array
 }
 
 /**

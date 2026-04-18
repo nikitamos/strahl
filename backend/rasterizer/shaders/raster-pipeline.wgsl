@@ -22,23 +22,25 @@ struct Colors_std140_0
 };
 
 @binding(7) @group(1) var<uniform> colors_0 : Colors_std140_0;
-@binding(4) @group(1) var diffuseTex_0 : texture_2d<f32>;
+@binding(6) @group(1) var normalTex_0 : texture_2d<f32>;
 
 @binding(0) @group(1) var sampler_0 : sampler;
+
+@binding(4) @group(1) var diffuseTex_0 : texture_2d<f32>;
 
 struct VertexOutput_0
 {
     @builtin(position) position_0 : vec4<f32>,
     @location(0) uv_0 : vec2<f32>,
-    @location(1) vertex_normal_0 : vec3<f32>,
+    @location(2) light_0 : vec3<f32>,
 };
 
-fn VertexOutput_x24init_0( position_1 : vec4<f32>,  uv_1 : vec2<f32>,  vertex_normal_1 : vec3<f32>) -> VertexOutput_0
+fn VertexOutput_x24init_0( position_1 : vec4<f32>,  uv_1 : vec2<f32>,  light_1 : vec3<f32>) -> VertexOutput_0
 {
     var _S1 : VertexOutput_0;
     _S1.position_0 = position_1;
     _S1.uv_0 = uv_1;
-    _S1.vertex_normal_0 = vertex_normal_1;
+    _S1.light_0 = light_1;
     return _S1;
 }
 
@@ -52,18 +54,28 @@ struct vertexInput_0
 @vertex
 fn MeshGeometryVS( _S2 : vertexInput_0) -> VertexOutput_0
 {
-    return VertexOutput_x24init_0(((((((mat4x4<f32>(mat4x4<f32>(global_0.projection_0.data_0[i32(0)][i32(0)], global_0.projection_0.data_0[i32(0)][i32(1)], global_0.projection_0.data_0[i32(0)][i32(2)], global_0.projection_0.data_0[i32(0)][i32(3)], global_0.projection_0.data_0[i32(1)][i32(0)], global_0.projection_0.data_0[i32(1)][i32(1)], global_0.projection_0.data_0[i32(1)][i32(2)], global_0.projection_0.data_0[i32(1)][i32(3)], global_0.projection_0.data_0[i32(2)][i32(0)], global_0.projection_0.data_0[i32(2)][i32(1)], global_0.projection_0.data_0[i32(2)][i32(2)], global_0.projection_0.data_0[i32(2)][i32(3)], global_0.projection_0.data_0[i32(3)][i32(0)], global_0.projection_0.data_0[i32(3)][i32(1)], global_0.projection_0.data_0[i32(3)][i32(2)], global_0.projection_0.data_0[i32(3)][i32(3)]))) * (mat4x4<f32>(mat4x4<f32>(global_0.camera_0.data_0[i32(0)][i32(0)], global_0.camera_0.data_0[i32(0)][i32(1)], global_0.camera_0.data_0[i32(0)][i32(2)], global_0.camera_0.data_0[i32(0)][i32(3)], global_0.camera_0.data_0[i32(1)][i32(0)], global_0.camera_0.data_0[i32(1)][i32(1)], global_0.camera_0.data_0[i32(1)][i32(2)], global_0.camera_0.data_0[i32(1)][i32(3)], global_0.camera_0.data_0[i32(2)][i32(0)], global_0.camera_0.data_0[i32(2)][i32(1)], global_0.camera_0.data_0[i32(2)][i32(2)], global_0.camera_0.data_0[i32(2)][i32(3)], global_0.camera_0.data_0[i32(3)][i32(0)], global_0.camera_0.data_0[i32(3)][i32(1)], global_0.camera_0.data_0[i32(3)][i32(2)], global_0.camera_0.data_0[i32(3)][i32(3)])))))) * (vec4<f32>(_S2.vertex_local_pos_0, 1.0f)))), _S2.uv_2, _S2.normal_1);
+    var tangent_0 : vec3<f32> = normalize(cross(_S2.normal_1, normalize(cross(vec3<f32>(0.0f, 1.0f, 0.0f), _S2.normal_1))));
+    return VertexOutput_x24init_0(((((((mat4x4<f32>(mat4x4<f32>(global_0.projection_0.data_0[i32(0)][i32(0)], global_0.projection_0.data_0[i32(0)][i32(1)], global_0.projection_0.data_0[i32(0)][i32(2)], global_0.projection_0.data_0[i32(0)][i32(3)], global_0.projection_0.data_0[i32(1)][i32(0)], global_0.projection_0.data_0[i32(1)][i32(1)], global_0.projection_0.data_0[i32(1)][i32(2)], global_0.projection_0.data_0[i32(1)][i32(3)], global_0.projection_0.data_0[i32(2)][i32(0)], global_0.projection_0.data_0[i32(2)][i32(1)], global_0.projection_0.data_0[i32(2)][i32(2)], global_0.projection_0.data_0[i32(2)][i32(3)], global_0.projection_0.data_0[i32(3)][i32(0)], global_0.projection_0.data_0[i32(3)][i32(1)], global_0.projection_0.data_0[i32(3)][i32(2)], global_0.projection_0.data_0[i32(3)][i32(3)]))) * (mat4x4<f32>(mat4x4<f32>(global_0.camera_0.data_0[i32(0)][i32(0)], global_0.camera_0.data_0[i32(0)][i32(1)], global_0.camera_0.data_0[i32(0)][i32(2)], global_0.camera_0.data_0[i32(0)][i32(3)], global_0.camera_0.data_0[i32(1)][i32(0)], global_0.camera_0.data_0[i32(1)][i32(1)], global_0.camera_0.data_0[i32(1)][i32(2)], global_0.camera_0.data_0[i32(1)][i32(3)], global_0.camera_0.data_0[i32(2)][i32(0)], global_0.camera_0.data_0[i32(2)][i32(1)], global_0.camera_0.data_0[i32(2)][i32(2)], global_0.camera_0.data_0[i32(2)][i32(3)], global_0.camera_0.data_0[i32(3)][i32(0)], global_0.camera_0.data_0[i32(3)][i32(1)], global_0.camera_0.data_0[i32(3)][i32(2)], global_0.camera_0.data_0[i32(3)][i32(3)])))))) * (vec4<f32>(_S2.vertex_local_pos_0, 1.0f)))), _S2.uv_2, (((vec3<f32>(0.0f, 0.0f, 1.0f)) * (transpose(mat3x3<f32>(tangent_0, cross(_S2.normal_1, tangent_0), _S2.normal_1))))));
 }
 
 @id(0) override COLORS_0 : u32;
 
-fn GetDiffuse_0( uv_3 : vec2<f32>) -> vec4<f32>
+fn GetNormal_0( uv_3 : vec2<f32>) -> vec4<f32>
+{
+    if(bool((COLORS_0 & (u32(32)))))
+    {
+        return colors_0.normal_0;
+    }
+    return (textureSample((normalTex_0), (sampler_0), (uv_3)));
+}
+
+fn GetDiffuse_0( uv_4 : vec2<f32>) -> vec4<f32>
 {
     if(bool((COLORS_0 & (u32(8)))))
     {
         return colors_0.diffuse_0;
     }
-    return (textureSample((diffuseTex_0), (sampler_0), (uv_3)));
+    return (textureSample((diffuseTex_0), (sampler_0), (uv_4)));
 }
 
 struct pixelOutput_0
@@ -73,14 +85,14 @@ struct pixelOutput_0
 
 struct pixelInput_0
 {
-    @location(0) uv_4 : vec2<f32>,
-    @location(1) vertex_normal_2 : vec3<f32>,
+    @location(0) uv_5 : vec2<f32>,
+    @location(2) light_2 : vec3<f32>,
 };
 
 @fragment
 fn RasterizerPbrFS( _S3 : pixelInput_0, @builtin(position) position_2 : vec4<f32>) -> pixelOutput_0
 {
-    var _S4 : pixelOutput_0 = pixelOutput_0( GetDiffuse_0(_S3.uv_4) );
+    var _S4 : pixelOutput_0 = pixelOutput_0( vec4<f32>(GetDiffuse_0(_S3.uv_5).xyz * vec3<f32>(clamp(dot(GetNormal_0(_S3.uv_5).xyz * vec3<f32>(2.0f) - vec3<f32>(1.0f), _S3.light_2), 0.0f, 1.0f)), 1.0f) );
     return _S4;
 }
 

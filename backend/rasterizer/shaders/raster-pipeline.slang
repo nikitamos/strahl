@@ -89,23 +89,34 @@ float4 GetNormal(float2 uv) {
 struct VertexOutput {
     float4 position: SV_Position;
     float2 uv: TEXCOORD0;
-    float3 vertex_normal: TEXCOORD1;
+    float3 light: TEXCOORD2;
 };
 
 [shader("vertex")]
 VertexOutput MeshGeometryVS(
     float3 vertex_local_pos: POSITION0,
     float3 normal: POSITION1,
-    float2 uv: POSITION2,
+    float2 uv: POSITION2
 ) {
     var transform = mul(global.camera, global.projection);
     var position = mul(float4(vertex_local_pos, 1.0),
                    transform
     );
-    return VertexOutput(position, uv, normal);
+    var up = float3(0.0, 1.0, 0.0);
+    float3 bitangent = normalize(cross(up, normal));
+    float3 tangent = normalize(cross(normal, bitangent));
+    float3x3 TBN = float3x3(tangent, cross(normal, tangent), normal);
+    TBN = transpose(TBN);
+
+    return VertexOutput(position, uv, mul(TBN, float3(0.0, 0.0, 1.0)));
 }
 
 [shader("fragment")]
 float4 RasterizerPbrFS(VertexOutput in) : SV_Target {
-    return GetDiffuse(in.uv);
+    float3 normal = GetNormal(in.uv).rgb * 2.0 - 1.0;
+    float3 color = GetDiffuse(in.uv).rgb;
+
+    float diffuse = clamp(dot(normal, in.light), 0.0, 1.0);
+
+    return float4(color * diffuse, 1.0);
 }

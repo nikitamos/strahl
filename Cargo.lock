@@ -2420,6 +2420,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ash",
+ "cc",
  "env_logger",
  "glam",
  "image",

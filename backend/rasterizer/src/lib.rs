@@ -25,6 +25,7 @@ pub struct Rasterizer {
   drawer:    Option<limne::TextureDrawer>,
   manager:   Arc<ShaderManager>,
   info:      RasterizerCreateInfo,
+  depth:     limne::TextureProvider,
 }
 
 pub mod geometry;
@@ -101,8 +102,25 @@ impl Rasterizer {
         usage:           wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
         view_formats:    vec![wgpu::TextureFormat::Rgba8Unorm],
       });
+      let depth = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
+        label:           Some("depth".to_string()),
+        size:            wgpu::Extent3d {
+          width:                 info.viewport.x,
+          height:                info.viewport.y,
+          depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count:    1,
+        dimension:       wgpu::TextureDimension::D2,
+        format:          wgpu::TextureFormat::Depth16Unorm,
+        usage:           wgpu::TextureUsages::RENDER_ATTACHMENT,
+        view_formats:    vec![wgpu::TextureFormat::Depth16Unorm],
+      });
 
-      let manager = Arc::new(ShaderManager::new(dev.clone()));
+      let manager = Arc::new(ShaderManager::new(
+        dev.clone(),
+        wgpu::TextureFormat::Depth16Unorm,
+      ));
 
       // On wgpu shutdown device is dropped earlier than callback is called for some reason
       Rasterizer {
@@ -114,6 +132,7 @@ impl Rasterizer {
         target,
         manager,
         info,
+        depth
       }
     };
     r.map_err(|x| anyhow::anyhow!(x))
@@ -153,7 +172,14 @@ impl Rasterizer {
           },
           depth_slice:    None,
         })],
-        depth_stencil_attachment: None,
+        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+          view:        &self.depth,
+          depth_ops:   Some(wgpu::Operations {
+            load:  wgpu::LoadOp::Clear(1.0),
+            store: wgpu::StoreOp::Store,
+          }),
+          stencil_ops: None,
+        }),
         timestamp_writes: None,
         occlusion_query_set: None,
         multiview_mask: None,

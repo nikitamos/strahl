@@ -18,6 +18,7 @@ pub enum Geometry {
 
 impl Geometry {
   pub fn from_gltf(dev: &wgpu::Device, gltf: GltfGeometry) -> anyhow::Result<Self> {
+    log::trace!("Creating geometry from glTF");
     get_gltf_index_format(&gltf).ok_or_else(|| {
       log::error!(
         "bad index format in glTF: expected 2 or 4-byte indices, got {}",

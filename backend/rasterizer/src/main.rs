@@ -1,59 +1,59 @@
-use std::{f32::consts::TAU, ptr::null};
+use std::{f32::consts::TAU, hint::black_box, ptr::null, time::{Duration, SystemTime}};
 
 use anyhow::anyhow;
 use glam::Mat4;
 use image::Rgba;
 pub use rasterizer::*;
 
-pub mod renderdoc {
-  use std::{
-    os::raw::c_void,
-    ptr::{self, NonNull},
-  };
+// pub mod renderdoc {
+//   use std::{
+//     os::raw::c_void,
+//     ptr::{self, NonNull},
+//   };
 
-  #[repr(transparent)]
-  pub struct Api {
-    handle: ptr::NonNull<c_void>,
-  }
+//   #[repr(transparent)]
+//   pub struct Api {
+//     handle: ptr::NonNull<c_void>,
+//   }
 
-  unsafe extern "C" {
-    fn create_renderdoc_api() -> *mut c_void;
-    fn destroy_renderdoc_api(api: *mut c_void);
-    fn renderdoc_start_capture(api: *const c_void);
-    fn renderdoc_end_capture(api: *const c_void);
-  }
-  impl Api {
-    pub fn new() -> Option<Self> {
-      unsafe {
-        let handle = create_renderdoc_api();
-        if handle.is_null() {
-          None
-        } else {
-          Some(Self {
-            handle: NonNull::new_unchecked(handle),
-          })
-        }
-      }
-    }
-    pub fn start_frame_capture(&self) {
-      unsafe {
-        renderdoc_start_capture(self.handle.as_ptr());
-      }
-    }
-    pub fn end_frame_capture(&self) {
-      unsafe {
-        renderdoc_end_capture(self.handle.as_ptr());
-      }
-    }
-  }
-  impl Drop for Api {
-    fn drop(&mut self) {
-      unsafe {
-        destroy_renderdoc_api(self.handle.as_mut());
-      }
-    }
-  }
-}
+//   unsafe extern "C" {
+//     fn create_renderdoc_api() -> *mut c_void;
+//     fn destroy_renderdoc_api(api: *mut c_void);
+//     fn renderdoc_start_capture(api: *const c_void);
+//     fn renderdoc_end_capture(api: *const c_void);
+//   }
+//   impl Api {
+//     pub fn new() -> Option<Self> {
+//       unsafe {
+//         let handle = create_renderdoc_api();
+//         if handle.is_null() {
+//           None
+//         } else {
+//           Some(Self {
+//             handle: NonNull::new_unchecked(handle),
+//           })
+//         }
+//       }
+//     }
+//     pub fn start_frame_capture(&self) {
+//       unsafe {
+//         renderdoc_start_capture(self.handle.as_ptr());
+//       }
+//     }
+//     pub fn end_frame_capture(&self) {
+//       unsafe {
+//         renderdoc_end_capture(self.handle.as_ptr());
+//       }
+//     }
+//   }
+//   impl Drop for Api {
+//     fn drop(&mut self) {
+//       unsafe {
+//         destroy_renderdoc_api(self.handle.as_mut());
+//       }
+//     }
+//   }
+// }
 
 pub fn main() -> anyhow::Result<()> {
   env_logger::Builder::new()
@@ -76,7 +76,7 @@ pub async fn true_main() -> anyhow::Result<()> {
 
   let size = glam::uvec2(800, 600);
   let mut strahl = Rasterizer::new(RasterizerCreateInfo { viewport: size }).await?;
-  let material = strahl.load_material("../../../strahl-import/assets/lava/lava.zip")?;
+  let material = strahl.load_material("../../../strahl-import/assets/gas.zip")?;
   let geometry = strahl.load_mesh("../../../strahl-import/assets/lava/Lava.gltf")?;
   let mut scene = strahl.create_scene();
   let body = scene.add_body(geometry, material);
@@ -103,6 +103,7 @@ pub async fn true_main() -> anyhow::Result<()> {
         eye.cross(glam::Vec3::X),
       )),
     };
+    
     let test = strahl.render(&scene, &camera);
     // rdoc.end_frame_capture();
     let buf =

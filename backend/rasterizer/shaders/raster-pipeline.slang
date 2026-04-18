@@ -89,7 +89,8 @@ float4 GetNormal(float2 uv) {
 struct VertexOutput {
     float4 position: SV_Position;
     float2 uv: TEXCOORD0;
-    float3 light: TEXCOORD2;
+    float3 light_dir: TEXCOORD2;
+    float3 halfway_dir: TEXCOORD3;
 };
 
 [shader("vertex")]
@@ -112,15 +113,25 @@ VertexOutput MeshGeometryVS(
     float3x3 TBN = float3x3(tangent, cross(normal, tangent), normal);
     TBN = transpose(TBN);
 
-    return VertexOutput(position, uv, mul(TBN, float3(0.0, 0.0, 1.0)));
+    float3 light_dir = float3(0.0, 0.0, 1.0);
+    float3 camera_pos = mul(global.camera, float4(0.0, 0.0, 0.0, 1.0)).xyz;
+    float3 view_dir = normalize(camera_pos - position.xyz);
+    float3 halfway_dir = normalize(light_dir + view_dir);
+
+    return VertexOutput(position, uv, mul(TBN, light_dir), mul(TBN, halfway_dir));
 }
 
 [shader("fragment")]
 float4 RasterizerPbrFS(VertexOutput in) : SV_Target {
     float3 normal = GetNormal(in.uv).rgb * 2.0 - 1.0;
-    float3 color = GetDiffuse(in.uv).rgb;
+    float3 albedo = GetDiffuse(in.uv).rgb;
+    float shininess = GetGlossy(in.uv).r;
 
-    float diffuse = clamp(dot(normal, in.light), 0.0, 1.0);
+    float diffuseness = clamp(dot(normal, in.light_dir), 0.0, 1.0);
+    float glossiness = pow(max(dot(normal, in.halfway_dir), 0.0), shininess);
 
-    return float4(color * diffuse, 1.0);
+    float3 diffuse = albedo * diffuseness;
+    float3 specular = glossiness * float3(0.1, 0.1, 0.1); // light is pure white
+
+    return float4(diffuse, 1.0);
 }

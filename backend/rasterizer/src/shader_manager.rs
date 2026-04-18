@@ -11,14 +11,15 @@ pub(crate) struct ShaderEntryPoint {
 }
 
 pub(crate) struct ShaderManager {
-  mesh_vert: ShaderEntryPoint,
-  pbr_frag:  ShaderEntryPoint,
-  dev:       wgpu::Device,
-  uniforms:  RwLock<GlobalUniformsWrapper>,
+  mesh_vert:    ShaderEntryPoint,
+  pbr_frag:     ShaderEntryPoint,
+  dev:          wgpu::Device,
+  uniforms:     RwLock<GlobalUniformsWrapper>,
+  depth_format: wgpu::TextureFormat,
 }
 
 impl ShaderManager {
-  pub fn new(dev: wgpu::Device) -> Self {
+  pub fn new(dev: wgpu::Device, depth_format: wgpu::TextureFormat) -> Self {
     let mesh_vert = ShaderEntryPoint {
       module:      Arc::new(
         dev.create_shader_module(include_wgsl!("../shaders/raster-pipeline.wgsl")),
@@ -36,6 +37,7 @@ impl ShaderManager {
       mesh_vert,
       pbr_frag,
       dev,
+      depth_format
     }
   }
   pub fn mesh_vertex(&self) -> &ShaderEntryPoint { &self.mesh_vert }
@@ -82,7 +84,13 @@ impl ShaderManager {
         polygon_mode:       wgpu::PolygonMode::Fill,
         conservative:       false,
       },
-      depth_stencil:  None,
+      depth_stencil:  Some(wgpu::DepthStencilState {
+        format:              self.depth_format,
+        depth_write_enabled: Some(true),
+        depth_compare:       Some(wgpu::CompareFunction::Less),
+        stencil:             wgpu::StencilState::default(),
+        bias:                wgpu::DepthBiasState::default(),
+      }),
       multisample:    wgpu::MultisampleState {
         count: 1,
         mask: !0,

@@ -32,15 +32,17 @@ struct VertexOutput_0
 {
     @builtin(position) position_0 : vec4<f32>,
     @location(0) uv_0 : vec2<f32>,
-    @location(2) light_0 : vec3<f32>,
+    @location(2) light_dir_0 : vec3<f32>,
+    @location(3) halfway_dir_0 : vec3<f32>,
 };
 
-fn VertexOutput_x24init_0( position_1 : vec4<f32>,  uv_1 : vec2<f32>,  light_1 : vec3<f32>) -> VertexOutput_0
+fn VertexOutput_x24init_0( position_1 : vec4<f32>,  uv_1 : vec2<f32>,  light_dir_1 : vec3<f32>,  halfway_dir_1 : vec3<f32>) -> VertexOutput_0
 {
     var _S1 : VertexOutput_0;
     _S1.position_0 = position_1;
     _S1.uv_0 = uv_1;
-    _S1.light_0 = light_1;
+    _S1.light_dir_0 = light_dir_1;
+    _S1.halfway_dir_0 = halfway_dir_1;
     return _S1;
 }
 
@@ -66,7 +68,9 @@ fn MeshGeometryVS( _S2 : vertexInput_0) -> VertexOutput_0
         up_0 = _S3;
     }
     var tangent_0 : vec3<f32> = normalize(cross(_S2.normal_1, normalize(cross(up_0, _S2.normal_1))));
-    return VertexOutput_x24init_0(position_2, _S2.uv_2, (((vec3<f32>(0.0f, 0.0f, 1.0f)) * (transpose(mat3x3<f32>(tangent_0, cross(_S2.normal_1, tangent_0), _S2.normal_1))))));
+    var TBN_0 : mat3x3<f32> = transpose(mat3x3<f32>(tangent_0, cross(_S2.normal_1, tangent_0), _S2.normal_1));
+    const light_dir_2 : vec3<f32> = vec3<f32>(0.0f, 0.0f, 1.0f);
+    return VertexOutput_x24init_0(position_2, _S2.uv_2, (((light_dir_2) * (TBN_0))), (((normalize(light_dir_2 + normalize((((vec4<f32>(0.0f, 0.0f, 0.0f, 1.0f)) * (mat4x4<f32>(mat4x4<f32>(global_0.camera_0.data_0[i32(0)][i32(0)], global_0.camera_0.data_0[i32(0)][i32(1)], global_0.camera_0.data_0[i32(0)][i32(2)], global_0.camera_0.data_0[i32(0)][i32(3)], global_0.camera_0.data_0[i32(1)][i32(0)], global_0.camera_0.data_0[i32(1)][i32(1)], global_0.camera_0.data_0[i32(1)][i32(2)], global_0.camera_0.data_0[i32(1)][i32(3)], global_0.camera_0.data_0[i32(2)][i32(0)], global_0.camera_0.data_0[i32(2)][i32(1)], global_0.camera_0.data_0[i32(2)][i32(2)], global_0.camera_0.data_0[i32(2)][i32(3)], global_0.camera_0.data_0[i32(3)][i32(0)], global_0.camera_0.data_0[i32(3)][i32(1)], global_0.camera_0.data_0[i32(3)][i32(2)], global_0.camera_0.data_0[i32(3)][i32(3)]))))).xyz - position_2.xyz))) * (TBN_0))));
 }
 
 @id(0) override COLORS_0 : u32;
@@ -97,13 +101,14 @@ struct pixelOutput_0
 struct pixelInput_0
 {
     @location(0) uv_5 : vec2<f32>,
-    @location(2) light_2 : vec3<f32>,
+    @location(2) light_dir_3 : vec3<f32>,
+    @location(3) halfway_dir_2 : vec3<f32>,
 };
 
 @fragment
 fn RasterizerPbrFS( _S4 : pixelInput_0, @builtin(position) position_3 : vec4<f32>) -> pixelOutput_0
 {
-    var _S5 : pixelOutput_0 = pixelOutput_0( vec4<f32>(GetDiffuse_0(_S4.uv_5).xyz * vec3<f32>(clamp(dot(GetNormal_0(_S4.uv_5).xyz * vec3<f32>(2.0f) - vec3<f32>(1.0f), _S4.light_2), 0.0f, 1.0f)), 1.0f) );
+    var _S5 : pixelOutput_0 = pixelOutput_0( vec4<f32>(GetDiffuse_0(_S4.uv_5).xyz * vec3<f32>(clamp(dot(GetNormal_0(_S4.uv_5).xyz * vec3<f32>(2.0f) - vec3<f32>(1.0f), _S4.light_dir_3), 0.0f, 1.0f)), 1.0f) );
     return _S5;
 }
 

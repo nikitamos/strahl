@@ -1,8 +1,10 @@
-const { TexWrapper, newTexWrapper } = require('../napi-test/napi-test.linux-x64-gnu.node')
+const { TexWrapper, newTexWrapper } = require('../napi-test')
 const { app, BrowserWindow } = require('electron/main')
 const { sharedTexture } = require('electron/common')
 const { ipcMain } = require('electron')
 const path = require('node:path')
+
+let window = null;
 
 function getTexture() {
   try {
@@ -32,13 +34,14 @@ function getTexture() {
         }
       }
     )
-    console.log(tex.textureId);
-    return tex
+    let frame = window.webContents.mainFrame;
+    console.log(`texture id: ${tex.textureId}`);
+    sharedTexture.sendSharedTexture({ frame: frame, importedSharedTexture: tex })
   } catch (err) {
     console.error("FATAL!")
     console.error(err)
-    return null
   }
+  return null
 }
 
 const createWindow = () => {
@@ -50,6 +53,7 @@ const createWindow = () => {
     }
   })
   win.webContents.openDevTools()
+  window = win;
   console.log(`electron main pid: ${process.pid}`)
 
   win.loadFile('index.html')

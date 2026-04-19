@@ -17,15 +17,15 @@ impl<'dev> Allocator<'dev> {
   pub fn new(phy: vk::PhysicalDevice, dev: &'dev ash::Device, instance: &ash::Instance) -> Self {
     let props = unsafe { instance.get_physical_device_memory_properties(phy) };
 
-    println!("allocator: available memory types: ");
+    log::info!("available Vulkan memory types: ");
     for i in 0..props.memory_type_count {
-      println!(
+      log::info!(
         "type {}: heap={} flags={:?}",
         i, props.memory_types[i as usize].heap_index, props.memory_types[i as usize].property_flags
       );
     }
     for i in 0..props.memory_heap_count {
-      println!(
+      log::info!(
         "heap {}: size={} flags={:?}",
         i, props.memory_heaps[i as usize].size, props.memory_heaps[i as usize].flags
       );
@@ -63,14 +63,15 @@ impl<'dev> Allocator<'dev> {
     T: ash::vk::ExtendsMemoryAllocateInfo,
   {
     let flags_str = format!("{:?}", flags);
-    println!(
+    log::trace!(
       "requested allocation with flags: {}, supported types: 0x{:x} :: ",
-      flags_str, allowed_mem_types
+      flags_str,
+      allowed_mem_types
     );
 
     let mem_type = self.find_mem_type(flags, allowed_mem_types)?;
 
-    println!("using mem type {}", mem_type);
+    log::trace!("using mem type {}", mem_type);
 
     let mut alloc_info = vk::MemoryAllocateInfo::default()
       .allocation_size(size)

@@ -169,7 +169,12 @@ impl Rasterizer {
           view:           &self.target,
           resolve_target: None,
           ops:            wgpu::Operations {
-            load:  wgpu::LoadOp::Clear(wgpu::Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }),
+            load:  wgpu::LoadOp::Clear(wgpu::Color {
+              r: 1.0,
+              g: 1.0,
+              b: 1.0,
+              a: 1.0,
+            }),
             store: wgpu::StoreOp::Store,
           },
           depth_slice:    None,
@@ -335,10 +340,19 @@ async unsafe fn raw_wgpu_setup(
       .unwrap();
     // TODO: proper offset/size calculation
     let reqs = dq.device.raw_device().get_image_memory_requirements(img);
+    if width as u64 * height as u64 * 4 < (reqs.size) {
+      log::warn!(
+        "The driver requires allocation of size {}, while the size of linear texture is {} ({width}x{height})",
+        reqs.size,
+        width as u64 * height as u64 * 4,
+      );
+      log::warn!("This may lead to unexpected results");
+    }
+    log::trace!("Required alignment: {}", reqs.alignment);
     let allocation = alloc
       .allocate(
         reqs.size,
-        vk::MemoryPropertyFlags::HOST_COHERENT,
+        vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_CACHED,
         reqs.memory_type_bits,
         None::<&mut vk::DedicatedAllocationMemoryAllocateInfoNV>,
       )
@@ -393,7 +407,6 @@ async unsafe fn raw_wgpu_setup(
       img,
       &vk_tex_desc,
       Some(Box::new(move || {
-        println!("drop callback!");
         vk_device.unmap_memory(allocation);
         vk_device.destroy_image(img, None);
         vk_device.free_memory(allocation, None);

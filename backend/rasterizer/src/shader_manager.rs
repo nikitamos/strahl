@@ -19,6 +19,28 @@ pub(crate) struct ShaderManager {
 }
 
 impl ShaderManager {
+  const EMPTY_ATTRIBUTES: [wgpu::VertexAttribute; 3] = [wgpu::VertexAttribute {
+    format:          wgpu::VertexFormat::Float16,
+    offset:          0,
+    shader_location: 0,
+  }; 3];
+  const EMPTY_BUFFER_LAYOUT: [wgpu::VertexBufferLayout<'_>; 3] = [
+    wgpu::VertexBufferLayout {
+      array_stride: 0,
+      step_mode:    wgpu::VertexStepMode::Instance,
+      attributes:   &[],
+    },
+    wgpu::VertexBufferLayout {
+      array_stride: 0,
+      step_mode:    wgpu::VertexStepMode::Instance,
+      attributes:   &[],
+    },
+    wgpu::VertexBufferLayout {
+      array_stride: 0,
+      step_mode:    wgpu::VertexStepMode::Instance,
+      attributes:   &[],
+    },
+  ];
   pub fn new(dev: wgpu::Device, depth_format: wgpu::TextureFormat) -> Self {
     let mesh_vert = ShaderEntryPoint {
       module:      Arc::new(
@@ -37,7 +59,7 @@ impl ShaderManager {
       mesh_vert,
       pbr_frag,
       dev,
-      depth_format
+      depth_format,
     }
   }
   pub fn mesh_vertex(&self) -> &ShaderEntryPoint { &self.mesh_vert }
@@ -67,9 +89,8 @@ impl ShaderManager {
         immediate_size:     256,
       });
 
-    let mut attrs: [wgpu::VertexAttribute; 3] = unsafe { MaybeUninit::uninit().assume_init() };
-    let mut attr_layout: [wgpu::VertexBufferLayout<'_>; 3] =
-      unsafe { MaybeUninit::uninit().assume_init() };
+    let mut attrs: [wgpu::VertexAttribute; 3] = Self::EMPTY_ATTRIBUTES;
+    let mut attr_layout: [wgpu::VertexBufferLayout<'_>; 3] = Self::EMPTY_BUFFER_LAYOUT;
 
     let desc = wgpu::RenderPipelineDescriptor {
       label:          Some("material"),

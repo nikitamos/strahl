@@ -12,8 +12,10 @@ pub trait Material: Send + Sync {
 pub trait TypedMaterial {
   type FixedMedium: Medium;
   type FixedBSDF: BSDF;
+
   fn medium(&self) -> &Self::FixedMedium
   where Self: Sized;
+
   fn bsdf(&self) -> &Self::FixedBSDF
   where Self: Sized;
 }

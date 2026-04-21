@@ -125,10 +125,13 @@ impl<T, M> Sample<T, M> {
       metadata,
     }
   }
-  pub fn compose<U, N>(self, mapper: impl Fn(T, M) -> Sample<U, N>) -> Sample<U, N> {
-    let mut m = mapper(self.sample, self.metadata);
+  pub fn compose<U, N>(
+    self,
+    mapper: impl Fn(T, M) -> Option<Sample<U, N>>,
+  ) -> Option<Sample<U, N>> {
+    let mut m = mapper(self.sample, self.metadata)?;
     m.prob *= self.prob;
-    m
+    Some(m)
   }
   pub fn replace<U>(self, replacement: U) -> Sample<U, M> {
     Sample {

@@ -6,7 +6,7 @@ fn main() {
   let mut scene = back.create_scene();
   let solver = back.create_solver();
   scene.add_sphere(2.0);
-  let g = back.create_sphere(1.0);
+  let g = back.create_sphere(0.4);
   scene.add_light(
     g,
     SurfaceProperty::Uniform(Vec3::ONE),
@@ -20,7 +20,7 @@ fn main() {
     rcpu::camera::CameraType::Perspective,
   );
   solver.render(&scene, &mut cam);
-  let mut img = image::RgbImage::new(640, 480);
+  let mut img = image::Rgb32FImage::new(640, 480);
   cam.write_image(&mut img);
-  img.save("out.png").unwrap();
+  img.save("out.tiff").unwrap();
 }

@@ -4,8 +4,8 @@ use crate::{
   camera::{self, CameraRay},
   light::LightSampleContext,
 };
-use glam::Vec3;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use glam::{FloatExt, Vec3, Vec3Swizzles, Vec4Swizzles};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 
 pub struct Solver {
   pub(crate) sampler: Sampler,
@@ -19,55 +19,61 @@ impl Solver {
   }
   pub fn render(&self, scene: &Scene, cam: &mut camera::Camera) {
     let rays = cam.init_rays();
-    const SAMPLES: i32 = 16;
+    const SAMPLES: i32 = 1;
     for _ in 0..SAMPLES {
-      rays
-        .into_par_iter()
-        .for_each(|ray| self.trace_camera_ray(scene, ray));
+      rays.into_par_iter().enumerate().for_each(|(i, ray)| {
+        self.trace_camera_ray(scene, ray);
+      });
     }
   }
 
   fn trace_camera_ray(&self, scene: &Scene, ray: &mut CameraRay) {
+    let mut local_ray = ray.clone();
     let mut throughput: f32 = 1.0;
     if let Some(intr) = Self::closest_hit(scene, ray) {
       let local2hit = glam::Quat::from_rotation_arc(intr.hit.normal, Vec3::Z);
-      let out_hit = (-local2hit.mul_vec3(intr.incoming.into())).into();
+      let out_hit = (local2hit.mul_vec3(-*intr.incoming)).into();
+      // println!("out+hit -> {:?}", out_hit);
       let sample = intr.body.material.bsdf().sample_bsdf(
         out_hit,
         self.sampler.sample(),
         crate::material::bsdf::BSDFSampleContext::Camera,
       );
+      // Sample the BSDF
       if let Some(bsdf) = sample {
-        let inc = intr.hit.transform.v2world(
+        let light_incoming = intr.hit.transform.v2world(
           (-local2hit.inverse().mul_vec3(bsdf.metadata.inc.into()))
             .normalize()
             .into(),
         );
-        ray.direction = inc.into();
-        ray.origin = intr.hit.transform.p2world(intr.hit.point);
-        if let Some(ls) = self.hit_light(scene, ray) {
-          ray.color += bsdf.sample * ls; // * inc.dot(intr.hit.normal);
+        // Ray direction in world coordinates
+        local_ray.direction = light_incoming.into();
+        local_ray.origin = intr.hit.transform.p2world(intr.hit.point);
+        // ray.color = Vec3::ONE;
+        if let Some(ls) = self.sample_light(scene, intr.hit.point_global()) {
+          // ray.color = 0.5 * out_hit.xyz() + 1.0;
+          local_ray.color +=
+            bsdf.sample * ls.sample * ((-*intr.incoming).dot(intr.hit.normal)).abs();
         }
       }
     }
+    ray.color = local_ray.color;
   }
   fn sample_light(
     &self,
     scene: &Scene,
     dest: PointGlobal,
-  ) -> Sample<Spectrum, GeometrySampleMetadata> {
+  ) -> Option<Sample<Spectrum, GeometrySampleMetadata>> {
     scene
       .sample_light_source(&self.sampler, dest)
-      .compose(|src, ()| src.sample(self.sampler.sample(), LightSampleContext { dst: dest }).expect("TODO!"))
+      .compose(|src, ()| {
+        src.sample(self.sampler.sample(), LightSampleContext {
+          dst: dest,
+          scene,
+        })
+      })
   }
-  pub(crate) fn hit_light(&self, scene: &Scene, ray: &dyn Castable) -> Option<Spectrum> {
-    let light = &scene.lights[0];
-    if let Some(hit) = light.try_intersect(ray) {
-      Some(light.spectrum.get())
-    } else {
-      None
-    }
-  }
+
   pub(crate) fn closest_hit<'a>(scene: &'a Scene, r: &mut CameraRay) -> Option<Interaction<'a>> {
     scene
       .bodies

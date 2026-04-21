@@ -1,8 +1,8 @@
-use glam::Mat4;
+use glam::{Mat4, Vec3};
 
 use crate::{
-  Castable, Geometry, GeometrySampleMetadata, IntersectionContext, PointGlobal, Sample,
-  SampleState, Spectrum, SurfaceHit, SurfaceProperty, Transform, VecGlobal,
+  Castable, Geometry, GeometrySampleMetadata, IntersectionContext, PointGlobal, PointLocal, Sample,
+  SampleState, Scene, Spectrum, SurfaceHit, SurfaceProperty, Transform, VecGlobal,
 };
 use std::sync::Arc;
 
@@ -14,10 +14,11 @@ pub enum LightEmissionDirection {
 }
 
 /// The context passed to the light sampler
-pub struct LightSampleContext {
+pub struct LightSampleContext<'s> {
   /// The point from which the light is sampled. It means
   /// that the sampled ray **must** hit this point
-  pub dst: PointGlobal,
+  pub dst:   PointGlobal,
+  pub scene: &'s Scene,
 }
 
 /// For now each point of the source emits light in direction normal
@@ -51,6 +52,9 @@ impl LightSource {
       ray,
     )
   }
+  pub fn transform(&self) -> Transform {
+    Transform::from_w2l(Mat4::from_translation(-self.translation))
+  }
   pub fn sample(
     &self,
     state: SampleState,
@@ -58,16 +62,30 @@ impl LightSource {
   ) -> Option<Sample<Spectrum, GeometrySampleMetadata>> {
     match self.dir {
       LightEmissionDirection::Omni => {
-        Some(
-          // TODO: occlusion test!
-          self
-            .geometry
-            .sample_point(state)
-            .map(|point| match self.spectrum {
-              SurfaceProperty::Uniform(s) => s,
+        // let point = Sample{
+        //     prob: 1.0,
+        //     sample: glam::vec3(2.0,0.0,0.0).into(),
+        //     metadata: GeometrySampleMetadata { normal: Vec3::X.into() },
+        // };
+        let point = self.geometry.sample_point(state);
+        point.compose(|point, meta| {
+          if ctx
+            .scene
+            .is_visible(self.transform().p2world(point), ctx.dst)
+          {
+            match self.spectrum {
+              SurfaceProperty::Uniform(s) => Some(Sample {
+                prob:     1.0,
+                sample:   s,
+                metadata: meta,
+              }),
               SurfaceProperty::Texture(_) => unimplemented!(),
-            }),
-        )
+            }
+          } else {
+            // println!("{:?} (dest) is occluded from {:?}(light)", ctx.dst, self.transform().p2world(point));
+            None
+          }
+        })
       }
       _ => unimplemented!(),
     }

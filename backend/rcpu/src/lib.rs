@@ -3,7 +3,7 @@
 use std::{marker::PhantomData, sync::Arc};
 
 mod points;
-use glam::{Mat4, Quat, USizeVec2, Vec3};
+use glam::{Mat4, Quat, USizeVec2, Vec3, Vec4Swizzles};
 pub use points::*;
 mod sampling;
 
@@ -176,6 +176,16 @@ impl Body {
 
 pub mod light;
 
+struct OcclusionRay {
+  pub eye:       PointGlobal,
+  pub direction: VecGlobal,
+}
+
+impl Castable for OcclusionRay {
+  fn pos(&self) -> PointGlobal { self.eye }
+  fn direction(&self) -> VecGlobal { self.direction }
+}
+
 pub struct Scene {
   // TODO: RWLock/mutex on body or lights?
   pub(crate) bodies: Vec<Body>,
@@ -228,7 +238,7 @@ impl Scene {
     self.lights.push(LightSource::new(
       geometry,
       spectrum,
-      2.0 * glam::vec3(1.0, 1.0, 0.4),
+      -2.0 * glam::vec3(1.0, 1.0, 0.4),
       dir,
     ));
     self.lights.last().unwrap()
@@ -239,6 +249,55 @@ impl Scene {
   pub fn sample_light_source(&self, sampler: &Sampler, _dest: PointGlobal) -> Sample<&LightSource> {
     sampler.sample_element(&self.lights)
   }
+  /// Checks whether one point is visible from another
+  ///
+  /// The function returns `true` if the scene surfaces contains no
+  /// surfaces between `eye` and `observed`.
+  pub fn is_visible(&self, eye: PointGlobal, observed: PointGlobal) -> bool {
+    let distance = observed.xyz() - eye.xyz();
+    let ray = OcclusionRay {
+      direction: (observed.xyz() - eye.xyz()).into(),
+      eye,
+    };
+    for body in &self.bodies {
+      if let Some(hit) = body.geometry.try_intersect(
+        IntersectionContext {
+          transform: body.transform(),
+        },
+        &ray,
+      ) {
+        let traversed = hit.point_global().xyz() - eye.xyz();
+        if are_codirectional(distance, traversed)
+          && traversed.length_squared() < distance.length_squared() - 1.0e-3
+        {
+          // println!(
+          //   "{} -> !{}! -> {}",
+          //   eye.xyz(),
+          //   hit.point_global().xyz(),
+          //   observed.xyz()
+          // );
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+}
+
+/// Checks whether two vectors are codirectional
+///
+/// Vectors $a$ and $b$ are considered codirectional if the following condition holds:
+/// $$ \frac{\langle a, b \rangle}{\lVert a \rVert \lVert b \rVert} \in \{1, 0\} $$
+pub fn are_codirectional(a: Vec3, b: Vec3) -> bool {
+  let a_norm = a.normalize_or_zero();
+  let b_norm = b.normalize_or_zero();
+
+  if a_norm == Vec3::ZERO || b_norm == Vec3::ZERO {
+    return false;
+  }
+
+  let cross = a_norm.cross(b_norm);
+  cross.length() < 1e-6 && a_norm.dot(b_norm) > 0.0
 }
 
 pub struct Texture<T>(PhantomData<T>);

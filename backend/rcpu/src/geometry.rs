@@ -3,7 +3,7 @@ use std::ops::Deref;
 use glam::Vec3;
 
 use crate::{
-  Castable, IntersectionContext, SurfaceHit, VecLocal,
+  Castable, IntersectionContext, SurfaceHit, VecLocal, are_codirectional,
   points::PointLocal,
   sampling::{Sample, SampleState},
 };
@@ -84,3 +84,30 @@ impl Geometry for Sphere {
 pub struct Plane {}
 
 pub struct Point {}
+
+impl Geometry for Point {
+  fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata> {
+    Sample {
+      prob:     1.0,
+      sample:   Vec3::ZERO.into(),
+      metadata: GeometrySampleMetadata {
+        normal: Vec3::ZERO.into(),
+      },
+    }
+  }
+
+  fn try_intersect<'a>(&self, ctx: IntersectionContext, ray: &dyn Castable) -> Option<SurfaceHit> {
+    let pos = ctx.transform.p2local(ray.pos());
+    let dir = ctx.transform.v2local(ray.direction());
+    if are_codirectional(pos.into(), -*dir) {
+      Some(SurfaceHit {
+        point:        Vec3::ZERO.into(),
+        normal:       Vec3::ZERO,
+        ray_distance: pos.length(),
+        transform:    ctx.transform,
+      })
+    } else {
+      None
+    }
+  }
+}

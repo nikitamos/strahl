@@ -57,15 +57,11 @@ impl Camera {
     }
   }
 
-  pub fn write_image(&self, img: &mut image::RgbImage) {
+  pub fn write_image(&self, img: &mut image::Rgb32FImage) {
     for x in 0..self.resolution.x {
       for y in 0..self.resolution.y {
-        let color = self.rays[self.resolution.x * y + x].color * 255.0;
-        img.put_pixel(
-          x as u32,
-          y as u32,
-          [color.x as u8, color.y as u8, color.z as u8].into(),
-        );
+        let color = self.rays[self.resolution.x * y + x].color;
+        img.put_pixel(x as u32, y as u32, [color.x, color.y, color.z].into());
       }
     }
   }

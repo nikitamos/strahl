@@ -2,6 +2,13 @@ compile_commands.json
 .cache
 build
 
+strahl-import/**/*.zip
+strahl-import/**/*.gltf
+strahl-import/**/*.bin
+strahl-import/**/*.png
+strahl-import/**/*.ktx2
+strahl-import/**/material.toml
+
 # Added by cargo
 
 /target

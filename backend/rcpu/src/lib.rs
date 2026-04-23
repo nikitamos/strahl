@@ -1,6 +1,11 @@
 #![feature(assert_matches)]
+#![feature(nonpoison_rwlock)]
+#![feature(sync_nonpoison)]
 
-use std::{marker::PhantomData, sync::Arc};
+use std::{
+  marker::PhantomData,
+  sync::{Arc, nonpoison::RwLock},
+};
 
 mod points;
 use glam::{Mat4, Quat, USizeVec2, Vec3, Vec4Swizzles};
@@ -13,7 +18,7 @@ pub use geometry::*;
 
 use crate::{
   light::LightSource,
-  material::{ConcreteMaterial, bsdf::lambertian::Lambertian, medium::UniformMedium},
+  material::{ConcreteMaterial, Material, bsdf::lambertian::Lambertian, medium::UniformMedium},
 };
 pub mod camera;
 
@@ -166,16 +171,13 @@ impl Transform {
   pub fn v2local(&self, g: VecGlobal) -> VecLocal { self.w2l.transform_vector3(g.into()).into() }
 }
 
-// #[derive(Default)]
-pub struct Body {
-  geometry: Arc<dyn Geometry>,
-  material: Arc<dyn material::Material>,
-  pos:      PointGlobal,
-  rotation: glam::Quat,
+#[derive(Default, Debug)]
+pub struct TransformParts {
+  pub pos:      PointGlobal,
+  pub rotation: glam::Quat,
 }
 
-impl Body {
-  /// Returns matrix representing transform from world coordinates to local
+impl TransformParts {
   pub fn w2l_matrix(&self) -> Mat4 {
     let mut res = Mat4::from_quat(self.rotation);
     res.w_axis = self.pos.into();
@@ -192,6 +194,26 @@ impl Body {
       l2w: self.l2w_matrix(),
     }
   }
+}
+
+// #[derive(Default)]
+pub struct Body {
+  geometry:    Arc<dyn Geometry>,
+  material:    Arc<dyn material::Material>,
+  coordinates: RwLock<TransformParts>,
+}
+
+impl Body {
+  /// Returns matrix representing transform from world coordinates to local
+  pub fn w2l_matrix(&self) -> Mat4 { self.coordinates.read().w2l_matrix() }
+  /// Returns matrix representing transform from local coordinates to world
+  pub fn l2w_matrix(&self) -> Mat4 { self.coordinates.read().l2w_matrix() }
+  /// Returns [`Transform`] that maps between local and world coordinates
+  pub fn transform(&self) -> Transform { self.coordinates.read().transform() }
+  pub fn position(&self) -> PointGlobal { self.coordinates.read().pos }
+  pub fn rotation(&self) -> glam::Quat { self.coordinates.read().rotation }
+  pub fn set_position(&self, position: PointGlobal) { self.coordinates.write().pos = position }
+  pub fn set_rotation(&self, rotation: glam::Quat) { self.coordinates.write().rotation = rotation }
 }
 
 pub mod light;
@@ -244,8 +266,7 @@ impl Scene {
         bsdf:   Lambertian { s: Vec3::X },
         medium: UniformMedium { ior: 1.0 },
       }),
-      pos:      Default::default(),
-      rotation: Quat::IDENTITY,
+      coordinates: Default::default()
     });
     self.bodies.last().unwrap()
   }
@@ -263,6 +284,21 @@ impl Scene {
     ));
     self.lights.last().unwrap()
   }
+
+  pub fn add_body(
+    &mut self,
+    geometry: Arc<dyn Geometry>,
+    material: Arc<dyn Material>,
+    coordinates: TransformParts,
+  ) -> &Body {
+    self.bodies.push(Body {
+      geometry,
+      material,
+      coordinates: RwLock::new(coordinates),
+    });
+    self.bodies.last().unwrap()
+  }
+
   /// Samples a light source present on the scene.
   /// For now the sampling is uniform, that is, each light source has
   /// equal probability to be sampled.

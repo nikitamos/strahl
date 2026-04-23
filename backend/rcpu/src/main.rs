@@ -7,7 +7,7 @@ use rcpu::{
   light::LightEmissionDirection,
   material::{
     ConcreteMaterial,
-    bsdf::{lambertian::Lambertian, specular::Specular},
+    bsdf::lambertian::Lambertian,
     medium::UniformMedium,
   },
 };

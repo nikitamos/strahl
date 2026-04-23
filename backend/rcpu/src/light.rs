@@ -1,7 +1,7 @@
-use glam::{Mat4, Vec3};
+use glam::Mat4;
 
 use crate::{
-  Castable, Geometry, GeometrySampleMetadata, IntersectionContext, PointGlobal, PointLocal, Sample,
+  Castable, Geometry, GeometrySampleMetadata, IntersectionContext, PointGlobal, Sample,
   SampleState, Scene, Spectrum, SurfaceHit, SurfaceProperty, Transform, VecGlobal,
 };
 use std::{ops::Deref, sync::Arc};

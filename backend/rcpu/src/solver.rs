@@ -2,12 +2,12 @@ use std::{fs::File, io::Write};
 
 use super::{Interaction, IntersectionContext, Scene, Spectrum};
 use crate::{
-  Castable, GeometrySampleMetadata, PointGlobal, Sample, Sampler,
+  Castable, PointGlobal, Sample, Sampler,
   camera::{self, CameraRay},
   light::{LightSampleContext, LightSampleMetadata},
   material::bsdf::BSDFSampleContext,
 };
-use glam::{FloatExt, Vec3, Vec3Swizzles, Vec4Swizzles};
+use glam::{Vec3, Vec3Swizzles, Vec4Swizzles};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 
 pub struct Solver {
@@ -59,8 +59,8 @@ impl Solver {
       // if b == BOUNCES break;
       let bsdf = isect.body.material.bsdf();
       let cur_ray = isect.hit.to_hit((-ray.direction).into());
-      if let Some(light) = self.sample_light(scene, isect.hit.point_global()) {
-        if light.prob != 0.0 {
+      if let Some(light) = self.sample_light(scene, isect.hit.point_global())
+        && light.prob != 0.0 {
           let wi = isect.hit.global_to_hit(
             (light.metadata.point.xyz() - isect.hit.point_global().xyz())
               .normalize()
@@ -73,14 +73,13 @@ impl Solver {
             ray.color += throughput * f * light.sample / (light.prob) / 4.0;
           }
         }
-      }
       // Sample a new direction
       let Some(bs) = bsdf.sample_bsdf(cur_ray, self.sampler.sample(), BSDFSampleContext::Camera)
       else {
         break;
       };
       throughput *= bs.sample * bs.metadata.inc.z.abs() / bs.prob;
-      ray.direction = isect.hit.to_global(bs.metadata.inc).normalize().into();
+      ray.direction = isect.hit.to_global(bs.metadata.inc).normalize();
       ray.origin = (isect.hit.point_global().xyz() + ray.direction * 0.0001).into();
     }
   }

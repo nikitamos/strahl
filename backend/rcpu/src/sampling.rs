@@ -1,7 +1,7 @@
 use rand::seq::IndexedRandom;
 use rand_distr::{Distribution, Uniform};
 
-use crate::{VecHit, with};
+use crate::VecHit;
 use std::f32::consts::{FRAC_1_PI, TAU};
 
 pub struct Sampler {

@@ -336,7 +336,7 @@ impl Scene {
         }
       }
     }
-    return true;
+    true
   }
 }
 

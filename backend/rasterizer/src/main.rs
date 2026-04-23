@@ -1,8 +1,14 @@
-use std::{f32::consts::TAU, hint::black_box, ptr::null, time::{Duration, SystemTime}};
+use std::{
+  f32::consts::TAU,
+  hint::black_box,
+  ptr::null,
+  time::{Duration, SystemTime},
+};
 
 use anyhow::anyhow;
 use glam::Mat4;
 use image::Rgba;
+use rasterizer::presenter::PresentationResult;
 pub use rasterizer::*;
 
 // pub mod renderdoc {
@@ -75,7 +81,14 @@ pub async fn true_main() -> anyhow::Result<()> {
   std::io::stdin().read_line(&mut s)?;
 
   let size = glam::uvec2(800, 600);
-  let mut strahl = Rasterizer::new(RasterizerCreateInfo { viewport: size }).await?;
+  let mut strahl = Rasterizer::new(RasterizerCreateInfo {
+    state: RasterizerStateInfo { viewport: size },
+    wgpu:  RasterizerWgpuInfo {
+      wgpu_setup: WgpuSetup::Managed,
+      target:     PresentTarget::ManagedMappedRam,
+    },
+  })
+  .await?;
   let material = strahl.load_material("../../../strahl-import/assets/gas.zip")?;
   let geometry = strahl.load_mesh("../../../strahl-import/assets/lava/Lava.gltf")?;
   let mut scene = strahl.create_scene();
@@ -103,8 +116,10 @@ pub async fn true_main() -> anyhow::Result<()> {
         eye.cross(glam::Vec3::X),
       )),
     };
-    
-    let test = strahl.render(&scene, &camera);
+
+    let PresentationResult::Mapped(test) = strahl.render(&scene, &camera) else {
+      unreachable!()
+    };
     // rdoc.end_frame_capture();
     let buf =
       image::ImageBuffer::<Rgba<u8>, _>::from_raw(size.x, size.y, test).ok_or_else(|| {

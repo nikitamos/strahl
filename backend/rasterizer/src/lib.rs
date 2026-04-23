@@ -4,15 +4,19 @@
 #![allow(dead_code)]
 #![feature(duration_millis_float)]
 
-use core::slice;
-use std::{path::Path, sync::Arc, time::SystemTime};
+use std::{ffi::CStr, path::Path, sync::Arc, time::SystemTime};
 
+use anyhow::anyhow;
 use ash::vk;
+use glam::UVec2;
 use material::Material;
-use wgpu::hal::vulkan as wgvk;
+use wgpu::{Backends, hal::vulkan as wgvk, naga::back, wgt::WgpuHasDisplayHandle};
 
 use crate::{
-  geometry::Geometry, gpu_alloc::Allocator, scene::Scene, shader_manager::ShaderManager,
+  geometry::Geometry,
+  presenter::{PresentationResult, Presenter, SurfacePresenter, TexturePresenter},
+  scene::Scene,
+  shader_manager::ShaderManager,
 };
 
 pub(crate) mod gpu_alloc;
@@ -21,11 +25,11 @@ pub struct Rasterizer {
   i:         wgpu::Instance,
   queue:     wgpu::Queue,
   dev:       wgpu::Device,
-  presenter: MappedPresenter,
+  presenter: Box<dyn Presenter>,
   target:    limne::TextureProvider,
   drawer:    Option<limne::TextureDrawer>,
   manager:   Arc<ShaderManager>,
-  info:      RasterizerCreateInfo,
+  info:      RasterizerStateInfo,
   depth:     limne::TextureProvider,
 }
 
@@ -35,8 +39,33 @@ pub mod material;
 pub mod scene;
 pub mod uniform;
 
+pub enum WgpuSetup {
+  External(wgpu::Instance, wgpu::Device, wgpu::Queue),
+  Managed,
+}
+
+pub enum PresentTarget {
+  ExternalTexture(wgpu::Texture),
+  ManagedTexture,
+  ManagedMappedRam,
+  ManagedWindow(
+    Box<dyn wgpu::wgt::WgpuHasDisplayHandle>,
+    Box<dyn wgpu::WindowHandle>,
+  ),
+}
+
 pub struct RasterizerCreateInfo {
-  pub viewport: glam::u32::UVec2,
+  pub state: RasterizerStateInfo,
+  pub wgpu:  RasterizerWgpuInfo,
+}
+
+pub struct RasterizerStateInfo {
+  pub viewport: UVec2,
+}
+
+pub struct RasterizerWgpuInfo {
+  pub wgpu_setup: WgpuSetup,
+  pub target:     PresentTarget,
 }
 
 #[derive(zerocopy::KnownLayout, zerocopy::IntoBytes, zerocopy::Immutable, Default, Clone)]
@@ -46,48 +75,28 @@ pub struct Camera {
   pub camera:     glam::Mat4,
 }
 
+struct WgpuState {
+  instance:  wgpu::Instance,
+  device:    wgpu::Device,
+  queue:     wgpu::Queue,
+  presenter: Box<dyn Presenter>,
+}
+
 impl Rasterizer {
-  pub async fn new(info: RasterizerCreateInfo) -> anyhow::Result<Rasterizer> {
+  pub async fn new(
+    RasterizerCreateInfo {
+      state: info,
+      wgpu: wgpu_info,
+    }: RasterizerCreateInfo,
+  ) -> anyhow::Result<Rasterizer> {
     log::info!("Creating Rasterizer backend?");
     let r: anyhow::Result<Rasterizer> = try {
-      let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
-      desc.backends = wgpu::Backends::VULKAN;
-      let instance = unsafe {
-        wgpu::Instance::from_hal::<wgvk::Api>(wgvk::Instance::init_with_callback(
-          &wgpu::hal::InstanceDescriptor {
-            name: "A?",
-            flags: desc.flags,
-            memory_budget_thresholds: desc.memory_budget_thresholds,
-            backend_options: desc.backend_options,
-            telemetry: None, // May be required on DX12
-            display: desc
-              .display
-              .as_ref()
-              .and_then(|dh| dh.display_handle().ok()),
-          },
-          Some(Box::new(|_opts| {})),
-        )?)
-      };
-
-      let adapter = instance
-        .request_adapter(&wgpu::RequestAdapterOptions {
-          power_preference: wgpu::PowerPreference::HighPerformance,
-          ..Default::default()
-        })
-        .await?;
-      let dev_desc = wgpu::DeviceDescriptor {
-        required_features: wgpu::Features {
-          features_wgpu:   wgpu::FeaturesWGPU::empty(),
-          features_webgpu: wgpu::FeaturesWebGPU::IMMEDIATES,
-        },
-        required_limits: wgpu::Limits {
-          max_immediate_size: 256,
-          ..Default::default()
-        },
-        ..Default::default()
-      };
-      let (raw, (dev, queue)) =
-        unsafe { create_presenter_dev_queue(&instance, adapter, dev_desc, &info).await? };
+      let WgpuState {
+        instance,
+        device: dev,
+        queue,
+        presenter,
+      } = Self::create_wgpu_state(wgpu_info, &info).await?;
 
       let target = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
         label:           Some(" a kind of render target".to_string()),
@@ -126,7 +135,7 @@ impl Rasterizer {
       // On wgpu shutdown device is dropped earlier than callback is called for some reason
       Rasterizer {
         i: instance,
-        presenter: raw.into_hal(&dev),
+        presenter,
         queue,
         drawer: None,
         dev,
@@ -137,6 +146,73 @@ impl Rasterizer {
       }
     };
     r.map_err(|x| anyhow::anyhow!(x))
+  }
+
+  async fn create_wgpu_state(
+    info: RasterizerWgpuInfo,
+    state: &RasterizerStateInfo,
+  ) -> anyhow::Result<WgpuState> {
+    match info.wgpu_setup {
+      WgpuSetup::External(instance, device, queue) => {
+        Self::create_external_wgpu(instance, device, queue, info.target)
+      }
+      WgpuSetup::Managed => Self::create_managed_wgpu(info, state).await,
+    }
+  }
+
+  async fn create_managed_wgpu(
+    info: RasterizerWgpuInfo,
+    state: &RasterizerStateInfo,
+  ) -> anyhow::Result<WgpuState> {
+    match info.target {
+      PresentTarget::ExternalTexture(_) => Err(anyhow::anyhow!(
+        "External texture must be used with external wgpu setup"
+      )),
+      PresentTarget::ManagedTexture => todo!(),
+      PresentTarget::ManagedMappedRam => Self::create_some_ram_presenter(state).await,
+      PresentTarget::ManagedWindow(display, window) => {
+        let (instance, adapter, desc) =
+          instantiate_wgpu(Backends::PRIMARY, Some(display), vec![]).await?;
+        let surface = instance.create_surface(wgpu::SurfaceTarget::Window(window))?;
+        let (device, queue) = adapter.request_device(&desc).await?;
+
+        surface.configure(&device, &wgpu::SurfaceConfiguration {
+          usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_DST,
+          format: wgpu::TextureFormat::Bgra8Unorm,
+          width: state.viewport.x,
+          height: state.viewport.y,
+          present_mode: wgpu::PresentMode::AutoVsync,
+          desired_maximum_frame_latency: 2,
+          alpha_mode: wgpu::CompositeAlphaMode::Opaque,
+          view_formats: vec![wgpu::TextureFormat::Rgba8Unorm],
+        });
+
+        Ok(WgpuState {
+          presenter: Box::new(SurfacePresenter::new(surface, device.clone())),
+          instance,
+          device,
+          queue,
+        })
+      }
+    }
+  }
+  fn create_external_wgpu(
+    instance: wgpu::Instance,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    target: PresentTarget,
+  ) -> anyhow::Result<WgpuState> {
+    match target {
+      PresentTarget::ExternalTexture(texture) => Ok(WgpuState {
+        instance: instance,
+        device,
+        queue,
+        presenter: Box::new(TexturePresenter::new(texture)),
+      }),
+      _ => Err(anyhow!(
+        "Only external texture may be used with external wgpu setup"
+      )),
+    }
   }
 
   pub fn create_scene(&self) -> Scene { Scene::new(Arc::clone(&self.manager)) }
@@ -152,7 +228,7 @@ impl Rasterizer {
     let gltf = strahl_import::reader::GltfGeometry::import_validate(path)?;
     Geometry::from_gltf(&self.dev, gltf).map(Arc::new)
   }
-  pub fn render(&mut self, scene: &Scene, camera: &Camera) -> &[u8] {
+  pub fn render(&mut self, scene: &Scene, camera: &Camera) -> PresentationResult<'_> {
     let begin = SystemTime::now();
     self.manager.uniforms_mut().camera = camera.clone();
     self.manager.uniforms_mut().viewport_size = self.info.viewport;
@@ -196,7 +272,7 @@ impl Rasterizer {
         body.draw(&mut pass);
       }
     }
-    self.copy_to_presenter(&mut encoder);
+    let res = self.copy_to_presenter(&mut encoder);
     let index = self.queue.submit(std::iter::once(encoder.finish()));
     log::trace!("work submitted to the GPU");
     // TODO: wait asynchronously
@@ -207,38 +283,119 @@ impl Rasterizer {
     let end = SystemTime::now();
     let dur = end.duration_since(begin).unwrap().as_millis_f32();
     log::trace!("finished in {dur:.2}ms, ~{:.0} draw/second", 1000.0 / dur);
-    self.presenter.mapped
+    res
   }
 
-  fn copy_to_presenter(&mut self, encoder: &mut wgpu::CommandEncoder) {
-    encoder.copy_texture_to_texture(
-      wgpu::TexelCopyTextureInfo {
-        texture:   self.target.texture(),
-        mip_level: 0,
-        origin:    wgpu::Origin3d { x: 0, y: 0, z: 0 },
-        aspect:    wgpu::TextureAspect::All,
-      },
-      wgpu::TexelCopyTextureInfo {
-        texture:   &self.presenter.present_texture,
-        mip_level: 0,
-        origin:    wgpu::Origin3d { x: 0, y: 0, z: 0 },
-        aspect:    wgpu::TextureAspect::All,
-      },
-      wgpu::Extent3d {
-        width:                 self.info.viewport.x,
-        height:                self.info.viewport.y,
-        depth_or_array_layers: 1,
-      },
-    );
+  fn copy_to_presenter(&self, encoder: &mut wgpu::CommandEncoder) -> PresentationResult<'_> {
+    self
+      .presenter
+      .present(self.target.texture(), encoder, self.info.viewport)
+  }
+
+  pub fn required_features() -> wgpu::Features {
+    wgpu::Features {
+      features_wgpu:   wgpu::FeaturesWGPU::empty(),
+      features_webgpu: wgpu::FeaturesWebGPU::IMMEDIATES,
+    }
+  }
+  pub fn required_limits() -> wgpu::Limits {
+    wgpu::Limits {
+      max_immediate_size: 256,
+      ..Default::default()
+    }
+  }
+  async fn create_some_ram_presenter(state: &RasterizerStateInfo) -> anyhow::Result<WgpuState> {
+    let (instance, adapter, dev_desc) =
+      instantiate_wgpu(wgpu::Backends::VULKAN, None, vec![]).await?;
+    let (raw, (dev, queue)) =
+      unsafe { create_presenter_dev_queue(&instance, adapter, dev_desc, state).await? };
+    // Ok((instance, raw.from_hal(&dev), dev, queue))
+    Ok(WgpuState {
+      instance,
+      queue,
+      presenter: Box::new(raw.from_hal(&dev)),
+      device: dev,
+    })
   }
 }
+
+/// Creates a WGPU instance, optionally enabling Vulkan instance extensions
+///
+/// # Panics
+/// Panics if backends is not equal to [`wgpu::Backends::VULKAN`] and `vk_extensions`
+/// is not empty
+async fn instantiate_wgpu(
+  backends: wgpu::Backends,
+  display: Option<Box<dyn WgpuHasDisplayHandle>>,
+  mut vk_extensions: Vec<&'static CStr>,
+) -> Result<
+  (
+    wgpu::Instance,
+    wgpu::Adapter,
+    wgpu::wgt::DeviceDescriptor<Option<&'static str>>,
+  ),
+  anyhow::Error,
+> {
+  let mut desc = wgpu::InstanceDescriptor {
+    backends,
+    display,
+    ..wgpu::InstanceDescriptor::new_without_display_handle_from_env()
+  };
+  desc.backends = backends;
+  // So far no instance extensions requested
+
+  let instance = if backends == wgpu::Backends::VULKAN && vk_extensions.len() > 0 {
+    log::debug!(
+      "Creating WGPU instance as Vulkan HAL ({} extensions requested)",
+      vk_extensions.len()
+    );
+    unsafe {
+      wgpu::Instance::from_hal::<wgvk::Api>(wgvk::Instance::init_with_callback(
+        &wgpu::hal::InstanceDescriptor {
+          name: "A?",
+          flags: desc.flags,
+          memory_budget_thresholds: desc.memory_budget_thresholds,
+          backend_options: desc.backend_options,
+          telemetry: None, // May be required on DX12
+          display: desc.display.as_ref().and_then(|dh| {
+            dh.display_handle()
+              .inspect_err(|e| log::error!("Failed to retrieve display handle: {e}"))
+              .ok()
+          }),
+        },
+        Some(Box::new(|opts| {
+          opts.extensions.append(&mut vk_extensions);
+        })),
+      )?)
+    }
+  } else if vk_extensions.len() > 0 {
+    panic!("Requested possibly non-Vulkan backend with Vulkan extensions")
+  } else {
+    wgpu::Instance::new(desc)
+  };
+
+  let adapter = instance
+    .request_adapter(&wgpu::RequestAdapterOptions {
+      power_preference: wgpu::PowerPreference::HighPerformance,
+      ..Default::default()
+    })
+    .await?;
+  let dev_desc = wgpu::DeviceDescriptor {
+    required_features: Rasterizer::required_features(),
+    required_limits: Rasterizer::required_limits(),
+    ..Default::default()
+  };
+  Ok((instance, adapter, dev_desc))
+}
+
+pub mod presenter;
 
 async unsafe fn create_presenter_dev_queue(
   instance: &wgpu::Instance,
   adapter: wgpu::Adapter,
   dev_desc: wgpu::wgt::DeviceDescriptor<Option<&str>>,
-  info: &RasterizerCreateInfo,
-) -> Result<(RawMappedPresenter, (wgpu::Device, wgpu::Queue)), anyhow::Error> {
+  info: &RasterizerStateInfo,
+) -> Result<(presenter::RawMappedPresenter, (wgpu::Device, wgpu::Queue)), anyhow::Error> {
   unsafe {
     let i = instance.as_hal::<wgvk::Api>().unwrap();
     let hal_adapter = adapter.as_hal::<wgvk::Api>().unwrap();
@@ -264,7 +421,7 @@ async unsafe fn create_presenter_dev_queue(
       })),
     )?;
     Ok((
-      raw_wgpu_setup(
+      presenter::raw_wgpu_setup(
         i.shared_instance(),
         &dq,
         phy,
@@ -274,150 +431,6 @@ async unsafe fn create_presenter_dev_queue(
       .await,
       adapter.create_device_from_hal(dq, &dev_desc)?,
     ))
-  }
-}
-
-struct MappedPresenter {
-  present_texture: wgpu::Texture,
-  mapped:          &'static [u8], // this is bad and unsound. must be rewritten somehow
-}
-
-impl MappedPresenter {
-  pub fn texture_view(&self) -> wgpu::TextureView { todo!() }
-}
-
-struct RawMappedPresenter {
-  present_texture: wgvk::Texture,
-  wgpu_tex_desc:   wgpu::TextureDescriptor<'static>,
-  mapped:          &'static [u8], // this is bad and unsound. must be rewritten somehow
-}
-
-impl RawMappedPresenter {
-  pub fn into_hal(self, dev: &wgpu::Device) -> MappedPresenter {
-    MappedPresenter {
-      present_texture: unsafe {
-        dev.create_texture_from_hal::<wgvk::Api>(self.present_texture, &self.wgpu_tex_desc)
-      },
-      mapped:          self.mapped,
-    }
-  }
-}
-
-// TODO: replace unwraps with proper error handling
-async unsafe fn raw_wgpu_setup(
-  vk_instance: &wgvk::InstanceShared,
-  dq: &wgpu::hal::OpenDevice<wgvk::Api>,
-  phy: vk::PhysicalDevice,
-  width: u32,
-  height: u32,
-) -> RawMappedPresenter {
-  let extent = vk::Extent3D {
-    width,
-    height,
-    depth: 1,
-  };
-  let alloc = Allocator::new(phy, dq.device.raw_device(), vk_instance.raw_instance());
-  unsafe {
-    let img = dq
-      .device
-      .raw_device()
-      .create_image(
-        &vk::ImageCreateInfo::default()
-          .array_layers(1) // Vulkan implementation must support at least 256 array layers
-          .extent(extent)
-          .flags(vk::ImageCreateFlags::empty())
-          .format(vk::Format::R8G8B8A8_UNORM)
-          .image_type(vk::ImageType::TYPE_2D)
-          .initial_layout(vk::ImageLayout::UNDEFINED)
-          .mip_levels(1)
-          .queue_family_indices(&[dq.device.queue_family_index()])
-          .samples(vk::SampleCountFlags::TYPE_1) // That's for multisampling, we don't use it (now)
-          .sharing_mode(vk::SharingMode::EXCLUSIVE)
-          .tiling(vk::ImageTiling::LINEAR) // Linear tiling for predictable memory layout
-          .usage(vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::COLOR_ATTACHMENT),
-        None,
-      )
-      .unwrap();
-    // TODO: proper offset/size calculation
-    let reqs = dq.device.raw_device().get_image_memory_requirements(img);
-    if width as u64 * height as u64 * 4 < (reqs.size) {
-      log::warn!(
-        "The driver requires allocation of size {}, while the size of linear texture is {} ({width}x{height})",
-        reqs.size,
-        width as u64 * height as u64 * 4,
-      );
-      log::warn!("This may lead to unexpected results");
-    }
-    log::trace!("Required alignment: {}", reqs.alignment);
-    let allocation = alloc
-      .allocate(
-        reqs.size,
-        vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_CACHED,
-        reqs.memory_type_bits,
-        None::<&mut vk::DedicatedAllocationMemoryAllocateInfoNV>,
-      )
-      .unwrap(); // TODO: fallback to manual flushing
-    let mapped = dq
-      .device
-      .raw_device()
-      .map_memory(allocation, 0, reqs.size, vk::MemoryMapFlags::empty())
-      .unwrap()
-      .cast();
-
-    let mapped = slice::from_raw_parts(mapped, reqs.size as usize);
-
-    dq.device
-      .raw_device()
-      .bind_image_memory(img, allocation, 0)
-      .unwrap();
-    let vk_device = dq.device.raw_device().clone();
-    let vk_tex_desc = wgpu::hal::TextureDescriptor {
-      label:           Some("framebuffer"),
-      size:            wgpu::Extent3d {
-        width:                 extent.width,
-        height:                extent.height,
-        depth_or_array_layers: 1,
-      },
-      mip_level_count: 1,
-      sample_count:    1,
-      dimension:       wgpu::TextureDimension::D2,
-      format:          wgpu::TextureFormat::Rgba8Unorm,
-      // TODO: Is it initial usage or all allowed usages
-      usage:           wgpu::TextureUses::COPY_DST
-        | wgpu::TextureUses::UNINITIALIZED
-        | wgpu::TextureUses::COLOR_TARGET,
-      view_formats:    vec![],
-      memory_flags:    wgpu::hal::MemoryFlags::PREFER_COHERENT, // I don't know what it exactly means, but it seems to be right
-    };
-    let wgpu_tex_desc = wgpu::TextureDescriptor {
-      label:           Some("framebuffer"),
-      size:            wgpu::Extent3d {
-        width:                 extent.width,
-        height:                extent.height,
-        depth_or_array_layers: 1,
-      },
-      mip_level_count: 1,
-      sample_count:    1,
-      dimension:       wgpu::TextureDimension::D2,
-      format:          wgpu::TextureFormat::Rgba8Unorm,
-      usage:           wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::RENDER_ATTACHMENT,
-      view_formats:    &[],
-    };
-    let swapchain = dq.device.texture_from_raw(
-      img,
-      &vk_tex_desc,
-      Some(Box::new(move || {
-        vk_device.unmap_memory(allocation);
-        vk_device.destroy_image(img, None);
-        vk_device.free_memory(allocation, None);
-      })),
-      wgvk::TextureMemory::External,
-    );
-    RawMappedPresenter {
-      present_texture: swapchain,
-      wgpu_tex_desc,
-      mapped,
-    }
   }
 }
 

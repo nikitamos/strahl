@@ -20,7 +20,7 @@ impl UVMap {
   pub fn new(uv: &[glam::Vec2]) -> Self { Self { uv: uv.into() } }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub struct GeometrySampleMetadata {
   pub normal: VecLocal,
 }
@@ -72,12 +72,12 @@ impl Geometry for Sphere {
     };
     let intersection = oc + t * direction;
 
-    Some(SurfaceHit {
-      point:        intersection.into(),
-      normal:       (intersection).normalize(),
-      ray_distance: t,
-      transform:    ctx.transform,
-    })
+    Some(SurfaceHit::new(
+      intersection.into(),
+      (intersection).normalize(),
+      t,
+      ctx.transform,
+    ))
   }
 }
 
@@ -100,12 +100,12 @@ impl Geometry for Point {
     let pos = ctx.transform.p2local(ray.pos());
     let dir = ctx.transform.v2local(ray.direction());
     if are_codirectional(pos.into(), -*dir) {
-      Some(SurfaceHit {
-        point:        Vec3::ZERO.into(),
-        normal:       Vec3::ZERO,
-        ray_distance: pos.length(),
-        transform:    ctx.transform,
-      })
+      Some(SurfaceHit::new(
+        Vec3::ZERO.into(),
+        Vec3::ZERO,
+        pos.length(),
+        ctx.transform,
+      ))
     } else {
       None
     }

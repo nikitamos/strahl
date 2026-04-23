@@ -38,6 +38,27 @@ impl BSDF for Specular {
     })
   }
 
+  fn bsdf2(
+    &self,
+    out: VecHit,
+    inc: VecHit,
+    _ctx: super::BSDFSampleContext,
+  ) -> Option<Sample<Spectrum, super::BsdfMetadata>> {
+    if inc.reflect(Vec3::Z) == out.into() {
+      Some(Sample {
+        prob:     1.0,
+        sample:   self.r,
+        metadata: super::BsdfMetadata {
+          inc,
+          eta: 1.0,
+          dirac: true,
+        },
+      })
+    } else {
+      None
+    }
+  }
+
   fn pdf(&self, out: VecHit, inc: VecHit, tm: super::BSDFSampleContext) -> f32 {
     if inc.reflect(Vec3::Z) == out.into() {
       1.0

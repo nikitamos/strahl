@@ -2,7 +2,8 @@ use super::{Interaction, IntersectionContext, Scene, Spectrum};
 use crate::{
   Castable, GeometrySampleMetadata, PointGlobal, Sample, Sampler,
   camera::{self, CameraRay},
-  light::LightSampleContext,
+  light::{LightSampleContext, LightSampleMetadata},
+  material::bsdf::BSDFSampleContext,
 };
 use glam::{FloatExt, Vec3, Vec3Swizzles, Vec4Swizzles};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
@@ -23,47 +24,55 @@ impl Solver {
     for _ in 0..SAMPLES {
       rays.into_par_iter().enumerate().for_each(|(i, ray)| {
         self.trace_camera_ray(scene, ray);
+        ray.reset_direction();
       });
     }
   }
 
   fn trace_camera_ray(&self, scene: &Scene, ray: &mut CameraRay) {
-    let mut local_ray = ray.clone();
-    let mut throughput: f32 = 1.0;
-    if let Some(intr) = Self::closest_hit(scene, ray) {
-      let local2hit = glam::Quat::from_rotation_arc(intr.hit.normal, Vec3::Z);
-      let out_hit = (local2hit.mul_vec3(-*intr.incoming)).into();
-      // println!("out+hit -> {:?}", out_hit);
-      let sample = intr.body.material.bsdf().sample_bsdf(
-        out_hit,
-        self.sampler.sample(),
-        crate::material::bsdf::BSDFSampleContext::Camera,
-      );
-      // Sample the BSDF
-      if let Some(bsdf) = sample {
-        let light_incoming = intr.hit.transform.v2world(
-          (-local2hit.inverse().mul_vec3(bsdf.metadata.inc.into()))
-            .normalize()
-            .into(),
-        );
-        // Ray direction in world coordinates
-        local_ray.direction = light_incoming.into();
-        local_ray.origin = intr.hit.transform.p2world(intr.hit.point);
-        // ray.color = Vec3::ONE;
-        if let Some(ls) = self.sample_light(scene, intr.hit.point_global()) {
-          // ray.color = 0.5 * out_hit.xyz() + 1.0;
-          local_ray.color +=
-            bsdf.sample * ls.sample * ((-*intr.incoming).dot(intr.hit.normal)).abs();
+    let mut throughput = Vec3::ONE;
+    const BOUNCES: u32 = 2;
+    for b in 0..BOUNCES {
+      let Some(isect) = Self::closest_hit(scene, ray) else {
+        // Infinite lights
+        break;
+      };
+      // if emissive then L += beta * interaction.emission(-ray.dir) w.r.t. spectrum
+      // if b == BOUNCES break;
+      let bsdf = isect.body.material.bsdf();
+      let cur_ray = isect.hit.to_hit((-ray.direction).into());
+      if let Some(light) = self.sample_light(scene, isect.hit.point_global()) {
+        if b == 1 {
+          dbg!(light.metadata.point);
+        }
+        if light.prob != 0.0 {
+          let wi = isect.hit.global_to_hit(
+            (light.metadata.point.xyz() - isect.hit.point_global().xyz())
+              .normalize()
+              .into(),
+          );
+          if let Some(bsdf2) = bsdf.bsdf2(cur_ray, wi, BSDFSampleContext::Camera) {
+            // In hit space wi.z corresponds to dot(wi, normal)
+            // Note that if using normal mapping that's generally not the case.
+            let f = bsdf2.sample * cur_ray.z.abs(); // is this really *that* angle?
+            ray.color += throughput * f * light.sample / (light.prob) / 4.0;
+          }
         }
       }
+      // Sample a new direction
+      let Some(bs) = bsdf.sample_bsdf(cur_ray, self.sampler.sample(), BSDFSampleContext::Camera) else {
+        break;
+      };
+      throughput *= bs.sample * bs.metadata.inc.z.abs() / bs.prob;
+      ray.origin = isect.hit.point_global();
+      ray.direction = isect.hit.to_global(bs.metadata.inc).into();
     }
-    ray.color = local_ray.color;
   }
   fn sample_light(
     &self,
     scene: &Scene,
     dest: PointGlobal,
-  ) -> Option<Sample<Spectrum, GeometrySampleMetadata>> {
+  ) -> Option<Sample<Spectrum, LightSampleMetadata>> {
     scene
       .sample_light_source(&self.sampler, dest)
       .compose(|src, ()| {
@@ -84,7 +93,7 @@ impl Solver {
         };
         b.geometry.try_intersect(ctx, r).map(|hit| Interaction {
           body: b,
-          incoming: hit.transform.v2local(r.direction()),
+          ray_dir: hit.transform.v2local(r.direction()),
           hit,
         })
       })

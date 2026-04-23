@@ -3,6 +3,7 @@
         "BSDF",
         "codirectional",
         "downcasting",
+        "isect",
         "Lambertian",
         "raygen",
         "Raymarcher",

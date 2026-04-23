@@ -11,6 +11,11 @@ pub struct CameraRay {
   pub direction: Vec3,
   /// Recorded color
   pub color:     Spectrum,
+  camera_dir:    VecGlobal,
+}
+
+impl CameraRay {
+  pub fn reset_direction(&mut self) { self.direction = self.camera_dir.into(); }
 }
 
 impl Castable for CameraRay {
@@ -90,8 +95,9 @@ impl Camera {
         let point = top_left + (i as f32) * x_step + (j as f32) * y_step;
         let ray_direction = (point - cam_pos).normalize();
         self.rays.push(CameraRay {
-          origin: point.into(),
-          direction: ray_direction,
+          origin:     point.into(),
+          direction:  ray_direction,
+          camera_dir: ray_direction.into(),
           ..Default::default()
         });
       }

@@ -29,6 +29,16 @@ pub trait BSDF {
     u: SampleState,
     ctx: BSDFSampleContext,
   ) -> Option<Sample<Spectrum, BsdfMetadata>>;
+  /// Evaluates the BSDF for the incident and exitant directions and
+  /// returns a Sample containing probability of such scattering event
+  fn bsdf2(
+    &self,
+    out: VecHit,
+    inc: VecHit,
+    ctx: BSDFSampleContext,
+  ) -> Option<Sample<Spectrum, BsdfMetadata>> {
+    todo!()
+  }
   /// Evaluates PDF for given directions.
   ///
   /// **This function may be deleted in future**

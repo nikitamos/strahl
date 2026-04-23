@@ -4,7 +4,7 @@ use crate::{
   Castable, Geometry, GeometrySampleMetadata, IntersectionContext, PointGlobal, PointLocal, Sample,
   SampleState, Scene, Spectrum, SurfaceHit, SurfaceProperty, Transform, VecGlobal,
 };
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 #[derive(Clone, Copy, Debug)]
 pub enum LightEmissionDirection {
@@ -28,6 +28,17 @@ pub struct LightSource {
   pub(crate) spectrum:    SurfaceProperty<Spectrum>,
   pub(crate) dir:         LightEmissionDirection,
   pub(crate) translation: glam::Vec3,
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct LightSampleMetadata {
+  pub geometry: GeometrySampleMetadata,
+  pub point:    PointGlobal,
+}
+
+impl Deref for LightSampleMetadata {
+  type Target = GeometrySampleMetadata;
+  fn deref(&self) -> &Self::Target { &self.geometry }
 }
 
 impl LightSource {
@@ -59,25 +70,23 @@ impl LightSource {
     &self,
     state: SampleState,
     ctx: LightSampleContext,
-  ) -> Option<Sample<Spectrum, GeometrySampleMetadata>> {
+  ) -> Option<Sample<Spectrum, LightSampleMetadata>> {
     match self.dir {
       LightEmissionDirection::Omni => {
-        // let point = Sample{
-        //     prob: 1.0,
-        //     sample: glam::vec3(2.0,0.0,0.0).into(),
-        //     metadata: GeometrySampleMetadata { normal: Vec3::X.into() },
-        // };
         let point = self.geometry.sample_point(state);
-        point.compose(|point, meta| {
+        point.compose(|point, geometry| {
           if ctx
             .scene
             .is_visible(self.transform().p2world(point), ctx.dst)
           {
             match self.spectrum {
               SurfaceProperty::Uniform(s) => Some(Sample {
-                prob:     1.0,
+                prob:     1.0, // TODO: fix probability?
                 sample:   s,
-                metadata: meta,
+                metadata: LightSampleMetadata {
+                  geometry,
+                  point: self.transform().p2world(point),
+                },
               }),
               SurfaceProperty::Texture(_) => unimplemented!(),
             }

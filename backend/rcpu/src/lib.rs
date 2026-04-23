@@ -105,17 +105,37 @@ pub struct SurfaceHit {
   /// Transform from global coordinates to the coordinates of the hit body.
   /// Usually is taken from [`IntersectionContext::transform`]
   pub transform:    Transform,
+  local2hit:        Quat,
 }
 
 impl SurfaceHit {
+  pub fn new(point: PointLocal, normal: Vec3, ray_distance: f32, transform: Transform) -> Self {
+    Self {
+      point,
+      normal,
+      ray_distance,
+      transform,
+      local2hit: glam::Quat::from_rotation_arc(normal, Vec3::Z),
+    }
+  }
   pub fn point_global(&self) -> PointGlobal { self.transform.p2world(self.point) }
+  pub fn to_hit(&self, local: VecLocal) -> VecHit { (self.local2hit * *local).into() }
+  pub fn global_to_hit(&self, global: VecGlobal) -> VecHit {
+    (self.local2hit * *self.transform.v2local(global)).into()
+  }
+  pub fn to_local(&self, hit: VecHit) -> VecLocal { (self.local2hit.inverse() * *hit).into() }
+  pub fn to_global(&self, hit: VecHit) -> VecGlobal {
+    self
+      .transform
+      .v2world((self.local2hit.inverse() * *hit).into())
+  }
 }
 
 pub struct Interaction<'a> {
-  pub hit:      SurfaceHit,
-  pub body:     &'a Body,
-  /// Normalized ray vector direction, pointing to the surface
-  pub incoming: VecLocal,
+  pub hit:     SurfaceHit,
+  pub body:    &'a Body,
+  /// Normalized direction of ray intersected the surfaces, pointing to the surface
+  pub ray_dir: VecLocal,
 }
 
 pub struct IntersectionContext {

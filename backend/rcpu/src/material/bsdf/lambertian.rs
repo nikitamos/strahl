@@ -37,8 +37,27 @@ impl BSDF for Lambertian {
     }))
   }
 
-  /// NOT IMPLEMENTED
+  fn bsdf2(
+    &self,
+    out: crate::VecHit,
+    inc: crate::VecHit,
+    ctx: super::BSDFSampleContext,
+  ) -> Option<crate::Sample<Spectrum, BsdfMetadata>> {
+    Some(crate::Sample {
+      prob:     self.pdf(out, inc, ctx),
+      sample:   self.s * FRAC_1_PI,
+      metadata: BsdfMetadata {
+        inc,
+        ..Default::default()
+      },
+    })
+  }
+
   fn pdf(&self, out: crate::VecHit, inc: crate::VecHit, tm: super::BSDFSampleContext) -> f32 {
-    todo!()
+    if out.z * inc.z < 0.0 {
+      0.0
+    } else {
+      inc.z.abs() * FRAC_1_PI
+    }
   }
 }

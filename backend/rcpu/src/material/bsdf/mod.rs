@@ -13,6 +13,7 @@ pub enum ScatteringEvent {
 
 #[derive(Default)]
 pub struct BsdfMetadata {
+  /// Sampled direction of incoming light.
   pub inc:   VecHit,
   pub eta:   f32,
   pub dirac: bool,

@@ -1,3 +1,5 @@
+use std::{fs::File, io::Write};
+
 use super::{Interaction, IntersectionContext, Scene, Spectrum};
 use crate::{
   Castable, GeometrySampleMetadata, PointGlobal, Sample, Sampler,
@@ -20,21 +22,37 @@ impl Solver {
   }
   pub fn render(&self, scene: &Scene, cam: &mut camera::Camera) {
     let rays = cam.init_rays();
-    const SAMPLES: i32 = 1;
-    for _ in 0..SAMPLES {
-      rays.into_par_iter().enumerate().for_each(|(i, ray)| {
+    const SAMPLES: i32 = 128;
+    rays.into_par_iter().enumerate().for_each(|(i, ray)| {
+      for _ in 0..SAMPLES {
         self.trace_camera_ray(scene, ray);
         ray.reset_direction();
-      });
+      }
+      ray.color /= SAMPLES as f32;
+    });
+    #[cfg(false)]
+    Self::dump_rays(rays);
+  }
+
+  fn dump_rays(rays: &[CameraRay]) {
+    let mut file = File::create("scatter.csv").unwrap();
+    for r in rays {
+      let next = r.origin.xyz() + r.direction;
+      let _ = writeln!(
+        file,
+        "{},{},{},{},{},{}",
+        r.origin.x, r.origin.y, r.origin.z, next.x, next.y, next.z
+      );
     }
   }
 
   fn trace_camera_ray(&self, scene: &Scene, ray: &mut CameraRay) {
     let mut throughput = Vec3::ONE;
-    const BOUNCES: u32 = 2;
+    const BOUNCES: u32 = 1;
     for b in 0..BOUNCES {
       let Some(isect) = Self::closest_hit(scene, ray) else {
         // Infinite lights
+        // println!("no hit, exiting {b}");
         break;
       };
       // if emissive then L += beta * interaction.emission(-ray.dir) w.r.t. spectrum
@@ -42,9 +60,6 @@ impl Solver {
       let bsdf = isect.body.material.bsdf();
       let cur_ray = isect.hit.to_hit((-ray.direction).into());
       if let Some(light) = self.sample_light(scene, isect.hit.point_global()) {
-        if b == 1 {
-          dbg!(light.metadata.point);
-        }
         if light.prob != 0.0 {
           let wi = isect.hit.global_to_hit(
             (light.metadata.point.xyz() - isect.hit.point_global().xyz())
@@ -60,12 +75,13 @@ impl Solver {
         }
       }
       // Sample a new direction
-      let Some(bs) = bsdf.sample_bsdf(cur_ray, self.sampler.sample(), BSDFSampleContext::Camera) else {
+      let Some(bs) = bsdf.sample_bsdf(cur_ray, self.sampler.sample(), BSDFSampleContext::Camera)
+      else {
         break;
       };
       throughput *= bs.sample * bs.metadata.inc.z.abs() / bs.prob;
-      ray.origin = isect.hit.point_global();
-      ray.direction = isect.hit.to_global(bs.metadata.inc).into();
+      ray.direction = isect.hit.to_global(bs.metadata.inc).normalize().into();
+      ray.origin = (isect.hit.point_global().xyz() + ray.direction * 0.0001).into();
     }
   }
   fn sample_light(

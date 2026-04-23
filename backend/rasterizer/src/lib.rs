@@ -2,6 +2,9 @@
 #![allow(dead_code)]
 #![feature(associated_type_defaults)]
 #![feature(duration_millis_float)]
+#![feature(rwlock_downgrade)]
+#![deny(clippy::all)]
+#![allow(dead_code)]
 
 use std::{ffi::CStr, path::Path, sync::Arc, time::SystemTime};
 

@@ -1,4 +1,7 @@
-use std::num::NonZero;
+use std::{
+  num::NonZero,
+  sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+};
 
 use strahl_import::{ImportedMaterial, MaterialComponentSource};
 use wgpu::{BindGroupDescriptor, ShaderStages, util::DeviceExt};
@@ -18,7 +21,7 @@ const MATERIAL_COMPONENTS: usize = 6;
 #[repr(transparent)]
 #[derive(Default, zerocopy::IntoBytes)]
 struct Colors([glam::Vec4; MATERIAL_COMPONENTS]);
-
+static FICTIVE_TEXTURE: RwLock<Option<wgpu::TextureView>> = RwLock::new(None);
 
 impl Material {
   pub fn from_imported(dev: &wgpu::Device, queue: &wgpu::Queue, s: ImportedMaterial) -> Self {
@@ -30,6 +33,7 @@ impl Material {
     let mut descriptors = Vec::with_capacity(MATERIAL_COMPONENTS + 2);
     let mut textures: [Option<wgpu::Texture>; MATERIAL_COMPONENTS] = Default::default();
     let mut texture_views: [Option<wgpu::TextureView>; MATERIAL_COMPONENTS] = Default::default();
+    let fictive = Self::fictive_texture(dev);
 
     // TODO: sampler settings
     layout.push(wgpu::BindGroupLayoutEntry {
@@ -120,6 +124,21 @@ impl Material {
         Some(MaterialComponentSource::Rgba { r, g, b, a }) => {
           color |= 0x01 << i;
           colors.0[i] = glam::vec4(*r, *g, *b, *a);
+          // Fictive texture
+          layout.push(wgpu::BindGroupLayoutEntry {
+            binding:    (i + 1) as u32,
+            visibility: ShaderStages::FRAGMENT,
+            ty:         wgpu::BindingType::Texture {
+              sample_type:    wgpu::TextureSampleType::Float { filterable: true },
+              view_dimension: wgpu::TextureViewDimension::D2,
+              multisampled:   false,
+            },
+            count:      None,
+          });
+          descriptors.push(wgpu::BindGroupEntry {
+            binding:  (i + 1) as u32,
+            resource: wgpu::BindingResource::TextureView(fictive.as_ref().unwrap()),
+          });
         }
         _ => panic!("Bad material (all components are expected to be present)"),
       }
@@ -168,6 +187,35 @@ impl Material {
       } else {
         None
       },
+    }
+  }
+
+  fn fictive_texture(dev: &wgpu::Device) -> RwLockReadGuard<'static, Option<wgpu::TextureView>> {
+    let reader = FICTIVE_TEXTURE.read().unwrap();
+    if reader.is_none() {
+      drop(reader);
+      let mut writer = FICTIVE_TEXTURE.write().unwrap();
+      let created_tex = dev.create_texture(&wgpu::TextureDescriptor {
+        label:           Some("fictive texture"),
+        size:            wgpu::Extent3d {
+          width:                 4,
+          height:                4,
+          depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count:    1,
+        dimension:       wgpu::TextureDimension::D2,
+        format:          wgpu::TextureFormat::Rgba8Unorm,
+        usage:           wgpu::TextureUsages::TEXTURE_BINDING,
+        view_formats:    &[],
+      });
+      let _ = writer.insert(created_tex.create_view(&wgpu::TextureViewDescriptor {
+        label: Some("fictive view"),
+        ..Default::default()
+      }));
+      RwLockWriteGuard::downgrade(writer)
+    } else {
+      reader
     }
   }
 

@@ -1,7 +1,6 @@
 #![deny(clippy::all)]
-#![feature(try_blocks)]
-#![feature(associated_type_defaults)]
 #![allow(dead_code)]
+#![feature(associated_type_defaults)]
 #![feature(duration_millis_float)]
 
 use std::{ffi::CStr, path::Path, sync::Arc, time::SystemTime};
@@ -90,62 +89,60 @@ impl Rasterizer {
     }: RasterizerCreateInfo,
   ) -> anyhow::Result<Rasterizer> {
     log::info!("Creating Rasterizer backend?");
-    let r: anyhow::Result<Rasterizer> = try {
-      let WgpuState {
-        instance,
-        device: dev,
-        queue,
-        presenter,
-      } = Self::create_wgpu_state(wgpu_info, &info).await?;
 
-      let target = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
-        label:           Some(" a kind of render target".to_string()),
-        size:            wgpu::Extent3d {
-          width:                 info.viewport.x,
-          height:                info.viewport.y,
-          depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count:    1,
-        dimension:       wgpu::TextureDimension::D2,
-        format:          wgpu::TextureFormat::Rgba8Unorm,
-        usage:           wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-        view_formats:    vec![wgpu::TextureFormat::Rgba8Unorm],
-      });
-      let depth = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
-        label:           Some("depth".to_string()),
-        size:            wgpu::Extent3d {
-          width:                 info.viewport.x,
-          height:                info.viewport.y,
-          depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count:    1,
-        dimension:       wgpu::TextureDimension::D2,
-        format:          wgpu::TextureFormat::Depth16Unorm,
-        usage:           wgpu::TextureUsages::RENDER_ATTACHMENT,
-        view_formats:    vec![wgpu::TextureFormat::Depth16Unorm],
-      });
+    let WgpuState {
+      instance,
+      device: dev,
+      queue,
+      presenter,
+    } = Self::create_wgpu_state(wgpu_info, &info).await?;
 
-      let manager = Arc::new(ShaderManager::new(
-        dev.clone(),
-        wgpu::TextureFormat::Depth16Unorm,
-      ));
+    let target = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
+      label:           Some(" a kind of render target".to_string()),
+      size:            wgpu::Extent3d {
+        width:                 info.viewport.x,
+        height:                info.viewport.y,
+        depth_or_array_layers: 1,
+      },
+      mip_level_count: 1,
+      sample_count:    1,
+      dimension:       wgpu::TextureDimension::D2,
+      format:          wgpu::TextureFormat::Rgba8Unorm,
+      usage:           wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+      view_formats:    vec![wgpu::TextureFormat::Rgba8Unorm],
+    });
+    let depth = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
+      label:           Some("depth".to_string()),
+      size:            wgpu::Extent3d {
+        width:                 info.viewport.x,
+        height:                info.viewport.y,
+        depth_or_array_layers: 1,
+      },
+      mip_level_count: 1,
+      sample_count:    1,
+      dimension:       wgpu::TextureDimension::D2,
+      format:          wgpu::TextureFormat::Depth16Unorm,
+      usage:           wgpu::TextureUsages::RENDER_ATTACHMENT,
+      view_formats:    vec![wgpu::TextureFormat::Depth16Unorm],
+    });
 
-      // On wgpu shutdown device is dropped earlier than callback is called for some reason
-      Rasterizer {
-        i: instance,
-        presenter,
-        queue,
-        drawer: None,
-        dev,
-        target,
-        manager,
-        info,
-        depth,
-      }
-    };
-    r.map_err(|x| anyhow::anyhow!(x))
+    let manager = Arc::new(ShaderManager::new(
+      dev.clone(),
+      wgpu::TextureFormat::Depth16Unorm,
+    ));
+
+    // On wgpu shutdown device is dropped earlier than callback is called for some reason
+    Ok(Rasterizer {
+      i: instance,
+      presenter,
+      queue,
+      drawer: None,
+      dev,
+      target,
+      manager,
+      info,
+      depth,
+    })
   }
 
   async fn create_wgpu_state(

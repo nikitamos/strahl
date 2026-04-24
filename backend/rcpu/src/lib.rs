@@ -1,4 +1,3 @@
-#![feature(assert_matches)]
 #![feature(nonpoison_rwlock)]
 #![feature(sync_nonpoison)]
 
@@ -34,7 +33,6 @@ mod test;
 ///
 /// Note that macro consumes the original value.
 /// ```
-/// #![feature(assert_matches)]
 /// use std::assert_matches::assert_matches;
 /// use rcpu::with;
 ///

@@ -1,5 +1,3 @@
-#![feature(assert_matches)]
-
 use std::{marker::PhantomData, sync::Arc};
 
 mod points;

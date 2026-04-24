@@ -1,7 +1,6 @@
 #![deny(clippy::all)]
-#![feature(try_blocks)]
-#![feature(associated_type_defaults)]
 #![allow(dead_code)]
+#![feature(associated_type_defaults)]
 #![feature(duration_millis_float)]
 
 use core::slice;
@@ -49,94 +48,93 @@ pub struct Camera {
 impl Rasterizer {
   pub async fn new(info: RasterizerCreateInfo) -> anyhow::Result<Rasterizer> {
     log::info!("Creating Rasterizer backend?");
-    let r: anyhow::Result<Rasterizer> = try {
-      let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
-      desc.backends = wgpu::Backends::VULKAN;
-      let instance = unsafe {
-        wgpu::Instance::from_hal::<wgvk::Api>(wgvk::Instance::init_with_callback(
-          &wgpu::hal::InstanceDescriptor {
-            name: "A?",
-            flags: desc.flags,
-            memory_budget_thresholds: desc.memory_budget_thresholds,
-            backend_options: desc.backend_options,
-            telemetry: None, // May be required on DX12
-            display: desc
-              .display
-              .as_ref()
-              .and_then(|dh| dh.display_handle().ok()),
-          },
-          Some(Box::new(|_opts| {})),
-        )?)
-      };
-
-      let adapter = instance
-        .request_adapter(&wgpu::RequestAdapterOptions {
-          power_preference: wgpu::PowerPreference::HighPerformance,
-          ..Default::default()
-        })
-        .await?;
-      let dev_desc = wgpu::DeviceDescriptor {
-        required_features: wgpu::Features {
-          features_wgpu:   wgpu::FeaturesWGPU::empty(),
-          features_webgpu: wgpu::FeaturesWebGPU::IMMEDIATES,
+    // let r: anyhow::Result<Rasterizer> =
+    let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
+    desc.backends = wgpu::Backends::VULKAN;
+    let instance = unsafe {
+      wgpu::Instance::from_hal::<wgvk::Api>(wgvk::Instance::init_with_callback(
+        &wgpu::hal::InstanceDescriptor {
+          name: "A?",
+          flags: desc.flags,
+          memory_budget_thresholds: desc.memory_budget_thresholds,
+          backend_options: desc.backend_options,
+          telemetry: None, // May be required on DX12
+          display: desc
+            .display
+            .as_ref()
+            .and_then(|dh| dh.display_handle().ok()),
         },
-        required_limits: wgpu::Limits {
-          max_immediate_size: 256,
-          ..Default::default()
-        },
-        ..Default::default()
-      };
-      let (raw, (dev, queue)) =
-        unsafe { create_presenter_dev_queue(&instance, adapter, dev_desc, &info).await? };
-
-      let target = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
-        label:           Some(" a kind of render target".to_string()),
-        size:            wgpu::Extent3d {
-          width:                 info.viewport.x,
-          height:                info.viewport.y,
-          depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count:    1,
-        dimension:       wgpu::TextureDimension::D2,
-        format:          wgpu::TextureFormat::Rgba8Unorm,
-        usage:           wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-        view_formats:    vec![wgpu::TextureFormat::Rgba8Unorm],
-      });
-      let depth = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
-        label:           Some("depth".to_string()),
-        size:            wgpu::Extent3d {
-          width:                 info.viewport.x,
-          height:                info.viewport.y,
-          depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count:    1,
-        dimension:       wgpu::TextureDimension::D2,
-        format:          wgpu::TextureFormat::Depth16Unorm,
-        usage:           wgpu::TextureUsages::RENDER_ATTACHMENT,
-        view_formats:    vec![wgpu::TextureFormat::Depth16Unorm],
-      });
-
-      let manager = Arc::new(ShaderManager::new(
-        dev.clone(),
-        wgpu::TextureFormat::Depth16Unorm,
-      ));
-
-      // On wgpu shutdown device is dropped earlier than callback is called for some reason
-      Rasterizer {
-        i: instance,
-        presenter: raw.into_hal(&dev),
-        queue,
-        drawer: None,
-        dev,
-        target,
-        manager,
-        info,
-        depth,
-      }
+        Some(Box::new(|_opts| {})),
+      )?)
     };
-    r.map_err(|x| anyhow::anyhow!(x))
+
+    let adapter = instance
+      .request_adapter(&wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::HighPerformance,
+        ..Default::default()
+      })
+      .await?;
+    let dev_desc = wgpu::DeviceDescriptor {
+      required_features: wgpu::Features {
+        features_wgpu:   wgpu::FeaturesWGPU::empty(),
+        features_webgpu: wgpu::FeaturesWebGPU::IMMEDIATES,
+      },
+      required_limits: wgpu::Limits {
+        max_immediate_size: 256,
+        ..Default::default()
+      },
+      ..Default::default()
+    };
+    let (raw, (dev, queue)) =
+      unsafe { create_presenter_dev_queue(&instance, adapter, dev_desc, &info).await? };
+
+    let target = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
+      label:           Some(" a kind of render target".to_string()),
+      size:            wgpu::Extent3d {
+        width:                 info.viewport.x,
+        height:                info.viewport.y,
+        depth_or_array_layers: 1,
+      },
+      mip_level_count: 1,
+      sample_count:    1,
+      dimension:       wgpu::TextureDimension::D2,
+      format:          wgpu::TextureFormat::Rgba8Unorm,
+      usage:           wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+      view_formats:    vec![wgpu::TextureFormat::Rgba8Unorm],
+    });
+    let depth = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
+      label:           Some("depth".to_string()),
+      size:            wgpu::Extent3d {
+        width:                 info.viewport.x,
+        height:                info.viewport.y,
+        depth_or_array_layers: 1,
+      },
+      mip_level_count: 1,
+      sample_count:    1,
+      dimension:       wgpu::TextureDimension::D2,
+      format:          wgpu::TextureFormat::Depth16Unorm,
+      usage:           wgpu::TextureUsages::RENDER_ATTACHMENT,
+      view_formats:    vec![wgpu::TextureFormat::Depth16Unorm],
+    });
+
+    let manager = Arc::new(ShaderManager::new(
+      dev.clone(),
+      wgpu::TextureFormat::Depth16Unorm,
+    ));
+
+    // On wgpu shutdown device is dropped earlier than callback is called for some reason
+    Ok(Rasterizer {
+      i: instance,
+      presenter: raw.into_hal(&dev),
+      queue,
+      drawer: None,
+      dev,
+      target,
+      manager,
+      info,
+      depth,
+    })
+    // r.map_err(|x| anyhow::anyhow!(x))
   }
 
   pub fn create_scene(&self) -> Scene { Scene::new(Arc::clone(&self.manager)) }

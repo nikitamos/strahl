@@ -14,7 +14,7 @@ impl Castable for TestRay {
 }
 
 mod sphere {
-  use std::assert_matches::assert_matches;
+  use std::assert_matches;
 
   use glam::{Mat4, Vec3, Vec4};
 

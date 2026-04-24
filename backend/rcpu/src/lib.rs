@@ -1,5 +1,3 @@
-#![feature(assert_matches)]
-
 use std::{marker::PhantomData, sync::Arc};
 
 mod points;
@@ -29,7 +27,6 @@ mod test;
 ///
 /// Note that macro consumes the original value.
 /// ```
-/// #![feature(assert_matches)]
 /// use std::assert_matches::assert_matches;
 /// use rcpu::with;
 ///

@@ -301,6 +301,9 @@ impl Scene {
   /// For now the sampling is uniform, that is, each light source has
   /// equal probability to be sampled.
   pub fn sample_light_source(&self, sampler: &Sampler, _dest: PointGlobal) -> Sample<&LightSource> {
+    self.sample_any_light_source(sampler)
+  }
+  pub fn sample_any_light_source(&self, sampler: &Sampler) -> Sample<&LightSource> {
     sampler.sample_element(&self.lights)
   }
   /// Checks whether one point is visible from another

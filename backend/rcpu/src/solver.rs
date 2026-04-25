@@ -90,15 +90,23 @@ impl Solver {
   ) -> Option<Sample<Spectrum, LightSampleMetadata>> {
     scene
       .sample_light_source(&self.sampler, dest)
-      .compose(|src, ()| {
-        src.sample(self.sampler.sample(), LightSampleContext {
-          dst: dest,
-          scene,
-        })
+      .and_then(|src, ()| {
+        src
+          .sample(self.sampler.sample(), LightSampleContext { dst: dest, scene })
       })
   }
-
-  pub(crate) fn closest_hit<'a>(scene: &'a Scene, r: &mut CameraRay) -> Option<Interaction<'a>> {
+  pub(crate) fn hit_light(&self, scene: &Scene, ray: &dyn Castable) -> Option<Spectrum> {
+    let light = &scene.lights[0];
+    if let Some(hit) = light.try_intersect(ray) {
+      Some(light.spectrum.get())
+    } else {
+      None
+    }
+  }
+  pub(crate) fn closest_hit<'a, C: Castable>(
+    scene: &'a Scene,
+    r: &mut C,
+  ) -> Option<Interaction<'a>> {
     scene
       .bodies
       .iter()
@@ -115,3 +123,37 @@ impl Solver {
       .min_by(|a, b| a.hit.ray_distance.partial_cmp(&b.hit.ray_distance).unwrap())
   }
 }
+
+/*
+enum PathSurface<'a> {
+  Light(&'a LightSource),
+  Body(&'a Body),
+  Camera(glam::UVec2),
+}
+
+struct BidirectionalPath<'a> {
+  vertices: Vec<PathSurface<'a>>,
+}
+
+impl<'a> BidirectionalPath<'a> {
+  pub fn sample(scene: &'a Scene, sampler: &Sampler, light_len: u32, camera_len: u32) -> Self {
+    todo!()
+  }
+
+  fn sample_light_subpath(scene: &'a Scene, sampler: &Sampler, len: u32) {
+    let source = scene.sample_any_light_source(sampler);
+    let dir = source.sample.sample_point_and_direction(sampler);
+    let ray = CameraRay {
+      origin:    dir.metadata.point,
+      direction: *dir.metadata.direction,
+      color:     Spectrum::ZERO,
+    };
+  }
+  fn subpath(scene: &'a Scene, sampler: &Sampler, castable: &mut dyn Castable, len: u32) {
+    for i in 1..len {
+      // We just sample the BSDFs, right?
+      if let Some(body) = Solver::closest_hit(scene, castable) {}
+    }
+  }
+}
+*/

@@ -125,10 +125,8 @@ impl<T, M> Sample<T, M> {
       metadata,
     }
   }
-  pub fn compose<U, N>(
-    self,
-    mapper: impl Fn(T, M) -> Option<Sample<U, N>>,
-  ) -> Option<Sample<U, N>> {
+  
+  pub fn and_then<U, N>(self, mapper: impl FnOnce(T, M) -> Option<Sample<U, N>>) -> Option<Sample<U, N>> {
     let mut m = mapper(self.sample, self.metadata)?;
     m.prob *= self.prob;
     Some(m)
@@ -141,11 +139,13 @@ impl<T, M> Sample<T, M> {
     }
   }
   /// Discards the metadata and replaces it with `()`
-  pub fn discard_metadata(self) -> Sample<T, ()> {
+  pub fn discard_metadata(self) -> Sample<T, ()> { self.with_metadata(()) }
+  /// Discards metadata and replaces it with the value provided
+  pub fn with_metadata<N>(self, metadata: N) -> Sample<T, N> {
     Sample {
       prob:     self.prob,
       sample:   self.sample,
-      metadata: (),
+      metadata,
     }
   }
 

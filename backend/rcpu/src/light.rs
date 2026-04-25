@@ -74,7 +74,7 @@ impl LightSource {
     match self.dir {
       LightEmissionDirection::Omni => {
         let point = self.geometry.sample_point(state);
-        point.compose(|point, geometry| {
+        point.and_then(|point, geometry| {
           if ctx
             .scene
             .is_visible(self.transform().p2world(point), ctx.dst)

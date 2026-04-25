@@ -108,7 +108,7 @@ impl Rasterizer {
       sample_count:    1,
       dimension:       wgpu::TextureDimension::D2,
       format:          wgpu::TextureFormat::Rgba8Unorm,
-      usage:           wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+      usage:           wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::TEXTURE_BINDING,
       view_formats:    vec![wgpu::TextureFormat::Rgba8Unorm],
     });
     let depth = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
@@ -181,7 +181,7 @@ impl Rasterizer {
           present_mode: wgpu::PresentMode::AutoVsync,
           desired_maximum_frame_latency: 2,
           alpha_mode: wgpu::CompositeAlphaMode::Opaque,
-          view_formats: vec![wgpu::TextureFormat::Rgba8Unorm],
+          view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
         });
 
         Ok(WgpuState {
@@ -271,6 +271,7 @@ impl Rasterizer {
     }
     let res = self.copy_to_presenter(&mut encoder);
     let index = self.queue.submit(std::iter::once(encoder.finish()));
+    self.presenter.post_submit();
     log::trace!("work submitted to the GPU");
     // TODO: wait asynchronously
     let _ = self.dev.poll(wgpu::wgt::PollType::Wait {

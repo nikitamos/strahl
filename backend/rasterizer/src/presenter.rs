@@ -25,6 +25,7 @@ pub(crate) trait Presenter: Send {
   ) -> PresentationResult<'_>;
 }
 
+#[derive(Debug)]
 pub enum PresentationResult<'a> {
   Mapped(&'a [u8]),
   Stored(&'a wgpu::Texture),

@@ -16,6 +16,14 @@ pub struct CameraRay {
 
 impl CameraRay {
   pub fn reset_direction(&mut self) { self.direction = self.camera_dir.into(); }
+  pub fn new(origin: PointGlobal, direction: VecGlobal) -> Self {
+    Self {
+      origin,
+      direction: direction.into(),
+      color: Default::default(),
+      camera_dir: direction.into(),
+    }
+  }
 }
 
 impl Castable for CameraRay {

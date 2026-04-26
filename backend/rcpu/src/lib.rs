@@ -1,5 +1,6 @@
 #![feature(nonpoison_rwlock)]
 #![feature(sync_nonpoison)]
+#![feature(fn_traits)]
 
 use std::{
   marker::PhantomData,
@@ -88,7 +89,7 @@ impl RayTracer {
   pub fn create_sphere(&self, radius: f32) -> Arc<Sphere> { Arc::new(Sphere { radius }) }
 }
 
-mod solver;
+pub mod solver;
 
 type Spectrum = Vec3;
 
@@ -259,12 +260,12 @@ impl Scene {
   }
   pub fn add_sphere(&mut self, radius: f32) -> &Body {
     self.bodies.push(Body {
-      geometry: Arc::new(Sphere { radius }),
-      material: Arc::new(ConcreteMaterial {
+      geometry:    Arc::new(Sphere { radius }),
+      material:    Arc::new(ConcreteMaterial {
         bsdf:   Lambertian { s: Vec3::X },
         medium: UniformMedium { ior: 1.0 },
       }),
-      coordinates: Default::default()
+      coordinates: Default::default(),
     });
     self.bodies.last().unwrap()
   }
@@ -300,11 +301,18 @@ impl Scene {
   /// Samples a light source present on the scene.
   /// For now the sampling is uniform, that is, each light source has
   /// equal probability to be sampled.
+  ///
+  /// # Panics
+  /// Panics if the scene contains no light sources
   pub fn sample_light_source(&self, sampler: &Sampler, _dest: PointGlobal) -> Sample<&LightSource> {
     self.sample_any_light_source(sampler)
   }
   pub fn sample_any_light_source(&self, sampler: &Sampler) -> Sample<&LightSource> {
-    sampler.sample_element(&self.lights)
+    if self.lights.len() > 0 {
+      sampler.sample_element(&self.lights)
+    } else {
+      panic!("`sample_light_source` called on scene without light sources")
+    }
   }
   /// Checks whether one point is visible from another
   ///
@@ -325,7 +333,7 @@ impl Scene {
       ) {
         let traversed = hit.point_global().xyz() - eye.xyz();
         if are_codirectional(distance, traversed)
-          && traversed.length_squared() < distance.length_squared() - 1.0e-3
+          && traversed.length_squared() < distance.length_squared() - 1e-3
         {
           // println!(
           //   "{} -> !{}! -> {}",

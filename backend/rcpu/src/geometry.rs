@@ -72,9 +72,15 @@ impl Geometry for Sphere {
     };
     let intersection = oc + t * direction;
 
+    // let mut fact = intersection.dot(direction).signum();
+    // if fact == 0.0 {
+    //   fact = 1.0;
+    // }
+    let fact = 1.0;
+
     Some(SurfaceHit::new(
       intersection.into(),
-      (intersection).normalize(),
+      (intersection).normalize() * fact,
       t,
       ctx.transform,
     ))

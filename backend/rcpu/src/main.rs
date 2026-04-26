@@ -1,15 +1,13 @@
-use std::sync::Arc;
+#![feature(iter_map_windows)]
+
+use std::{io::Write, sync::Arc};
 
 use glam::{Quat, Vec3};
 use rcpu::{
-  Geometry, RayTracer, SurfaceProperty,
-  camera::Camera,
+  Geometry, RayTracer, Sampler, SurfaceProperty,
+  camera::{Camera, CameraRay},
   light::LightEmissionDirection,
-  material::{
-    ConcreteMaterial,
-    bsdf::lambertian::Lambertian,
-    medium::UniformMedium,
-  },
+  material::{ConcreteMaterial, bsdf::lambertian::Lambertian, medium::UniformMedium},
 };
 
 fn main() {
@@ -24,6 +22,19 @@ fn main() {
     LightEmissionDirection::Omni,
   );
   scene.add_body(
+    back.create_sphere(20.0),
+    Arc::new(ConcreteMaterial {
+      medium: UniformMedium { ior: 1.0 },
+      bsdf:   Lambertian {
+        s: glam::vec3(0.76, 0.8, 0.1),
+      },
+    }),
+    rcpu::TransformParts {
+      pos:      Vec3::ZERO.into(),
+      rotation: Quat::IDENTITY,
+    },
+  );
+  scene.add_body(
     g,
     Arc::new(ConcreteMaterial {
       medium: UniformMedium { ior: 1.0 },
@@ -36,6 +47,30 @@ fn main() {
       rotation: Quat::IDENTITY,
     },
   );
+  let mut f = std::fs::File::create("light-paths.csv").unwrap();
+  for i in 0..64 {
+    let path = rcpu::solver::BidirectionalPath::sample_eye_subpath(
+      &scene,
+      &Sampler::new(),
+      &mut CameraRay::new((5.0 * Vec3::NEG_Y).into(), Vec3::Y.into()),
+      &3,
+      Default::default(),
+    );
+    // rcpu::solver::BidirectionalPath::sample_light_subpath(&scene, &Sampler::new(), &6usize);
+    path
+      .vertices
+      .iter()
+      .map_windows(|[l, r]| {
+        writeln!(
+          &mut f,
+          "{},{},{},{},{},{}",
+          l.point.x, l.point.y, l.point.z, r.point.x, r.point.y, r.point.z
+        )
+        .unwrap();
+      })
+      .for_each(|()| ());
+  }
+  /*
   let mut cam = Camera::new(
     (480, 480).into(),
     Vec3::Y,
@@ -46,5 +81,5 @@ fn main() {
   solver.render(&scene, &mut cam);
   let mut img = image::Rgb32FImage::new(480, 480);
   cam.write_image(&mut img);
-  img.save("out.tiff").unwrap();
+  img.save("out.tiff").unwrap();*/
 }

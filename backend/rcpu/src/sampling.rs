@@ -107,6 +107,7 @@ pub struct Sample<T, M = ()> {
   /// The data associated with the sampling result. It may be used to store
   /// operation-specific information.
   pub metadata: M,
+  // TODO: add conditional probability?
 }
 
 impl<T, M> Sample<T, M> {
@@ -117,7 +118,7 @@ impl<T, M> Sample<T, M> {
       metadata: self.metadata,
     }
   }
-  pub fn map_all<U, N>(self, mapper: impl Fn(T, M) -> (U, N)) -> Sample<U, N> {
+  pub fn map_all<U, N>(self, mapper: impl FnOnce(T, M) -> (U, N)) -> Sample<U, N> {
     let (sample, metadata) = mapper(self.sample, self.metadata);
     Sample {
       prob: self.prob,
@@ -125,12 +126,30 @@ impl<T, M> Sample<T, M> {
       metadata,
     }
   }
-  
-  pub fn and_then<U, N>(self, mapper: impl FnOnce(T, M) -> Option<Sample<U, N>>) -> Option<Sample<U, N>> {
+
+  pub fn compose<U, N>(self, mapper: impl FnOnce(T, M) -> Sample<U, N>) -> Sample<U, N> {
+    let mut m = mapper(self.sample, self.metadata);
+    m.prob *= self.prob;
+    m
+  }
+
+  pub fn and_then<U, N>(
+    self,
+    mapper: impl FnOnce(T, M) -> Option<Sample<U, N>>,
+  ) -> Option<Sample<U, N>> {
     let mut m = mapper(self.sample, self.metadata)?;
     m.prob *= self.prob;
     Some(m)
   }
+
+  pub fn flip(self) -> Sample<M, T> {
+    Sample {
+      prob:     self.prob,
+      sample:   self.metadata,
+      metadata: self.sample,
+    }
+  }
+
   pub fn replace<U>(self, replacement: U) -> Sample<U, M> {
     Sample {
       prob:     self.prob,
@@ -143,8 +162,8 @@ impl<T, M> Sample<T, M> {
   /// Discards metadata and replaces it with the value provided
   pub fn with_metadata<N>(self, metadata: N) -> Sample<T, N> {
     Sample {
-      prob:     self.prob,
-      sample:   self.sample,
+      prob: self.prob,
+      sample: self.sample,
       metadata,
     }
   }

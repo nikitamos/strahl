@@ -19,6 +19,12 @@ pub struct BsdfMetadata {
   pub dirac: bool,
 }
 
+impl BsdfMetadata {
+  pub fn jacobian_with(&self, out: VecHit) -> f32 {
+    (out.z * self.inc.z).abs() / out.distance_squared(*self.inc)
+  }
+}
+
 /// Bidirectional scattering distribution functions
 pub trait BSDF {
   /// Evaluates the BSDF given incident and exitant direction

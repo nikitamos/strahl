@@ -1,8 +1,8 @@
-use glam::Mat4;
+use glam::{Mat4, Quat, Vec3, Vec3Swizzles};
 
 use crate::{
-  Castable, Geometry, GeometrySampleMetadata, IntersectionContext, PointGlobal, Sample,
-  SampleState, Scene, Spectrum, SurfaceHit, SurfaceProperty, Transform, VecGlobal,
+  Castable, Geometry, GeometrySampleMetadata, IntersectionContext, PointGlobal, PointLocal, Sample,
+  SampleState, Sampler, Scene, Spectrum, SurfaceHit, SurfaceProperty, Transform, VecGlobal, VecHit,
 };
 use std::{ops::Deref, sync::Arc};
 
@@ -32,8 +32,11 @@ pub struct LightSource {
 
 #[derive(Clone, Default, Debug)]
 pub struct LightSampleMetadata {
-  pub geometry: GeometrySampleMetadata,
-  pub point:    PointGlobal,
+  pub geometry:   GeometrySampleMetadata,
+  pub point:      PointGlobal,
+  pub direction:  VecGlobal,
+  pub point_prob: f32,
+  pub dir_prob:   f32,
 }
 
 impl Deref for LightSampleMetadata {
@@ -74,6 +77,7 @@ impl LightSource {
     match self.dir {
       LightEmissionDirection::Omni => {
         let point = self.geometry.sample_point(state);
+        let point_prob = point.prob;
         point.and_then(|point, geometry| {
           if ctx
             .scene
@@ -86,6 +90,9 @@ impl LightSource {
                 metadata: LightSampleMetadata {
                   geometry,
                   point: self.transform().p2world(point),
+                  dir_prob: 1.0,
+                  direction: Vec3::Z.into(),
+                  point_prob,
                 },
               }),
               SurfaceProperty::Texture(_) => unimplemented!(),
@@ -98,5 +105,39 @@ impl LightSource {
       }
       _ => unimplemented!(),
     }
+  }
+
+  fn sample_direction_at(
+    &self,
+    _point: PointLocal,
+    sample: SampleState,
+  ) -> Sample<VecHit, Spectrum> {
+    match self.spectrum {
+      SurfaceProperty::Uniform(s) => sample.hemisphere_cosine().with_metadata(s),
+      SurfaceProperty::Texture(_) => todo!(),
+    }
+  }
+
+  pub fn sample_point_and_direction(
+    &self,
+    sampler: &Sampler,
+    _ctx: LightSampleContext,
+  ) -> Sample<Spectrum, LightSampleMetadata> {
+    let ps = self.geometry.sample_point(sampler.sample());
+    let point_prob = ps.prob;
+    ps.compose(|point, geometry| {
+      let hit2local = Quat::from_rotation_arc(Vec3::Z, geometry.normal.into());
+      let ds = self.sample_direction_at(point, sampler.sample());
+      let dir_prob = ds.prob;
+      ds.map_all(|hit, spec| {
+        (spec, LightSampleMetadata {
+          geometry,
+          point: self.transform().p2world(point),
+          direction: self.transform().v2world((hit2local * hit.xyz()).into()),
+          point_prob,
+          dir_prob,
+        })
+      })
+    })
   }
 }

@@ -23,7 +23,7 @@ impl Solver {
   pub fn render(&self, scene: &Scene, cam: &mut camera::Camera) {
     let rays = cam.init_rays();
     const SAMPLES: i32 = 128;
-    rays.into_par_iter().enumerate().for_each(|(i, ray)| {
+    rays.into_par_iter().enumerate().for_each(|(_i, ray)| {
       for _ in 0..SAMPLES {
         self.trace_camera_ray(scene, ray);
         ray.reset_direction();
@@ -49,7 +49,7 @@ impl Solver {
   fn trace_camera_ray(&self, scene: &Scene, ray: &mut CameraRay) {
     let mut throughput = Vec3::ONE;
     const BOUNCES: u32 = 1;
-    for b in 0..BOUNCES {
+    for _b in 0..BOUNCES {
       let Some(isect) = Self::closest_hit(scene, ray) else {
         // Infinite lights
         // println!("no hit, exiting {b}");
@@ -97,11 +97,7 @@ impl Solver {
   }
   pub(crate) fn hit_light(&self, scene: &Scene, ray: &dyn Castable) -> Option<Spectrum> {
     let light = &scene.lights[0];
-    if let Some(hit) = light.try_intersect(ray) {
-      Some(light.spectrum.get())
-    } else {
-      None
-    }
+    light.try_intersect(ray).map(|_hit| light.spectrum.get())
   }
   pub(crate) fn closest_hit<'a, C: Castable>(
     scene: &'a Scene,

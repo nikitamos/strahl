@@ -86,7 +86,7 @@ pub struct Plane {}
 pub struct Point {}
 
 impl Geometry for Point {
-  fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata> {
+  fn sample_point(&self, _state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata> {
     Sample {
       prob:     1.0,
       sample:   Vec3::ZERO.into(),

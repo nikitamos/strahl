@@ -34,9 +34,9 @@ pub trait BSDF {
   /// returns a Sample containing probability of such scattering event
   fn bsdf2(
     &self,
-    out: VecHit,
-    inc: VecHit,
-    ctx: BSDFSampleContext,
+    _out: VecHit,
+    _inc: VecHit,
+    _ctx: BSDFSampleContext,
   ) -> Option<Sample<Spectrum, BsdfMetadata>> {
     todo!()
   }

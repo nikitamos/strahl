@@ -12,7 +12,7 @@ pub struct Lambertian {
 }
 
 impl BSDF for Lambertian {
-  fn bsdf(&self, out: crate::VecHit, inc: crate::VecHit, tm: super::BSDFSampleContext) -> Spectrum {
+  fn bsdf(&self, out: crate::VecHit, inc: crate::VecHit, _tm: super::BSDFSampleContext) -> Spectrum {
     if out.z * inc.z < 0.0 {
       Spectrum::ZERO
     } else {
@@ -53,7 +53,7 @@ impl BSDF for Lambertian {
     })
   }
 
-  fn pdf(&self, out: crate::VecHit, inc: crate::VecHit, tm: super::BSDFSampleContext) -> f32 {
+  fn pdf(&self, out: crate::VecHit, inc: crate::VecHit, _tm: super::BSDFSampleContext) -> f32 {
     if out.z * inc.z < 0.0 {
       0.0
     } else {

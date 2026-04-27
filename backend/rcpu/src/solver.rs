@@ -130,6 +130,54 @@ impl Solver {
   }
 }
 
+pub struct BDPTParams<LT: PathTerminator, ET: PathTerminator> {
+  pub light_terminator: LT,
+  pub eye_terminator:   ET,
+  pub sample_count:     usize,
+}
+
+pub struct BidirectionalPathTracer<LT: PathTerminator, ET: PathTerminator> {
+  params:  BDPTParams<LT, ET>, // TODO: cache of subpaths?
+  sampler: Sampler,
+}
+
+impl<LT, ET> BidirectionalPathTracer<LT, ET>
+where
+  LT: PathTerminator,
+  ET: PathTerminator,
+{
+  pub fn render(&self, scene: &Scene, camera: &mut camera::Camera) {
+    let resolution = camera.resolution().as_uvec2();
+    let rays = camera.init_rays();
+    for s in 0..self.params.sample_count {
+      rays.into_par_iter().enumerate().for_each(|(px, ray)| {
+        let pixel = glam::uvec2(px as u32 % resolution.x, px as u32 / resolution.x);
+        let path = self.generate_pixel_path(scene, ray, pixel);
+        ray.color += path.eye.alpha;
+        // based on path add to vector
+        // so should we do something like
+        // sounds to easy here
+        // ray.color += path.mis_weight() * path.throughput()?
+      });
+    }
+  }
+  #[inline]
+  fn generate_pixel_path<'s>(
+    &self,
+    scene: &'s Scene,
+    ray: &mut CameraRay,
+    pixel: glam::UVec2,
+  ) -> BidirectionalPath<'s> {
+    BidirectionalPath::sample(
+      scene,
+      &self.sampler,
+      &self.params.eye_terminator,
+      &self.params.light_terminator,
+      ray,
+    )
+  }
+}
+
 pub struct LightRay {
   origin:    PointGlobal,
   direction: VecGlobal,
@@ -167,26 +215,27 @@ impl<'a> PathVertex<'a> {
   pub fn jacobian(&self) -> f32 { todo!() }
 }
 
-pub trait PathTerminationCondition {
+pub trait PathTerminator: Sync {
   fn should_terminate(&self, vertices: usize, gen_vertex: &PathVertex, sampler: &Sampler) -> bool;
 }
 
-impl<T> PathTerminationCondition for T
-where T: Fn(usize, &PathVertex, &Sampler) -> bool
+impl<T> PathTerminator for T
+where T: Fn(usize, &PathVertex, &Sampler) -> bool + Sync
 {
   fn should_terminate(&self, length: usize, last_vertex: &PathVertex, sampler: &Sampler) -> bool {
     self.call((length, last_vertex, sampler))
   }
 }
 
-impl PathTerminationCondition for usize {
+impl PathTerminator for usize {
   fn should_terminate(&self, length: usize, _last_vertex: &PathVertex, _sampler: &Sampler) -> bool {
     length >= *self
   }
 }
 
 pub struct BidirectionalPath<'a> {
-  vertices: Vec<PathSurface<'a>>,
+  light: Subpath<'a>,
+  eye:   Subpath<'a>,
 }
 
 pub struct Subpath<'a> {
@@ -195,15 +244,27 @@ pub struct Subpath<'a> {
   p:            f32,
 }
 
+impl<'a> Subpath<'a> {
+  pub fn len(&self) -> usize { self.vertices.len() }
+}
+
 impl<'a> BidirectionalPath<'a> {
-  pub fn sample(scene: &'a Scene, sampler: &Sampler, light_len: u32, camera_len: u32) -> Self {
+  pub fn sample(
+    scene: &'a Scene,
+    sampler: &Sampler,
+    camera_term: &(impl PathTerminator + ?Sized),
+    light_term: &(impl PathTerminator + ?Sized),
+    ray: &mut CameraRay,
+  ) -> Self {
+    let light = Self::sample_light_subpath(scene, sampler, light_term);
+    let eye = Self::sample_eye_subpath(scene, sampler, ray, light_term, glam::UVec2::ZERO);
     todo!()
   }
 
   pub fn sample_light_subpath(
     scene: &'a Scene,
     sampler: &Sampler,
-    term_cond: &(impl PathTerminationCondition + ?Sized),
+    term_cond: &(impl PathTerminator + ?Sized),
   ) -> Subpath<'a> {
     let source = scene.sample_any_light_source(sampler);
     let radiance = source
@@ -268,7 +329,7 @@ impl<'a> BidirectionalPath<'a> {
     scene: &'a Scene,
     sampler: &Sampler,
     init_ray: &mut CameraRay,
-    term_cond: &(impl PathTerminationCondition + ?Sized),
+    term_cond: &(impl PathTerminator + ?Sized),
     pixel: glam::UVec2,
   ) -> Subpath<'a> {
     const INITIAL_IMPORTANCE: Vec3 = Vec3::ONE;
@@ -318,6 +379,21 @@ impl<'a> BidirectionalPath<'a> {
       vertices: path,
       alpha:    importance_next,
       p:        prob_next,
+    }
+  }
+
+  pub fn mis_weight(&self) -> f32 { todo!() } // or should we return spectrum?
+  pub fn throughput(&self) -> Spectrum {
+    match (self.eye.len(), self.light.len()) {
+      (1, _) => {
+        todo!()
+      }
+      (_, 1) => {
+        todo!()
+      }
+      (_, _) => {
+        todo!()
+      }
     }
   }
 }

@@ -1,6 +1,7 @@
 #![feature(nonpoison_rwlock)]
 #![feature(sync_nonpoison)]
 #![feature(fn_traits)]
+#![feature(trait_alias)]
 
 use std::{
   marker::PhantomData,

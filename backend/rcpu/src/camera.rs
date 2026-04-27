@@ -113,4 +113,6 @@ impl Camera {
 
     &mut self.rays
   }
+
+  pub fn resolution(&self) -> glam::USizeVec2 { self.resolution }
 }

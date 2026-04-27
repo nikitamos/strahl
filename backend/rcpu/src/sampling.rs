@@ -1,4 +1,4 @@
-use rand::seq::IndexedRandom;
+use rand::{rand_core, seq::IndexedRandom};
 use rand_distr::{Distribution, Uniform};
 
 use crate::VecHit;
@@ -41,6 +41,10 @@ impl Sampler {
       prob:     1.0 / (slice.len() as f32),
       metadata: (),
     }
+  }
+  pub fn usize(&self, min: usize, max_exclusive: usize) -> usize {
+    let mut rng = rand::rng();
+    rand::random_range(min..max_exclusive)
   }
 }
 

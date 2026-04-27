@@ -2,10 +2,7 @@ use std::{fs::File, io::Write};
 
 use super::{Interaction, IntersectionContext, Scene, Spectrum};
 use crate::{
-  Castable, PointGlobal, Sample, Sampler,
-  camera::{self, CameraRay},
-  light::{LightSampleContext, LightSampleMetadata},
-  material::bsdf::BSDFSampleContext,
+  Castable, Point, PointGlobal, Sample, Sampler, camera::{self, CameraRay}, light::{LightSampleContext, LightSampleMetadata}, material::bsdf::BSDFSampleContext
 };
 use glam::{Vec3, Vec3Swizzles, Vec4Swizzles};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
@@ -22,7 +19,7 @@ impl Solver {
   }
   pub fn render(&self, scene: &Scene, cam: &mut camera::Camera) {
     let rays = cam.init_rays();
-    const SAMPLES: i32 = 128;
+    const SAMPLES: i32 = 16;
     rays.into_par_iter().enumerate().for_each(|(i, ray)| {
       for _ in 0..SAMPLES {
         self.trace_camera_ray(scene, ray);
@@ -70,7 +67,7 @@ impl Solver {
             // In hit space wi.z corresponds to dot(wi, normal)
             // Note that if using normal mapping that's generally not the case.
             let f = bsdf2.sample * cur_ray.z.abs(); // is this really *that* angle?
-            ray.color += throughput * f * light.sample / (light.prob) / 4.0;
+            ray.color += throughput * f * light.sample / (light.prob) / 4.0; // Why 4.0?
           }
         }
       // Sample a new direction
@@ -83,6 +80,34 @@ impl Solver {
       ray.origin = (isect.hit.point_global().xyz() + ray.direction * 0.0001).into();
     }
   }
+  
+  fn trace_mlt(&self, scene: &Scene, ray: &mut CameraRay) {
+    // Probably we'd like to create a path here?
+    // 1. Sample path
+    // 2.
+  }
+
+  #[allow(unused)]
+  fn mlt(&self, scene: &Scene, image: ()) {
+    let mut x = MLTPath::new_with_length(4, scene, MLTPathPolicy {  });
+    const MUTATIONS: u32 = 4;
+    for i in 0..MUTATIONS {
+      let y = x.mutate(&());
+      let a = y.prob;
+      if self.sampler.sample().uniform_1d < a {
+        x = y.sample;
+      }
+      // Pixels may be updating by filtering
+      todo!("record sample(image, x)");
+    }
+  }
+
+  #[allow(unused)]
+  fn mlt_init<'s>(&self, scene: &'s Scene, path_count: u32, retain: &mut [MLTPath<'s>]) {
+    
+  }
+
+
   fn sample_light(
     &self,
     scene: &Scene,
@@ -115,3 +140,96 @@ impl Solver {
       .min_by(|a, b| a.hit.ray_distance.partial_cmp(&b.hit.ray_distance).unwrap())
   }
 }
+
+struct MLTVertex(PointGlobal);
+
+impl MLTVertex {
+  pub fn global(&self) -> PointGlobal {
+    self.0
+  }
+}
+
+pub struct MLTPath<'a> {
+  scene: &'a Scene,
+  vertices: Vec<MLTVertex>
+}
+
+#[derive(Default)]
+pub struct MLTPathPolicy {
+
+}
+
+pub struct BidirectionalMutationProb {
+
+}
+
+pub enum ScatterEventType {
+  Diffuse, Specular
+}
+
+pub trait MutationStrategies {
+  fn bidirectional(&self, path: &mut MLTPath, sampler: &Sampler) -> f32 {
+    let last_del = sampler.usize(0, path.len());
+    let first_del = sampler.usize(0, last_del);
+
+    // new subpath len
+    let k = 2usize;
+    // Sample new subpath(s)
+    // Sample the BSDF at the endpoint and cast some rays...
+    // OR IF the subpath is terminal, sample a point at lens or light source.
+
+    // Join the subpaths or reject the mutation
+    // regeneration may be required?
+    todo!()
+  }
+
+  fn lens_perturbation(&self, path: &mut MLTPath, sampler: &Sampler) -> f32 {
+
+    todo!()
+  }
+
+  fn caustics_perturbation(&self, path: &mut MLTPath, sampler: &Sampler) -> f32 {
+
+    todo!()
+  }
+}
+
+impl MutationStrategy for () {
+
+}
+
+impl<'a> MLTPath<'a> {
+  pub fn len(&self) -> usize {
+    0
+  }
+  pub fn mutate(&self, strategy: &impl MutationStrategy) -> Sample<MLTPath<'a>> {
+    todo!()
+  }
+
+  pub fn acceptance_prob(&self) -> f32 {
+    todo!()
+  }
+
+  pub fn f(&self) -> f32 {
+    todo!()
+  }
+
+  pub fn new_with_length(length: u32, scene: &Scene, policy: MLTPathPolicy) -> Self {
+    todo!()
+  }
+
+  pub fn a(x: &Self, y: &Self) -> f32{
+    (y.f() * Self::t(y, x) / x.f() / Self::t(x, y)).min(1.0)
+  }
+
+  pub fn t(x: &Self, y: &Self) -> f32{
+    todo!()
+  }
+}
+
+// K(x, y) is Markov chain kernel:
+// \forall x \in \Omega \int_\Omega K(x \to y) \dd \mu(y) = 1 
+// p_i(x) = \int_\Omega K(x \to y) p_{i-1}(y) \dd \mu(y)
+// p_i converges to certain density function p^* (stationary distr) independently of ICs.
+
+// detailed balance -- what is it?

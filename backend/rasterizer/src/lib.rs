@@ -111,7 +111,9 @@ impl Rasterizer {
       sample_count:    1,
       dimension:       wgpu::TextureDimension::D2,
       format:          wgpu::TextureFormat::Rgba8Unorm,
-      usage:           wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::TEXTURE_BINDING,
+      usage:           wgpu::TextureUsages::RENDER_ATTACHMENT
+        | wgpu::TextureUsages::COPY_SRC
+        | wgpu::TextureUsages::TEXTURE_BINDING,
       view_formats:    vec![wgpu::TextureFormat::Rgba8Unorm],
     });
     let depth = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
@@ -183,7 +185,7 @@ impl Rasterizer {
           height: state.viewport.y,
           present_mode: wgpu::PresentMode::AutoVsync,
           desired_maximum_frame_latency: 2,
-          alpha_mode: wgpu::CompositeAlphaMode::Opaque,
+          alpha_mode: wgpu::CompositeAlphaMode::Inherit,
           view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
         });
 
@@ -267,6 +269,7 @@ impl Rasterizer {
         occlusion_query_set: None,
         multiview_mask: None,
       });
+      // pass.set_viewport(200.0, 200.0, 200.0, 150.0, 0.0, 1.0);
       pass.set_bind_group(0, self.manager.uniforms().bind_group(), &[]);
       for body in scene.bodies() {
         body.draw(&mut pass);
@@ -288,9 +291,12 @@ impl Rasterizer {
   }
 
   fn copy_to_presenter(&self, encoder: &mut wgpu::CommandEncoder) -> PresentationResult<'_> {
-    self
-      .presenter
-      .present(self.target.texture(), encoder, self.info.viewport)
+    self.presenter.present(
+      self.target.texture(),
+      encoder,
+      self.info.viewport,
+      glam::uvec4(200, 200, 200, 150),
+    )
   }
 
   pub fn required_features() -> wgpu::Features {

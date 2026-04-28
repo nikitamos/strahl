@@ -1,9 +1,12 @@
 use std::{cell::Cell, slice};
 
-use crate::gpu_alloc::Allocator;
+use crate::{
+  gpu_alloc::Allocator,
+  limne::{self, RenderTarget},
+};
 
-use ash::vk;
-use glam::UVec2;
+use ash::vk::{self, BlitImageInfo2};
+use glam::{UVec2, UVec4, Vec4};
 use wgpu::{hal::vulkan as wgvk, naga::back};
 
 pub(crate) trait Presenter: Send {
@@ -21,7 +24,8 @@ pub(crate) trait Presenter: Send {
     &self,
     backbuffer: &wgpu::Texture,
     encoder: &mut wgpu::CommandEncoder,
-    viewport: UVec2,
+    tex_dim: UVec2,
+    viewport: UVec4,
   ) -> PresentationResult<'_>;
 }
 
@@ -67,7 +71,8 @@ impl Presenter for MappedPresenter {
     &self,
     backbuffer: &wgpu::Texture,
     encoder: &mut wgpu::CommandEncoder,
-    viewport: UVec2,
+    tex_dim: UVec2,
+    viewport: UVec4,
   ) -> PresentationResult<'_> {
     encoder.copy_texture_to_texture(
       wgpu::TexelCopyTextureInfo {
@@ -83,8 +88,8 @@ impl Presenter for MappedPresenter {
         aspect:    wgpu::TextureAspect::All,
       },
       wgpu::Extent3d {
-        width:                 viewport.x,
-        height:                viewport.y,
+        width:                 tex_dim.x,
+        height:                tex_dim.y,
         depth_or_array_layers: 1,
       },
     );
@@ -229,7 +234,8 @@ impl Presenter for TexturePresenter {
     &self,
     backbuffer: &wgpu::Texture,
     encoder: &mut wgpu::CommandEncoder,
-    viewport: UVec2,
+    tex_dim: UVec2,
+    viewport: UVec4,
   ) -> PresentationResult<'_> {
     encoder.copy_texture_to_texture(
       wgpu::TexelCopyTextureInfo {
@@ -245,8 +251,8 @@ impl Presenter for TexturePresenter {
         aspect:    wgpu::TextureAspect::All,
       },
       wgpu::Extent3d {
-        width:                 viewport.x,
-        height:                viewport.y,
+        width:                 tex_dim.x,
+        height:                tex_dim.y,
         depth_or_array_layers: 1,
       },
     );
@@ -256,20 +262,37 @@ impl Presenter for TexturePresenter {
 
 pub(crate) struct SurfacePresenter<'window> {
   surface: wgpu::Surface<'window>,
-  blitter: wgpu::util::TextureBlitter,
+  drawer:  limne::TextureDrawer,
   device:  wgpu::Device,
   texture: Cell<Option<wgpu::SurfaceTexture>>,
 }
 
 impl<'w> SurfacePresenter<'w> {
   pub fn new(surface: wgpu::Surface<'w>, device: wgpu::Device) -> Self {
-    let blitter =
-      wgpu::util::TextureBlitter::new(&device, surface.get_configuration().unwrap().format);
+    let drawer = limne::TextureDrawer::new(
+      &device,
+      &wgpu::TextureFormat::Bgra8Unorm,
+      limne::TextureDrawerInitRes {
+        blend: Some(wgpu::BlendState {
+          color: wgpu::BlendComponent {
+            src_factor: wgpu::BlendFactor::SrcAlpha,
+            dst_factor: wgpu::BlendFactor::DstAlpha,
+            operation:  wgpu::BlendOperation::Add,
+          },
+          alpha: wgpu::BlendComponent {
+            src_factor: wgpu::BlendFactor::One,
+            dst_factor: wgpu::BlendFactor::One,
+            operation:  wgpu::BlendOperation::Add,
+          },
+        }),
+        ..Default::default()
+      },
+    );
     Self {
       surface,
-      blitter,
       device,
       texture: Cell::new(None),
+      drawer,
     }
   }
 }
@@ -285,7 +308,8 @@ impl<'w> Presenter for SurfacePresenter<'w> {
     &self,
     backbuffer: &wgpu::Texture,
     encoder: &mut wgpu::CommandEncoder,
-    _viewport: UVec2,
+    tex_dim: UVec2,
+    viewport: UVec4,
   ) -> PresentationResult<'_> {
     let tex = match self.surface.get_current_texture() {
       wgpu::CurrentSurfaceTexture::Timeout => {
@@ -314,14 +338,77 @@ impl<'w> Presenter for SurfacePresenter<'w> {
       }
       wgpu::CurrentSurfaceTexture::Success(tex) => tex,
     };
-    self.blitter.copy(
-      &self.device,
-      encoder,
-      &backbuffer.create_view(&Default::default()),
-      &tex.texture.create_view(&Default::default()),
-    );
+
+    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+      label: Some("present pass"),
+      color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+        view:           &tex.texture.create_view(&Default::default()),
+        depth_slice:    None,
+        resolve_target: None,
+        ops:            wgpu::Operations {
+          load:  wgpu::LoadOp::Load,
+          store: wgpu::StoreOp::Store,
+        },
+      })],
+      depth_stencil_attachment: None,
+      timestamp_writes: None,
+      occlusion_query_set: None,
+      multiview_mask: None,
+    });
+    // pass.set_scissor_rect(viewport.x, viewport.y, viewport.z, viewport.w);
+    self
+      .drawer
+      .render_into_pass(&mut pass, &limne::TextureDrawerResources {
+        src:         &backbuffer.create_view(&Default::default()),
+        bind_groups: &[],
+        device:      &self.device,
+      });
+
     self.texture.set(Some(tex));
     PresentationResult::Submitted
   }
   fn post_submit(&self) { self.texture.take().map(|t| t.present()); }
+}
+
+#[cfg(false)]
+impl<'w> SurfacePresenter<'w> {
+  fn vulkan_blit(
+    src: vk::Image,
+    dst: vk::Image,
+    dev: &ash::Device,
+    command_buffer: &vk::CommandBuffer,
+  ) {
+    let region = vk::ImageBlit2::default()
+      .dst_offsets([vk::Offset3D::default(), vk::Offset3D {
+        x: 1212,
+        y: 1212,
+        z: 1212,
+      }])
+      .src_offsets([vk::Offset3D::default(), vk::Offset3D {
+        x: 1212,
+        y: 1212,
+        z: 1212,
+      }])
+      .src_subresource(vk::ImageSubresourceLayers {
+        aspect_mask:      vk::ImageAspectFlags::COLOR,
+        mip_level:        0,
+        base_array_layer: 0,
+        layer_count:      1,
+      })
+      .dst_subresource(vk::ImageSubresourceLayers {
+        aspect_mask:      vk::ImageAspectFlags::COLOR,
+        mip_level:        0,
+        base_array_layer: 0,
+        layer_count:      1,
+      });
+
+    let info = vk::BlitImageInfo2::default()
+      .src_image(src)
+      .src_image_layout(todo!())
+      .dst_image(dst)
+      .dst_image_layout(todo!())
+      .regions(&[region])
+      .filter(vk::Filter::LINEAR);
+    unsafe { dev.cmd_blit_image2(*command_buffer, &info) }
+  }
 }

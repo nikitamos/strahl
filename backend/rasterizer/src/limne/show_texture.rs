@@ -1,7 +1,9 @@
+use std::cell::Cell;
+
 use crate::limne::render_target::{ExternalResources, RenderTarget};
 use wgpu::{
   AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
-  BindGroupLayoutEntry, DepthStencilState, Device, FilterMode, FragmentState, Sampler,
+  BindGroupLayoutEntry, BlendState, DepthStencilState, Device, FilterMode, FragmentState, Sampler,
   SamplerDescriptor, ShaderStages, TextureView,
 };
 
@@ -31,13 +33,14 @@ pub struct TextureDrawer {
   sampler:  Sampler,
   pipeline: wgpu::RenderPipeline,
   layout:   BindGroupLayout,
-  bg:       BindGroup,
+  bg:       Cell<Option<BindGroup>>,
 }
 
 pub struct TextureDrawerResources<'a> {
-  pub texture:     &'a TextureView,
+  pub src:         &'a TextureView,
   /// Bind groups for custom shading. The first group here has index `1`.
   pub bind_groups: &'a [&'a BindGroup],
+  pub device:      &'a wgpu::Device, // pub blend:       Option<BlendState>,
 }
 impl<'a> ExternalResources<'a> for TextureDrawerResources<'a> {}
 
@@ -48,7 +51,6 @@ impl TextureDrawer {
     device: &Device,
     tex: &TextureView,
   ) -> BindGroup {
-    
     device.create_bind_group(&BindGroupDescriptor {
       label: None,
       layout,
@@ -65,16 +67,23 @@ impl TextureDrawer {
     })
   }
   pub fn resized(&mut self, device: &Device, texture: &TextureView) {
-    self.bg = Self::create_bg(&self.layout, &self.sampler, device, texture);
+    self.bg = Cell::new(Some(Self::create_bg(
+      &self.layout,
+      &self.sampler,
+      device,
+      texture,
+    )));
   }
 }
 
+#[derive(Default)]
 pub struct TextureDrawerInitRes<'a> {
   pub stencil:         Option<DepthStencilState>,
   pub fragment:        Option<FragmentState<'a>>,
   /// The first bind group here has `1` index
   pub layout:          &'a [BindGroupLayout],
   pub unclipped_depth: bool,
+  pub blend:           Option<wgpu::BlendState>,
 }
 
 impl<'a> RenderTarget<'a> for TextureDrawer {
@@ -92,19 +101,23 @@ impl<'a> RenderTarget<'a> for TextureDrawer {
   }
 
   fn render_into_pass(&self, pass: &mut wgpu::RenderPass, resources: &'a Self::RenderResources) {
+    let mut opt_bg = self.bg.take();
+    let bg = opt_bg.get_or_insert_with(|| {
+      Self::create_bg(&self.layout, &self.sampler, resources.device, resources.src)
+    });
     pass.set_pipeline(&self.pipeline);
-    pass.set_bind_group(0, &self.bg, &[]);
+    pass.set_bind_group(0, bg as &BindGroup, &[]);
     for (i, &g) in resources.bind_groups.iter().enumerate() {
       pass.set_bind_group((i + 1) as u32, g, &[]);
     }
     pass.draw(0..4, 0..1);
+    self.bg.replace(opt_bg);
   }
 }
 
 impl TextureDrawer {
   pub fn new(
     device: &wgpu::Device,
-    resources: &TextureDrawerResources,
     format: &wgpu::TextureFormat,
     mut init_res: TextureDrawerInitRes,
   ) -> Self {
@@ -175,7 +188,7 @@ impl TextureDrawer {
         compilation_options: Default::default(),
         targets:             &[Some(wgpu::ColorTargetState {
           format:     *format,
-          blend:      Some(wgpu::BlendState::REPLACE),
+          blend:      init_res.blend,
           write_mask: wgpu::ColorWrites::all(),
         })],
       })),
@@ -200,7 +213,7 @@ impl TextureDrawer {
 
     Self {
       pipeline,
-      bg: Self::create_bg(&layout, &sampler, device, resources.texture),
+      bg: Cell::new(None),
       layout,
       sampler,
     }

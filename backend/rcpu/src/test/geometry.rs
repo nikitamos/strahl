@@ -16,7 +16,7 @@ impl Castable for TestRay {
 mod sphere {
   use std::assert_matches;
 
-  use glam::{Mat4, Vec3, Vec4};
+  use glam::{Mat4, Vec3};
 
   use crate::{Geometry, PointLocal, Sphere, SurfaceHit, Transform, test::geometry::TestRay};
 
@@ -33,7 +33,7 @@ mod sphere {
       },
       &ray,
     );
-    const POINT: PointLocal = PointLocal::new(Vec4::new(0., 1., 0., 1.));
+    const POINT: PointLocal = PointLocal::new(Vec3::new(0.0, 1.0, 0.0));
     assert_matches!(
       isect,
       Some(SurfaceHit {
@@ -72,7 +72,7 @@ mod sphere {
       },
       &ray,
     );
-    const POINT: PointLocal = PointLocal::new(Vec4::new(0., 1., 0., 1.));
+    const POINT: PointLocal = PointLocal::new(Vec3::new(0.0, 1.0, 0.0));
     assert_matches!(
       isect,
       Some(SurfaceHit {
@@ -96,7 +96,7 @@ mod sphere {
       },
       &ray,
     );
-    const POINT: PointLocal = PointLocal::new(Vec4::new(1., 0., 0., 1.));
+    const POINT: PointLocal = PointLocal::new(Vec3::new(1.0, 0.0, 0.0));
     assert_matches!(
       isect,
       Some(SurfaceHit {

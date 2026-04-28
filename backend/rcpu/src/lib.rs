@@ -9,7 +9,7 @@ use std::{
 };
 
 mod points;
-use glam::{Mat4, Quat, USizeVec2, Vec3, Vec4Swizzles};
+use glam::{Mat4, Quat, USizeVec2, Vec3, Vec3Swizzles};
 pub use points::*;
 mod sampling;
 
@@ -180,7 +180,7 @@ pub struct TransformParts {
 impl TransformParts {
   pub fn w2l_matrix(&self) -> Mat4 {
     let mut res = Mat4::from_quat(self.rotation);
-    res.w_axis = self.pos.into();
+    res.w_axis = self.pos.extend(1.0);
     res.w_axis *= -1f32;
     res.w_axis.w = 1.0;
     res

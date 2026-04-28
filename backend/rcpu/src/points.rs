@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use glam::{Vec3, Vec4Swizzles};
+use glam::Vec3;
 
 macro_rules! vec_wrapper {
   {
@@ -39,38 +39,12 @@ macro_rules! vec_wrapper {
 
 vec_wrapper! {
   /// Type-safe wrapper around point in geometry space
-  PointLocal => glam::Vec4
-}
-
-impl PointLocal {
-  #[deprecated]
-  pub fn into_global(self, l2g: glam::Mat4) -> PointGlobal { PointGlobal(l2g * self.0) }
-}
-
-impl From<PointLocal> for glam::Vec3 {
-  fn from(value: PointLocal) -> Self { value.0.xyz() }
-}
-
-impl From<glam::Vec3> for PointLocal {
-  fn from(value: glam::Vec3) -> Self { PointLocal(glam::vec4(value.x, value.y, value.z, 1.0)) }
+  PointLocal => glam::Vec3
 }
 
 vec_wrapper! {
   /// Type-safe wrapper around point in world coordinates
-  PointGlobal => glam::Vec4
-}
-
-impl PointGlobal {
-  #[deprecated]
-  pub fn into_local(self, g2l: glam::Mat4) -> PointLocal { PointLocal(g2l * self.0) }
-}
-
-impl From<PointGlobal> for glam::Vec3 {
-  fn from(value: PointGlobal) -> Self { value.0.xyz() }
-}
-
-impl From<glam::Vec3> for PointGlobal {
-  fn from(value: glam::Vec3) -> Self { PointGlobal(glam::vec4(value.x, value.y, value.z, 1.0)) }
+  PointGlobal => glam::Vec3
 }
 
 vec_wrapper! {

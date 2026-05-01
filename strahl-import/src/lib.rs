@@ -1,4 +1,5 @@
 #![doc = include_str!("../README.md")]
+#![feature(file_buffered)]
 use std::{fs::File, io::Write};
 
 use image::codecs::png::PngEncoder;

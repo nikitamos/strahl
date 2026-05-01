@@ -100,7 +100,7 @@ impl Scene {
     if let Some((skybox, pipeline)) = &self.skybox {
       pass.set_pipeline(pipeline);
       pass.set_bind_group(1, skybox.bind_group(), &[]);
-      pass.draw(0..4, 0..1);
+      pass.draw(0..14, 0..1);
     }
   }
   pub fn add_body(&mut self, geometry: Arc<Geometry>, material: Arc<Material>) -> Arc<Body> {

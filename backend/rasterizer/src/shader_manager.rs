@@ -173,7 +173,7 @@ impl ShaderManager {
         depth_stencil:  Some(wgpu::DepthStencilState {
           format:              self.depth_format,
           depth_write_enabled: Some(true),
-          depth_compare:       Some(wgpu::CompareFunction::Equal),
+          depth_compare:       Some(wgpu::CompareFunction::LessEqual),
           stencil:             wgpu::StencilState::default(),
           bias:                wgpu::DepthBiasState::default(),
         }),

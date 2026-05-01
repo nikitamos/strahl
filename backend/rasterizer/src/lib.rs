@@ -292,10 +292,10 @@ impl Rasterizer {
     log::trace!("work submitted to the GPU");
 
     // TODO: wait asynchronously (?)
-    let _ = self.dev.poll(wgpu::wgt::PollType::Wait {
-      submission_index: Some(index),
-      timeout:          None,
-    });
+    // let _ = self.dev.poll(wgpu::wgt::PollType::Wait {
+    //   submission_index: Some(index),
+    //   timeout:          None,
+    // });
 
     let end = SystemTime::now();
     let dur = end.duration_since(begin).unwrap().as_millis_f32();

@@ -85,12 +85,14 @@ pub async fn true_main() -> anyhow::Result<()> {
   })
   .await?;
   let loader = strahl.asset_loader();
-  // let material = strahl.load_material("../../../strahl-import/assets/gas.zip")?;
-  // let geometry = strahl.load_mesh("../../../strahl-import/assets/lava/Lava.gltf")?;
+  let material =
+    loader.load_material("/HDD/home/nikita/BSUIR/strahl/strahl-import/assets/gas.zip")?;
+  let geometry =
+    loader.load_mesh("/HDD/home/nikita/BSUIR/strahl/strahl-import/assets/lava/Lava.gltf")?;
   let mut scene = strahl.create_scene();
-  let skybox = loader.load_skybox("/HDD/home/nikita/BSUIR/ExoplanetsCatalog/assets/skybox")?;
+  let skybox = loader.load_skybox("/HDD/home/nikita/BSUIR/ExoplanetsCatalog/assets/starbox")?;
   scene.set_skybox(skybox);
-  // let _body = scene.add_body(geometry, material);
+  let _body = scene.add_body(geometry, material);
   let aspect = (size.x as f32) / (size.y as f32);
   const POINTS: usize = 10;
   for i in 0..POINTS {

@@ -1,4 +1,4 @@
-[vk::binding(1,0)]
+[vk::binding(0,1)]
 uniform TextureCube skybox;
 [vk::binding(1,1)]
 uniform SamplerState sampler;

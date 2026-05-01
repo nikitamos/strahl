@@ -1,8 +1,8 @@
-use image::RgbImage;
+use image::RgbaImage;
 use strahl_import::reader::{Cubemap, CubemapImages};
 use strahl_types::with;
 
-use crate::shader_manager::{ShaderEntryPoint, ShaderManager};
+use crate::shader_manager::ShaderEntryPoint;
 
 pub struct Skybox {
   texture: wgpu::Texture,
@@ -30,20 +30,20 @@ impl Skybox {
       },
       mip_level_count: 1,
       sample_count:    1,
-      dimension:       wgpu::TextureDimension::D3,
+      dimension:       wgpu::TextureDimension::D2,
       format:          wgpu::TextureFormat::Rgba8Unorm,
       usage:           wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
       view_formats:    &[],
     });
 
-    let imgs: [RgbImage; 6] = imgs.into();
+    let imgs: [RgbaImage; 6] = imgs.into();
     let origin = wgpu::Origin3d::ZERO;
     let dim = imgs[0].width();
     for i in 0..6 {
       queue.write_texture(
         wgpu::TexelCopyTextureInfoBase {
           texture:   &texture,
-          mip_level: 1,
+          mip_level: 0,
           origin:    with!(origin: z = i as u32),
           aspect:    wgpu::TextureAspect::All,
         },
@@ -98,7 +98,12 @@ impl Skybox {
       entries: &[
         wgpu::BindGroupEntry {
           binding:  0,
-          resource: wgpu::BindingResource::TextureView(&texture.create_view(&Default::default())),
+          resource: wgpu::BindingResource::TextureView(&texture.create_view(
+            &wgpu::TextureViewDescriptor {
+              dimension: Some(wgpu::TextureViewDimension::Cube),
+              ..Default::default()
+            },
+          )),
         },
         wgpu::BindGroupEntry {
           binding:  1,

@@ -284,6 +284,7 @@ impl Rasterizer {
       for body in scene.bodies() {
         body.draw(&mut pass);
       }
+      scene.draw_skybox(&mut pass);
     }
     let res = self.copy_to_presenter(&mut encoder);
     let index = self.queue.submit(std::iter::once(encoder.finish()));

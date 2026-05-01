@@ -1,9 +1,15 @@
 use std::sync::{Arc, RwLock};
 
 use glam::Mat4;
+use wgpu::RenderPipeline;
 use zerocopy::IntoBytes;
 
-use crate::{geometry::Geometry, material::Material, shader_manager::ShaderManager};
+use crate::{
+  geometry::Geometry,
+  material::Material,
+  shader_manager::ShaderManager,
+  skybox::{self, Skybox},
+};
 
 #[repr(C)]
 #[derive(Clone)]
@@ -72,6 +78,7 @@ impl Body {
 pub struct Scene {
   bodies:  Vec<Arc<Body>>,
   manager: Arc<ShaderManager>,
+  skybox:  Option<(Arc<Skybox>, wgpu::RenderPipeline)>,
 }
 
 impl Scene {
@@ -79,6 +86,21 @@ impl Scene {
     Self {
       bodies: vec![],
       manager,
+      skybox: None,
+    }
+  }
+  pub fn set_skybox(&mut self, skybox: Arc<Skybox>) {
+    let pipeline = self.manager.create_pipeline_for_skybox(&skybox);
+    self.skybox = Some((skybox, pipeline));
+  }
+  pub fn take_skybox(&mut self, skybox: Arc<Skybox>) -> Option<Arc<Skybox>> {
+    self.skybox.take().map(|x| x.0)
+  }
+  pub fn draw_skybox(&self, pass: &mut wgpu::RenderPass) {
+    if let Some((skybox, pipeline)) = &self.skybox {
+      pass.set_pipeline(pipeline);
+      pass.set_bind_group(1, skybox.bind_group(), &[]);
+      pass.draw(0..4, 0..1);
     }
   }
   pub fn add_body(&mut self, geometry: Arc<Geometry>, material: Arc<Material>) -> Arc<Body> {

@@ -1,4 +1,4 @@
-@binding(1) @group(0) var skybox_0 : texture_cube<f32>;
+@binding(0) @group(1) var skybox_0 : texture_cube<f32>;
 
 @binding(1) @group(1) var sampler_0 : sampler;
 

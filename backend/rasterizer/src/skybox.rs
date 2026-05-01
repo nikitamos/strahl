@@ -21,11 +21,13 @@ impl Skybox {
   }
 
   pub fn from_images(imgs: CubemapImages, device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
+    let imgs: [RgbaImage; 6] = imgs.into();
+    let dim = imgs[0].width();
     let texture = device.create_texture(&wgpu::TextureDescriptor {
       label:           Some("skybox"),
       size:            wgpu::Extent3d {
-        width:                 512,
-        height:                512,
+        width:                 dim,
+        height:                dim,
         depth_or_array_layers: 6,
       },
       mip_level_count: 1,
@@ -36,9 +38,7 @@ impl Skybox {
       view_formats:    &[],
     });
 
-    let imgs: [RgbaImage; 6] = imgs.into();
     let origin = wgpu::Origin3d::ZERO;
-    let dim = imgs[0].width();
     for i in 0..6 {
       queue.write_texture(
         wgpu::TexelCopyTextureInfoBase {
@@ -89,7 +89,7 @@ impl Skybox {
       address_mode_v: wgpu::AddressMode::ClampToEdge,
       address_mode_w: wgpu::AddressMode::ClampToEdge,
       mag_filter: wgpu::FilterMode::Linear,
-      min_filter: wgpu::FilterMode::Nearest,
+      min_filter: wgpu::FilterMode::Linear,
       ..Default::default()
     });
     let group = device.create_bind_group(&wgpu::BindGroupDescriptor {

@@ -37,7 +37,7 @@ impl AssetLoader {
   }
 
   pub fn load_skybox(&self, path: impl AsRef<Path>) -> anyhow::Result<Arc<Skybox>> {
-    let cubemap = Cubemap::read_from_dir_png(path, false)?;
+    let cubemap = Cubemap::read_from_dir_png(self.get_path(path.as_ref()), false)?;
     Ok(Arc::new(Skybox::from_cubemap(
       cubemap,
       &self.dev,

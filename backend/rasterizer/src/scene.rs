@@ -108,5 +108,16 @@ impl Scene {
     self.bodies.push(res.clone());
     res
   }
+  pub fn remove_body(&mut self, body: &Arc<Body>) {
+    let item = self
+      .bodies
+      .iter()
+      .find(|x| Arc::as_ptr(x) == Arc::as_ptr(&body));
+    if let Some(element) = item {
+      log::info!("removing the body!");
+      let index = self.bodies.element_offset(element).unwrap();
+      self.bodies.remove(index);
+    }
+  }
   pub(crate) fn bodies(&self) -> &[Arc<Body>] { &self.bodies }
 }

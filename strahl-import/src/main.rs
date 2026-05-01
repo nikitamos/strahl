@@ -51,7 +51,7 @@ enum Commands {
   ValidateCubemap {
     /// Path to the directory containing cubemap images
     dir:       PathBuf,
-    /// Transcode non-RGB8 images to RGB8
+    /// Transcode non-RGBA8 images to RGBA8
     #[arg(long)]
     transcode: bool,
   },

@@ -6,13 +6,11 @@ use std::{
 };
 
 use anyhow::{Context, anyhow, bail};
-use clap::error;
 use gltf::{
   Accessor,
   accessor::{DataType, Dimensions},
-  buffer::{self, Target},
 };
-use image::{DynamicImage, RgbImage};
+use image::{DynamicImage, RgbaImage};
 use ktx2_rw::Ktx2Texture;
 use zip::ZipArchive;
 
@@ -283,16 +281,16 @@ impl GltfGeometry {
 
 #[derive(Debug)]
 pub struct CubemapImages {
-  pub x_plus:  RgbImage,
-  pub x_minus: RgbImage,
-  pub y_plus:  RgbImage,
-  pub y_minus: RgbImage,
-  pub z_plus:  RgbImage,
-  pub z_minus: RgbImage,
+  pub x_plus:  RgbaImage,
+  pub x_minus: RgbaImage,
+  pub y_plus:  RgbaImage,
+  pub y_minus: RgbaImage,
+  pub z_plus:  RgbaImage,
+  pub z_minus: RgbaImage,
 }
 
-impl From<[RgbImage; 6]> for CubemapImages {
-  fn from(images: [RgbImage; 6]) -> Self {
+impl From<[RgbaImage; 6]> for CubemapImages {
+  fn from(images: [RgbaImage; 6]) -> Self {
     let [x_plus, x_minus, y_plus, y_minus, z_plus, z_minus] = images;
     CubemapImages {
       x_plus,
@@ -305,7 +303,7 @@ impl From<[RgbImage; 6]> for CubemapImages {
   }
 }
 
-impl From<CubemapImages> for [RgbImage; 6] {
+impl From<CubemapImages> for [RgbaImage; 6] {
   fn from(cubemap: CubemapImages) -> Self {
     [
       cubemap.x_plus,
@@ -334,7 +332,7 @@ impl Cubemap {
   ];
   pub fn read_from_dir_png(cubemap_dir: impl AsRef<Path>, transcode: bool) -> anyhow::Result<Self> {
     let paths = Self::FACE_FILES;
-    let mut images: [Option<RgbImage>; 6] = Default::default();
+    let mut images: [Option<RgbaImage>; 6] = Default::default();
     // 0 is invalid dimension for PNG file
     let mut width = 0;
     for (i, fname) in paths.into_iter().enumerate() {
@@ -347,14 +345,14 @@ impl Cubemap {
       Self::validate_square(&img, &path, cubemap_dir.as_ref())?;
       Self::validate_dim(&img, &mut width, cubemap_dir.as_ref())?;
 
-      if let DynamicImage::ImageRgb8(buf) = img {
+      if let DynamicImage::ImageRgba8(buf) = img {
         images[i] = Some(buf);
       } else if transcode {
         log::warn!(
-          "Image {} is in invalid format; transcoding to RGB8",
+          "Image {} is in invalid format; transcoding to RGBA8",
           path.display()
         );
-        let buf = img.into_rgb8();
+        let buf = img.into_rgba8();
         let mut writer = File::create_buffered(path)
           .inspect_err(|e| log::error!("Transcoding error: failed to open file ({e})"))
           .context("transcoding error")?;
@@ -365,12 +363,12 @@ impl Cubemap {
         images[i] = Some(buf);
       } else {
         log::error!(
-          "Cubemap {} is invalid: {} has non-RGB8 pixel format",
+          "Cubemap {} is invalid: {} has non-RGBA8 pixel format",
           cubemap_dir.as_ref().display(),
           fname
         );
         bail!(
-          "Cubemap {} is invalid: there is non-RGB8 image",
+          "Cubemap {} is invalid: there is non-RGBA8 image",
           cubemap_dir.as_ref().display()
         );
       }

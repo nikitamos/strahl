@@ -85,6 +85,12 @@ struct WgpuState {
 }
 
 impl Rasterizer {
+  pub fn info(&self) -> &RasterizerStateInfo {
+    &self.info
+  }
+  pub fn info_mut(&mut self) -> &mut RasterizerStateInfo {
+    &mut self.info
+  }
   pub async fn new(
     RasterizerCreateInfo {
       state: info,

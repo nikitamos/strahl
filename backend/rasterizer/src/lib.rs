@@ -1,12 +1,19 @@
-#![deny(clippy::all)]
-#![allow(dead_code)]
 #![feature(associated_type_defaults)]
 #![feature(duration_millis_float)]
-#![feature(rwlock_downgrade)]
+#![feature(sync_nonpoison)]
+#![feature(nonpoison_rwlock)]
 #![deny(clippy::all)]
 #![allow(dead_code)]
 
-use std::{ffi::CStr, path::Path, sync::Arc, time::SystemTime};
+use std::{
+  ffi::CStr,
+  path::Path,
+  sync::{
+    Arc,
+    nonpoison::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+  },
+  time::SystemTime,
+};
 
 use anyhow::anyhow;
 use ash::vk;
@@ -31,7 +38,8 @@ pub struct Rasterizer {
   target:    limne::TextureProvider,
   drawer:    Option<limne::TextureDrawer>,
   manager:   Arc<ShaderManager>,
-  info:      RasterizerStateInfo,
+  info:      RwLock<RasterizerStateInfo>,
+  loader:    loader::AssetLoader,
   depth:     limne::TextureProvider,
 }
 
@@ -85,8 +93,8 @@ struct WgpuState {
 }
 
 impl Rasterizer {
-  pub fn info(&self) -> &RasterizerStateInfo { &self.info }
-  pub fn info_mut(&mut self) -> &mut RasterizerStateInfo { &mut self.info }
+  pub fn info(&self) -> RwLockReadGuard<'_, RasterizerStateInfo> { self.info.read() }
+  pub fn info_mut(&self) -> RwLockWriteGuard<'_, RasterizerStateInfo> { self.info.write() }
   pub async fn new(
     RasterizerCreateInfo {
       state: info,
@@ -142,12 +150,13 @@ impl Rasterizer {
     Ok(Rasterizer {
       i: instance,
       presenter,
+      loader: loader::AssetLoader::new(dev.clone(), queue.clone()),
       queue,
       drawer: None,
       dev,
       target,
       manager,
-      info,
+      info: RwLock::new(info),
       depth,
     })
   }
@@ -187,7 +196,7 @@ impl Rasterizer {
           height: state.viewport.y,
           present_mode: wgpu::PresentMode::AutoVsync,
           desired_maximum_frame_latency: 2,
-          alpha_mode: wgpu::CompositeAlphaMode::Inherit,
+          alpha_mode: wgpu::CompositeAlphaMode::Opaque,
           view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
         });
 
@@ -220,22 +229,19 @@ impl Rasterizer {
   }
 
   pub fn create_scene(&self) -> Scene { Scene::new(Arc::clone(&self.manager)) }
+  #[deprecated(note = "Use AssetLoader to load materials")]
   pub fn load_material(&self, path: impl AsRef<Path>) -> anyhow::Result<Arc<Material>> {
-    let imported = strahl_import::reader::Material::read(path)?;
-    Ok(Arc::new(Material::from_imported(
-      &self.dev,
-      &self.queue,
-      imported,
-    )))
+    self.loader.load_material(path)
   }
+  #[deprecated(note = "Use AssetLoader to load meshes")]
   pub fn load_mesh(&self, path: impl AsRef<Path>) -> anyhow::Result<Arc<Geometry>> {
-    let gltf = strahl_import::reader::GltfGeometry::import_validate(path)?;
-    Geometry::from_gltf(&self.dev, gltf).map(Arc::new)
+    self.loader.load_mesh(path)
   }
-  pub fn render(&mut self, scene: &Scene, camera: &Camera) -> PresentationResult<'_> {
+  pub fn asset_loader(&self) -> loader::AssetLoader { self.loader.clone() }
+  pub fn render(&self, scene: &Scene, camera: &Camera) -> PresentationResult<'_> {
     let begin = SystemTime::now();
     self.manager.uniforms_mut().camera = camera.clone();
-    self.manager.uniforms_mut().viewport_size = self.info.viewport;
+    self.manager.uniforms_mut().viewport_size = self.info.read().viewport;
     self.manager.uniforms().upload(&self.queue);
     let mut encoder = self
       .dev
@@ -281,11 +287,13 @@ impl Rasterizer {
     let index = self.queue.submit(std::iter::once(encoder.finish()));
     self.presenter.post_submit();
     log::trace!("work submitted to the GPU");
-    // TODO: wait asynchronously
+
+    // TODO: wait asynchronously (?)
     let _ = self.dev.poll(wgpu::wgt::PollType::Wait {
       submission_index: Some(index),
       timeout:          None,
     });
+
     let end = SystemTime::now();
     let dur = end.duration_since(begin).unwrap().as_millis_f32();
     log::trace!("finished in {dur:.2}ms, ~{:.0} draw/second", 1000.0 / dur);
@@ -296,7 +304,7 @@ impl Rasterizer {
     self.presenter.present(
       self.target.texture(),
       encoder,
-      self.info.viewport,
+      self.info.read().viewport,
       glam::uvec4(200, 200, 200, 150),
     )
   }
@@ -327,6 +335,8 @@ impl Rasterizer {
     })
   }
 }
+
+pub mod loader;
 
 /// Creates a WGPU instance, optionally enabling Vulkan instance extensions
 ///

@@ -74,7 +74,7 @@ impl Geometry {
           constants: &[],
           zero_initialize_workgroup_memory: false,
         },
-        buffers:             layout
+        buffers:             layout,
       }
     } else {
       unreachable!()

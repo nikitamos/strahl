@@ -3,7 +3,7 @@ use std::cell::Cell;
 use crate::limne::render_target::{ExternalResources, RenderTarget};
 use wgpu::{
   AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
-  BindGroupLayoutEntry, BlendState, DepthStencilState, Device, FilterMode, FragmentState, Sampler,
+  BindGroupLayoutEntry, DepthStencilState, Device, FilterMode, FragmentState, Sampler,
   SamplerDescriptor, ShaderStages, TextureView,
 };
 

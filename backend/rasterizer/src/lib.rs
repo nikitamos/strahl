@@ -12,7 +12,7 @@ use anyhow::anyhow;
 use ash::vk;
 use glam::UVec2;
 use material::Material;
-use wgpu::{Backends, hal::vulkan as wgvk, naga::back, wgt::WgpuHasDisplayHandle};
+use wgpu::{Backends, hal::vulkan as wgvk, wgt::WgpuHasDisplayHandle};
 
 use crate::{
   geometry::Geometry,
@@ -85,12 +85,8 @@ struct WgpuState {
 }
 
 impl Rasterizer {
-  pub fn info(&self) -> &RasterizerStateInfo {
-    &self.info
-  }
-  pub fn info_mut(&mut self) -> &mut RasterizerStateInfo {
-    &mut self.info
-  }
+  pub fn info(&self) -> &RasterizerStateInfo { &self.info }
+  pub fn info_mut(&mut self) -> &mut RasterizerStateInfo { &mut self.info }
   pub async fn new(
     RasterizerCreateInfo {
       state: info,
@@ -212,7 +208,7 @@ impl Rasterizer {
   ) -> anyhow::Result<WgpuState> {
     match target {
       PresentTarget::ExternalTexture(texture) => Ok(WgpuState {
-        instance: instance,
+        instance,
         device,
         queue,
         presenter: Box::new(TexturePresenter::new(texture)),
@@ -357,7 +353,7 @@ async fn instantiate_wgpu(
   desc.backends = backends;
   // So far no instance extensions requested
 
-  let instance = if backends == wgpu::Backends::VULKAN && vk_extensions.len() > 0 {
+  let instance = if backends == wgpu::Backends::VULKAN && !vk_extensions.is_empty() {
     log::debug!(
       "Creating WGPU instance as Vulkan HAL ({} extensions requested)",
       vk_extensions.len()
@@ -381,7 +377,7 @@ async fn instantiate_wgpu(
         })),
       )?)
     }
-  } else if vk_extensions.len() > 0 {
+  } else if !vk_extensions.is_empty() {
     panic!("Requested possibly non-Vulkan backend with Vulkan extensions")
   } else {
     wgpu::Instance::new(desc)

@@ -1,9 +1,4 @@
-use std::{
-  f32::consts::TAU,
-  hint::black_box,
-  ptr::null,
-  time::{Duration, SystemTime},
-};
+use std::f32::consts::TAU;
 
 use anyhow::anyhow;
 use glam::Mat4;
@@ -92,7 +87,7 @@ pub async fn true_main() -> anyhow::Result<()> {
   let material = strahl.load_material("../../../strahl-import/assets/gas.zip")?;
   let geometry = strahl.load_mesh("../../../strahl-import/assets/lava/Lava.gltf")?;
   let mut scene = strahl.create_scene();
-  let body = scene.add_body(geometry, material);
+  let _body = scene.add_body(geometry, material);
   let aspect = (size.x as f32) / (size.y as f32);
   const POINTS: usize = 10;
   for i in 0..POINTS {

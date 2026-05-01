@@ -5,9 +5,9 @@ use crate::{
   limne::{self, RenderTarget},
 };
 
-use ash::vk::{self, BlitImageInfo2};
-use glam::{UVec2, UVec4, Vec4};
-use wgpu::{hal::vulkan as wgvk, naga::back};
+use ash::vk::{self};
+use glam::{UVec2, UVec4};
+use wgpu::hal::vulkan as wgvk;
 
 pub(crate) trait Presenter: Send {
   // type CreateInfo: Into<Self>
@@ -72,7 +72,7 @@ impl Presenter for MappedPresenter {
     backbuffer: &wgpu::Texture,
     encoder: &mut wgpu::CommandEncoder,
     tex_dim: UVec2,
-    viewport: UVec4,
+    _viewport: UVec4,
   ) -> PresentationResult<'_> {
     encoder.copy_texture_to_texture(
       wgpu::TexelCopyTextureInfo {
@@ -235,7 +235,7 @@ impl Presenter for TexturePresenter {
     backbuffer: &wgpu::Texture,
     encoder: &mut wgpu::CommandEncoder,
     tex_dim: UVec2,
-    viewport: UVec4,
+    _viewport: UVec4,
   ) -> PresentationResult<'_> {
     encoder.copy_texture_to_texture(
       wgpu::TexelCopyTextureInfo {
@@ -308,8 +308,8 @@ impl<'w> Presenter for SurfacePresenter<'w> {
     &self,
     backbuffer: &wgpu::Texture,
     encoder: &mut wgpu::CommandEncoder,
-    tex_dim: UVec2,
-    viewport: UVec4,
+    _tex_dim: UVec2,
+    _viewport: UVec4,
   ) -> PresentationResult<'_> {
     let tex = match self.surface.get_current_texture() {
       wgpu::CurrentSurfaceTexture::Timeout => {
@@ -367,7 +367,7 @@ impl<'w> Presenter for SurfacePresenter<'w> {
     self.texture.set(Some(tex));
     PresentationResult::Submitted
   }
-  fn post_submit(&self) { self.texture.take().map(|t| t.present()); }
+  fn post_submit(&self) { if let Some(t) = self.texture.take() { t.present() } }
 }
 
 #[cfg(false)]

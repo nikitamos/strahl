@@ -3,16 +3,14 @@ use ash::vk;
 
 pub struct Allocator<'dev> {
   props: vk::PhysicalDeviceMemoryProperties,
-  dev: &'dev ash::Device,
+  dev:   &'dev ash::Device,
 }
 
 impl<'dev> Allocator<'dev> {
   pub fn staging_flags() -> vk::MemoryPropertyFlags {
     vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_CACHED
   }
-  pub fn device_flags() -> vk::MemoryPropertyFlags {
-    vk::MemoryPropertyFlags::DEVICE_LOCAL
-  }
+  pub fn device_flags() -> vk::MemoryPropertyFlags { vk::MemoryPropertyFlags::DEVICE_LOCAL }
 
   pub fn new(phy: vk::PhysicalDevice, dev: &'dev ash::Device, instance: &ash::Instance) -> Self {
     let props = unsafe { instance.get_physical_device_memory_properties(phy) };
@@ -21,13 +19,17 @@ impl<'dev> Allocator<'dev> {
     for i in 0..props.memory_type_count {
       log::info!(
         "type {}: heap={} flags={:?}",
-        i, props.memory_types[i as usize].heap_index, props.memory_types[i as usize].property_flags
+        i,
+        props.memory_types[i as usize].heap_index,
+        props.memory_types[i as usize].property_flags
       );
     }
     for i in 0..props.memory_heap_count {
       log::info!(
         "heap {}: size={} flags={:?}",
-        i, props.memory_heaps[i as usize].size, props.memory_heaps[i as usize].flags
+        i,
+        props.memory_heaps[i as usize].size,
+        props.memory_heaps[i as usize].flags
       );
     }
 
@@ -77,7 +79,7 @@ impl<'dev> Allocator<'dev> {
       .allocation_size(size)
       .memory_type_index(mem_type);
     if let Some(next) = next {
-        alloc_info = alloc_info.push_next(next);
+      alloc_info = alloc_info.push_next(next);
     }
 
     unsafe { self.dev.allocate_memory(&alloc_info, None).ok() }

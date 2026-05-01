@@ -1,8 +1,5 @@
 use crate::{geometry::Geometry, uniform::GlobalUniformsWrapper};
-use std::{
-  mem::MaybeUninit,
-  sync::{Arc, RwLock},
-};
+use std::sync::{Arc, RwLock};
 use wgpu::include_wgsl;
 
 pub(crate) struct ShaderEntryPoint {

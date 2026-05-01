@@ -1,4 +1,6 @@
-use crate::{geometry::Geometry, material::Material};
+use strahl_import::reader::Cubemap;
+
+use crate::{geometry::Geometry, material::Material, skybox::Skybox};
 
 use std::{
   borrow::Cow,
@@ -32,6 +34,15 @@ impl AssetLoader {
   pub fn load_mesh(&self, path: impl AsRef<Path>) -> anyhow::Result<Arc<Geometry>> {
     let gltf = strahl_import::reader::GltfGeometry::import_validate(self.get_path(path.as_ref()))?;
     Geometry::from_gltf(&self.dev, gltf).map(Arc::new)
+  }
+
+  pub fn load_skybox(&self, path: impl AsRef<Path>) -> anyhow::Result<Arc<Skybox>> {
+    let cubemap = Cubemap::read_from_dir_png(path, false)?;
+    Ok(Arc::new(Skybox::from_cubemap(
+      cubemap,
+      &self.dev,
+      &self.queue,
+    )))
   }
 
   pub fn set_prefix(&mut self, path: PathBuf) -> Option<PathBuf> { self.prefix.replace(path) }

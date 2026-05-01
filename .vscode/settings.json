@@ -9,6 +9,7 @@
         "Rasterizer",
         "raygen",
         "Raymarcher",
+        "skybox",
         "strahl",
         "Texel",
         "Unorm",

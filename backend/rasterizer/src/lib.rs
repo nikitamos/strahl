@@ -4,6 +4,7 @@
 #![feature(nonpoison_rwlock)]
 #![deny(clippy::all)]
 #![allow(dead_code)]
+#![allow(irrefutable_let_patterns)]
 
 use std::{
   ffi::CStr,
@@ -29,6 +30,7 @@ use crate::{
 };
 
 pub(crate) mod gpu_alloc;
+pub mod skybox;
 
 pub struct Rasterizer {
   i:         wgpu::Instance,

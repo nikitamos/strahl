@@ -112,7 +112,7 @@ in table below:
 Images representing a valid cubemap must satisfy the following conditions:
 1. All images have the same dimensions.
 2. For each image, its height is equal to its width.
-3. Each image is stored in RGB8 format.
+3. Each image is stored in RGBA8 format.
 
 The following command may be used to validate the cubemap:
 ```
@@ -120,4 +120,4 @@ cargo r -- validate-cubemap path/to/cubemap/dir [--transcode]
 ```
 
 The `--transcode` option may be passed to allow transcoding image files
-to RGB8 if they are in wrong format.
+to RGBA8 if they are in wrong format.

@@ -2,9 +2,10 @@
 This crate is designed to import assets into `strahl` engine.
 
 # Assets format
-`strahl` uses assets of two types:
+`strahl` uses assets of three types:
 1. Materials, stored as ZIP archives.
 2. Geometries, stored as glTF scenes.
+3. Cubemaps, stored as PNG images.
 
 # Material
 ## Archive format
@@ -57,6 +58,8 @@ cargo r -- create-material path/to/material.toml path/to/output.zip
 
 # Geometry
 Geometry, its UV map, vertex normals are stored in a glTF file.
+
+## Validity
 The glTF file must satisfy the following conditions:
 1. It has exactly one mesh.
 2. The `primitives` field of the mesh has the following form:
@@ -78,4 +81,43 @@ The glTF file must satisfy the following conditions:
 }
 ```
 3. Used accessors are not sparse.
-3. All attributes are stored in the same buffer.
+4. All attributes are stored in the same buffer.
+
+The following command may be used to validate the glTF file:
+```
+cargo r -- validate-gltf path/to/cubemap/geometry.gltf
+```
+
+# Cubemaps
+Cubemap is stored as a set of six PNG images located at the
+same directory. Each image is mapped to specific
+face of the cube.
+
+Consider a unit cube centered at the origin $O$. Each face is
+intersected by single coordinate ray. Each image file is named
+after ray intersecting the corresponding face, as shown
+in table below:
+
+<center>
+
+|   File name   | Corresponding ray |
+|---------------|-------------------|
+| `x_plus.png`  |      $ Ox $       |
+| `x_minus.png` |      $ -Ox $      |
+| `y_plus.png`  |      $ Oy $       |
+|       ...     |      ...          |
+</center>
+
+## Validity
+Images representing a valid cubemap must satisfy the following conditions:
+1. All images have the same dimensions.
+2. For each image, its height is equal to its width.
+3. Each image is stored in RGB8 format.
+
+The following command may be used to validate the cubemap:
+```
+cargo r -- validate-cubemap path/to/cubemap/dir [--transcode]
+```
+
+The `--transcode` option may be passed to allow transcoding image files
+to RGB8 if they are in wrong format.

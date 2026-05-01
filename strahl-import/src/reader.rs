@@ -4,12 +4,14 @@ use std::{
   path::Path,
 };
 
-use anyhow::{anyhow, bail};
+use anyhow::{Context, anyhow, bail};
+use clap::error;
 use gltf::{
   Accessor,
   accessor::{DataType, Dimensions},
   buffer::{self, Target},
 };
+use image::{DynamicImage, RgbImage};
 use ktx2_rw::Ktx2Texture;
 use zip::ZipArchive;
 
@@ -229,11 +231,151 @@ impl GltfGeometry {
 
     Ok(Self {
       index_size: indices.size() as u8,
-      position:   GltfBufferView::new(mesh_name, position, Dimensions::Vec3, DataType::F32)?,
-      normals:    GltfBufferView::new(mesh_name, normals, Dimensions::Vec3, DataType::F32)?,
-      uv:         GltfBufferView::new(mesh_name, uv, Dimensions::Vec2, DataType::F32)?,
-      indices:    GltfBufferView::new_validate_dim(mesh_name, indices, Dimensions::Scalar)?,
-      buffer
+      position: GltfBufferView::new(mesh_name, position, Dimensions::Vec3, DataType::F32)?,
+      normals: GltfBufferView::new(mesh_name, normals, Dimensions::Vec3, DataType::F32)?,
+      uv: GltfBufferView::new(mesh_name, uv, Dimensions::Vec2, DataType::F32)?,
+      indices: GltfBufferView::new_validate_dim(mesh_name, indices, Dimensions::Scalar)?,
+      buffer,
     })
+  }
+}
+
+#[derive(Debug)]
+pub struct CubemapImages {
+  pub x_plus:  RgbImage,
+  pub x_minus: RgbImage,
+  pub y_plus:  RgbImage,
+  pub y_minus: RgbImage,
+  pub z_plus:  RgbImage,
+  pub z_minus: RgbImage,
+}
+
+impl From<[RgbImage; 6]> for CubemapImages {
+  fn from(images: [RgbImage; 6]) -> Self {
+    let [x_plus, x_minus, y_plus, y_minus, z_plus, z_minus] = images;
+    CubemapImages {
+      x_plus,
+      x_minus,
+      y_plus,
+      y_minus,
+      z_plus,
+      z_minus,
+    }
+  }
+}
+
+impl From<CubemapImages> for [RgbImage; 6] {
+  fn from(cubemap: CubemapImages) -> Self {
+    [
+      cubemap.x_plus,
+      cubemap.x_minus,
+      cubemap.y_plus,
+      cubemap.y_minus,
+      cubemap.z_plus,
+      cubemap.z_minus,
+    ]
+  }
+}
+
+#[derive(Debug)]
+pub enum Cubemap {
+  Images(CubemapImages),
+}
+
+impl Cubemap {
+  const FACE_FILES: [&str; 6] = [
+    "x_plus.png",
+    "x_minus.png",
+    "y_plus.png",
+    "y_minus.png",
+    "z_plus.png",
+    "z_minus.png",
+  ];
+  pub fn read_from_dir_png(cubemap_dir: impl AsRef<Path>, transcode: bool) -> anyhow::Result<Self> {
+    let paths = Self::FACE_FILES;
+    let mut images: [Option<RgbImage>; 6] = Default::default();
+    // 0 is invalid dimension for PNG file
+    let mut width = 0;
+    for (i, fname) in paths.into_iter().enumerate() {
+      let path = cubemap_dir.as_ref().join(fname);
+      let f = File::open_buffered(&path)
+        .inspect_err(|e| log::error!("Failed to open cubemap face {fname}: {e}"))
+        .context(format!("failed to open cubemap face {}", path.display()))?;
+      let img = image::ImageReader::with_format(f, image::ImageFormat::Png).decode()?;
+
+      Self::validate_square(&img, &path, cubemap_dir.as_ref())?;
+      Self::validate_dim(&img, &mut width, cubemap_dir.as_ref())?;
+
+      if let DynamicImage::ImageRgb8(buf) = img {
+        images[i] = Some(buf);
+      } else if transcode {
+        log::warn!(
+          "Image {} is in invalid format; transcoding to RGB8",
+          path.display()
+        );
+        let buf = img.into_rgb8();
+        let mut writer = File::create_buffered(path)
+          .inspect_err(|e| log::error!("Transcoding error: failed to open file ({e})"))
+          .context("transcoding error")?;
+        buf
+          .write_to(&mut writer, image::ImageFormat::Png)
+          .inspect_err(|e| log::error!("Failed to transcode image: {e}"))
+          .context("transcoding error")?;
+        images[i] = Some(buf);
+      } else {
+        log::error!(
+          "Cubemap {} is invalid: {} has non-RGB8 pixel format",
+          cubemap_dir.as_ref().display(),
+          fname
+        );
+        bail!(
+          "Cubemap {} is invalid: there is non-RGB8 image",
+          cubemap_dir.as_ref().display()
+        );
+      }
+    }
+    Ok(Cubemap::Images(images.map(Option::unwrap).into()))
+  }
+
+  fn validate_dim(
+    img: &DynamicImage,
+    width: &mut u32,
+    cubemap_dir: &Path,
+  ) -> Result<(), anyhow::Error> {
+    if *width == 0 {
+      *width = img.width();
+    } else if img.width() != *width {
+      log::error!(
+        "Cubemap {0} is invalid: there are images with different dimensions {width}x{width} != {1}x{1}",
+        cubemap_dir.display(),
+        img.width()
+      );
+      bail!(
+        "Cubemap {} is invalid: there are images with different dimensions",
+        cubemap_dir.display()
+      );
+    }
+    Ok(())
+  }
+
+  fn validate_square(
+    img: &DynamicImage,
+    path: &Path,
+    cubemap_dir: &Path,
+  ) -> Result<(), anyhow::Error> {
+    if img.width() != img.height() {
+      log::error!(
+        "Cubemap {} is invalid: image {} has distinct height and width: {} != {}",
+        cubemap_dir.display(),
+        path.display(),
+        img.height(),
+        img.width()
+      );
+      bail!(
+        "Image {} is invalid for the cubemap: width != height",
+        path.display()
+      );
+    }
+    Ok(())
   }
 }

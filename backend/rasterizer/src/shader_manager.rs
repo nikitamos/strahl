@@ -162,7 +162,7 @@ impl ShaderManager {
         layout:         Some(&layout),
         vertex:         skybox.vertex_state(&self.skybox_vert),
         primitive:      wgpu::PrimitiveState {
-          topology:           wgpu::PrimitiveTopology::TriangleStrip,
+          topology:           wgpu::PrimitiveTopology::TriangleList,
           strip_index_format: None,
           front_face:         wgpu::FrontFace::Ccw,
           cull_mode:          None,

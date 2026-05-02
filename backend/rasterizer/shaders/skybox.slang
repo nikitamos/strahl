@@ -10,21 +10,48 @@ struct VSOut {
     float3 vec: TEXCOORD0;
 }
 
-static const float3 COORDS[14] = {
-    {-1.f,  1.f,  1.f},  // Front-top-left
-    {-1.f, -1.f,  1.f},  // Front-bottom-left
-    { 1.f,  1.f,  1.f},  // Front-top-right
-    { 1.f, -1.f,  1.f},  // Front-bottom-right
-    { 1.f, -1.f, -1.f},  // Back-bottom-right
-    { 1.f,  1.f,  1.f},  // Front-top-right
-    { 1.f,  1.f, -1.f},  // Back-top-right
-    {-1.f,  1.f,  1.f},  // Front-top-left
-    {-1.f,  1.f, -1.f},  // Back-top-left
-    {-1.f, -1.f,  1.f},  // Front-bottom-left
-    {-1.f, -1.f, -1.f},  // Back-bottom-left
-    { 1.f, -1.f, -1.f},  // Back-bottom-right
-    {-1.f,  1.f, -1.f},  // Back-top-left
-    { 1.f,  1.f, -1.f}   // Back-top-right
+static const float3 COORDS[36] = {
+        -1.0f,  1.0f, -1.0f,
+        -1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+        -1.0f,  1.0f, -1.0f,
+         1.0f,  1.0f, -1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+         1.0f, -1.0f,  1.0f
 };
 
 [shader("vertex")]

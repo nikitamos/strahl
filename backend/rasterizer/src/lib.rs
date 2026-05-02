@@ -310,7 +310,7 @@ impl Rasterizer {
     let end = SystemTime::now();
     let dur = end.duration_since(begin).unwrap().as_millis_f32();
     log::trace!("finished in {dur:.2}ms, ~{:.0} draw/second", 1000.0 / dur);
-    if let PresentationResult::ReconfigurationRequired = res {
+    if let PresentationResult::ReconfigurationRequired(_) = res {
       self.presenter.reconfigure(self.info().viewport);
     }
     res

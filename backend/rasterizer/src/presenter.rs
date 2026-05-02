@@ -37,7 +37,7 @@ pub enum PresentationResult<'a> {
   Stored(&'a wgpu::Texture),
   Submitted,
   Ignored,
-  ReconfigurationRequired,
+  ReconfigurationRequired(Option<&'a wgpu::Texture>),
 }
 
 pub(crate) struct MappedPresenter {
@@ -297,50 +297,13 @@ impl<'w> SurfacePresenter<'w> {
       drawer,
     }
   }
-}
 
-impl<'w> Presenter for SurfacePresenter<'w> {
-  fn get_wgpu_capabilities(&self) -> (wgpu::Limits, wgpu::Features) { Default::default() }
-
-  fn texture_view(&self) -> &wgpu::TextureView { todo!() }
-
-  fn present_texture(&self) -> &wgpu::Texture { todo!() }
-
-  fn present(
+  fn copy_texture(
     &self,
     backbuffer: &wgpu::Texture,
     encoder: &mut wgpu::CommandEncoder,
-    _tex_dim: UVec2,
-    _viewport: UVec4,
-  ) -> PresentationResult<'_> {
-    let tex = match self.surface.get_current_texture() {
-      wgpu::CurrentSurfaceTexture::Timeout => {
-        log::warn!("Swapchain timed out?");
-        return PresentationResult::Ignored;
-      }
-      wgpu::CurrentSurfaceTexture::Occluded => {
-        log::warn!("The window is occluded");
-        return PresentationResult::Ignored;
-      }
-      wgpu::CurrentSurfaceTexture::Outdated => {
-        log::warn!("Surface outdated");
-        return PresentationResult::Ignored;
-      }
-      wgpu::CurrentSurfaceTexture::Lost => {
-        log::warn!("Surface lost");
-        return PresentationResult::Ignored;
-      }
-      wgpu::CurrentSurfaceTexture::Validation => {
-        log::warn!("Surface validation error");
-        return PresentationResult::Ignored;
-      }
-      wgpu::CurrentSurfaceTexture::Suboptimal(tex) => {
-        log::warn!("Surface is suboptimal");
-        tex
-      }
-      wgpu::CurrentSurfaceTexture::Success(tex) => tex,
-    };
-
+    tex: &wgpu::SurfaceTexture,
+  ) {
     let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
       label: Some("present pass"),
       color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -365,22 +328,75 @@ impl<'w> Presenter for SurfacePresenter<'w> {
         bind_groups: &[],
         device:      &self.device,
       });
-
-    self.texture.set(Some(tex));
-    PresentationResult::Submitted
   }
-  fn post_submit(&self) { if let Some(t) = self.texture.take() { t.present() } }
+}
+
+impl<'w> Presenter for SurfacePresenter<'w> {
+  fn get_wgpu_capabilities(&self) -> (wgpu::Limits, wgpu::Features) { Default::default() }
+
+  fn texture_view(&self) -> &wgpu::TextureView { todo!() }
+
+  fn present_texture(&self) -> &wgpu::Texture { todo!() }
+
+  fn present(
+    &self,
+    backbuffer: &wgpu::Texture,
+    encoder: &mut wgpu::CommandEncoder,
+    _tex_dim: UVec2,
+    _viewport: UVec4,
+  ) -> PresentationResult<'_> {
+    match self.surface.get_current_texture() {
+      wgpu::CurrentSurfaceTexture::Timeout => {
+        log::warn!("Swapchain timed out?");
+        return PresentationResult::Ignored;
+      }
+      wgpu::CurrentSurfaceTexture::Occluded => {
+        log::warn!("The window is occluded");
+        return PresentationResult::ReconfigurationRequired(None);
+      }
+      wgpu::CurrentSurfaceTexture::Outdated => {
+        log::warn!("Surface outdated");
+        return PresentationResult::ReconfigurationRequired(None);
+      }
+      wgpu::CurrentSurfaceTexture::Lost => {
+        log::warn!("Surface lost");
+        return PresentationResult::ReconfigurationRequired(None);
+      }
+      wgpu::CurrentSurfaceTexture::Validation => {
+        log::warn!("Surface validation error");
+        return PresentationResult::Ignored;
+      }
+      wgpu::CurrentSurfaceTexture::Suboptimal(tex) => {
+        log::warn!("Surface is suboptimal");
+        self.copy_texture(backbuffer, encoder, &tex);
+        self.texture.set(Some(tex));
+        PresentationResult::ReconfigurationRequired(None)
+      }
+      wgpu::CurrentSurfaceTexture::Success(tex) => {
+        self.copy_texture(backbuffer, encoder, &tex);
+        self.texture.set(Some(tex));
+        PresentationResult::Submitted
+      }
+    }
+  }
+  fn post_submit(&self) {
+    if let Some(t) = self.texture.take() {
+      t.present()
+    }
+  }
   fn reconfigure(&self, viewport: UVec2) {
-      self.surface.configure(&self.device, &wgpu::SurfaceConfiguration {
-          usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_DST,
-          format: wgpu::TextureFormat::Bgra8Unorm,
-          width: viewport.x,
-          height: viewport.y,
-          present_mode: wgpu::PresentMode::AutoVsync,
-          desired_maximum_frame_latency: 2,
-          alpha_mode: wgpu::CompositeAlphaMode::Opaque,
-          view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
-        });
+    self
+      .surface
+      .configure(&self.device, &wgpu::SurfaceConfiguration {
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_DST,
+        format: wgpu::TextureFormat::Bgra8Unorm,
+        width: viewport.x,
+        height: viewport.y,
+        present_mode: wgpu::PresentMode::AutoVsync,
+        desired_maximum_frame_latency: 2,
+        alpha_mode: wgpu::CompositeAlphaMode::Opaque,
+        view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
+      });
   }
 }
 

@@ -114,7 +114,6 @@ impl Scene {
       .iter()
       .find(|x| Arc::as_ptr(x) == Arc::as_ptr(&body));
     if let Some(element) = item {
-      log::info!("removing the body!");
       let index = self.bodies.element_offset(element).unwrap();
       self.bodies.remove(index);
     }

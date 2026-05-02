@@ -82,6 +82,7 @@ pub async fn true_main() -> anyhow::Result<()> {
       wgpu_setup: WgpuSetup::Managed,
       target:     PresentTarget::ManagedMappedRam,
     },
+    buffer_side: 2048
   })
   .await?;
   let loader = strahl.asset_loader();

@@ -43,6 +43,7 @@ pub struct Rasterizer {
   info:      RwLock<RasterizerStateInfo>,
   loader:    loader::AssetLoader,
   depth:     limne::TextureProvider,
+  buffer_side: u32
 }
 
 pub mod geometry;
@@ -69,6 +70,7 @@ pub enum PresentTarget {
 pub struct RasterizerCreateInfo {
   pub state: RasterizerStateInfo,
   pub wgpu:  RasterizerWgpuInfo,
+  pub buffer_side: u32
 }
 
 pub struct RasterizerStateInfo {
@@ -101,6 +103,7 @@ impl Rasterizer {
     RasterizerCreateInfo {
       state: info,
       wgpu: wgpu_info,
+      buffer_side
     }: RasterizerCreateInfo,
   ) -> anyhow::Result<Rasterizer> {
     log::info!("Creating Rasterizer backend?");
@@ -115,8 +118,8 @@ impl Rasterizer {
     let target = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
       label:           Some(" a kind of render target".to_string()),
       size:            wgpu::Extent3d {
-        width:                 info.viewport.x,
-        height:                info.viewport.y,
+        width:                 buffer_side,
+        height:                buffer_side,
         depth_or_array_layers: 1,
       },
       mip_level_count: 1,
@@ -131,8 +134,8 @@ impl Rasterizer {
     let depth = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
       label:           Some("depth".to_string()),
       size:            wgpu::Extent3d {
-        width:                 info.viewport.x,
-        height:                info.viewport.y,
+        width:                 buffer_side,
+        height:                buffer_side,
         depth_or_array_layers: 1,
       },
       mip_level_count: 1,
@@ -160,6 +163,7 @@ impl Rasterizer {
       manager,
       info: RwLock::new(info),
       depth,
+      buffer_side
     })
   }
 
@@ -242,8 +246,14 @@ impl Rasterizer {
   pub fn asset_loader(&self) -> loader::AssetLoader { self.loader.clone() }
   pub fn render(&self, scene: &Scene, camera: &Camera) -> PresentationResult<'_> {
     let begin = SystemTime::now();
+    let viewport = self.info.read().viewport;
+    let viewport_size = viewport.clamp(UVec2::ZERO, glam::uvec2(self.buffer_side, self.buffer_side));
+    if viewport_size != viewport {
+      log::warn!("Viewport is too large; its size is clamped to texture dimensions");
+    }
+
     self.manager.uniforms_mut().camera = camera.clone();
-    self.manager.uniforms_mut().viewport_size = self.info.read().viewport;
+    self.manager.uniforms_mut().viewport_size = viewport_size;
     self.manager.uniforms().upload(&self.queue);
     let mut encoder = self
       .dev
@@ -300,15 +310,19 @@ impl Rasterizer {
     let end = SystemTime::now();
     let dur = end.duration_since(begin).unwrap().as_millis_f32();
     log::trace!("finished in {dur:.2}ms, ~{:.0} draw/second", 1000.0 / dur);
+    if let PresentationResult::ReconfigurationRequired = res {
+      self.presenter.reconfigure(self.info().viewport);
+    }
     res
   }
 
   fn copy_to_presenter(&self, encoder: &mut wgpu::CommandEncoder) -> PresentationResult<'_> {
+    let viewport = self.info().viewport;
     self.presenter.present(
       self.target.texture(),
       encoder,
-      self.info.read().viewport,
-      glam::uvec4(200, 200, 200, 150),
+      glam::uvec2(self.buffer_side, self.buffer_side),
+      glam::uvec4(0, 0, viewport.x, viewport.y),
     )
   }
 

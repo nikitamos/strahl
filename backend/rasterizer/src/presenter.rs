@@ -27,6 +27,8 @@ pub(crate) trait Presenter: Send {
     tex_dim: UVec2,
     viewport: UVec4,
   ) -> PresentationResult<'_>;
+
+  fn reconfigure(&self, _viewport: UVec2) {}
 }
 
 #[derive(Debug)]
@@ -368,6 +370,18 @@ impl<'w> Presenter for SurfacePresenter<'w> {
     PresentationResult::Submitted
   }
   fn post_submit(&self) { if let Some(t) = self.texture.take() { t.present() } }
+  fn reconfigure(&self, viewport: UVec2) {
+      self.surface.configure(&self.device, &wgpu::SurfaceConfiguration {
+          usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_DST,
+          format: wgpu::TextureFormat::Bgra8Unorm,
+          width: viewport.x,
+          height: viewport.y,
+          present_mode: wgpu::PresentMode::AutoVsync,
+          desired_maximum_frame_latency: 2,
+          alpha_mode: wgpu::CompositeAlphaMode::Opaque,
+          view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
+        });
+  }
 }
 
 #[cfg(false)]

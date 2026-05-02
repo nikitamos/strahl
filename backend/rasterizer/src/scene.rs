@@ -56,6 +56,10 @@ impl Body {
       * Mat4::from_quat(self.rotation())
       * Mat4::from_scale(glam::Vec3::splat(self.scale()));
     pass.set_immediates(0, transform.as_bytes());
+    pass.set_immediates(
+      std::mem::size_of_val(&transform) as u32,
+      self.translation().as_bytes(),
+    );
     self.geometry.setup_attributes(pass);
     self.geometry.dispatch_draw(pass);
   }

@@ -39,6 +39,7 @@ ConstantBuffer<Colors> colors;
 
 struct Body {
     float4x4 body2world;
+    float3 center_world;
 };
 
 [vk::push_constant]

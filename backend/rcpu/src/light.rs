@@ -3,6 +3,7 @@ use glam::{Mat4, Quat, Vec3, Vec3Swizzles};
 use crate::{
   Castable, Geometry, GeometrySampleMetadata, IntersectionContext, PointGlobal, PointLocal, Sample,
   SampleState, Sampler, Scene, Spectrum, SurfaceHit, SurfaceProperty, Transform, VecGlobal, VecHit,
+  VecLocal,
 };
 use std::{ops::Deref, sync::Arc};
 
@@ -116,6 +117,10 @@ impl LightSource {
       SurfaceProperty::Uniform(s) => sample.hemisphere_cosine().with_metadata(s),
       SurfaceProperty::Texture(_) => todo!(),
     }
+  }
+  /// TODO: name this function properly
+  pub fn intensity(&self, origin: PointLocal, direction: VecLocal, normal: VecLocal) -> Spectrum {
+    todo!()
   }
 
   pub fn sample_point_and_direction(

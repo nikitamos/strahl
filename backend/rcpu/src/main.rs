@@ -13,7 +13,7 @@ use rcpu::{
 fn main() {
   let back = RayTracer::new();
   let mut scene = back.create_scene();
-  let solver = back.create_solver();
+  let solver = back.create_bdpt_solver(2, 2, 64);
   scene.add_sphere(1.0);
   let g: Arc<dyn Geometry> = back.create_sphere(0.4);
   scene.add_light(
@@ -47,6 +47,7 @@ fn main() {
       rotation: Quat::IDENTITY,
     },
   );
+  /*
   let mut f = std::fs::File::create("light-paths.csv").unwrap();
   for i in 0..64 {
     let path = rcpu::solver::BidirectionalPath::sample_eye_subpath(
@@ -70,7 +71,8 @@ fn main() {
       })
       .for_each(|()| ());
   }
-  /*
+  */
+  
   let mut cam = Camera::new(
     (480, 480).into(),
     Vec3::Y,
@@ -81,5 +83,5 @@ fn main() {
   solver.render(&scene, &mut cam);
   let mut img = image::Rgb32FImage::new(480, 480);
   cam.write_image(&mut img);
-  img.save("out.tiff").unwrap();*/
+  img.save("out.tiff").unwrap();
 }

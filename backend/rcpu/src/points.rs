@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use std::ops::{Deref, DerefMut, Neg, Sub};
 
 use glam::Vec3;
 
@@ -60,4 +60,16 @@ vec_wrapper! {
 vec_wrapper! {
   /// Type-safe wrapper around vector in hit space
   VecHit => Vec3; glam::Vec3A,
+}
+
+impl Sub for PointGlobal {
+  type Output = VecGlobal;
+
+  fn sub(self, rhs: Self) -> Self::Output { (*self - *rhs).into() }
+}
+
+impl Neg for VecGlobal {
+  type Output = VecGlobal;
+
+  fn neg(self) -> Self::Output { (-*self).into() }
 }

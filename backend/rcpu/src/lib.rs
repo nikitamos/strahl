@@ -20,6 +20,7 @@ pub use geometry::*;
 use crate::{
   light::LightSource,
   material::{ConcreteMaterial, Material, bsdf::lambertian::Lambertian, medium::UniformMedium},
+  solver::{BDPTParams, PathTerminator},
 };
 pub mod camera;
 
@@ -87,6 +88,21 @@ impl RayTracer {
   pub fn new() -> Self { Self {} }
   pub fn create_scene(&self) -> Scene { Scene::new() }
   pub fn create_solver(&self) -> solver::Solver { solver::Solver::new() }
+  pub fn create_bdpt_solver<LT: PathTerminator, ET: PathTerminator>(
+    &self,
+    light: LT,
+    eye: ET,
+    samples: usize,
+  ) -> solver::BidirectionalPathTracer<LT, ET> {
+    solver::BidirectionalPathTracer::new(
+      BDPTParams {
+        light_terminator: light,
+        eye_terminator:   eye,
+        sample_count:     samples,
+      },
+      Sampler::new(),
+    )
+  }
   pub fn create_sphere(&self, radius: f32) -> Arc<Sphere> { Arc::new(Sphere { radius }) }
 }
 
@@ -124,6 +140,7 @@ impl SurfaceHit {
     }
   }
   pub fn point_global(&self) -> PointGlobal { self.transform.p2world(self.point) }
+  pub fn normal_global(&self) -> VecGlobal { self.transform.v2world(self.normal.into()) }
   pub fn to_hit(&self, local: VecLocal) -> VecHit { (self.local2hit * *local).into() }
   pub fn global_to_hit(&self, global: VecGlobal) -> VecHit {
     (self.local2hit * *self.transform.v2local(global)).into()
@@ -347,6 +364,36 @@ impl Scene {
       }
     }
     true
+  }
+
+  /// Evaluates so-called geometry factor between points
+  /// `x` and `y` taking the mutual visibility into account.
+  #[inline(always)]
+  pub fn geom_factor_vis(
+    &self,
+    x: PointGlobal,
+    nx: VecGlobal,
+    y: PointGlobal,
+    ny: VecGlobal,
+  ) -> Spectrum {
+    if self.is_visible(x, y) {
+      self.geom_factor_skip(x, nx, y, ny)
+    } else {
+      Spectrum::ZERO
+    }
+  }
+  /// Evaluates the geometric factor without performing visibility test.
+  ///
+  /// $$ G(x \lefrightarrow y) = \frac{\left|\cos\theta_o \cos\theta\right|}{\lVert x - y \rVert^2} $$
+  #[inline(always)]
+  pub fn geom_factor_skip(
+    &self,
+    x: PointGlobal,
+    nx: VecGlobal,
+    y: PointGlobal,
+    ny: VecGlobal,
+  ) -> Spectrum {
+    Spectrum::splat(f32::abs(x.dot(*nx) * y.dot(*ny)) / x.distance_squared(*y))
   }
 }
 

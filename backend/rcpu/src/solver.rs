@@ -2,12 +2,12 @@ use std::{fs::File, io::Write, ops::Neg};
 
 use super::{Interaction, IntersectionContext, Scene, Spectrum};
 use crate::{
-  Body, Castable, PointGlobal, PointLocal, Sample, Sampler, VecGlobal,
+  Castable, PointGlobal, Sample, Sampler, VecGlobal,
   camera::{self, CameraRay},
   light::{LightSampleContext, LightSampleMetadata, LightSource},
   material::bsdf::BSDFSampleContext,
 };
-use glam::{Vec3, Vec3Swizzles, Vec4Swizzles};
+use glam::{Vec3, Vec3Swizzles};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 
 pub struct Solver {
@@ -121,12 +121,6 @@ impl Solver {
           .inspect(|_| x += 1)
       })
       .min_by(|a, b| a.hit.ray_distance.partial_cmp(&b.hit.ray_distance).unwrap())
-      .inspect(|_| {
-        if x > 1 {
-          println!("{x} bodies intersected")
-        } else {
-        }
-      })
   }
 }
 
@@ -146,14 +140,19 @@ where
   LT: PathTerminator,
   ET: PathTerminator,
 {
+  pub(crate) fn new(params: BDPTParams<LT, ET>, sampler: Sampler) -> Self {
+    Self { params, sampler }
+  }
   pub fn render(&self, scene: &Scene, camera: &mut camera::Camera) {
     let resolution = camera.resolution().as_uvec2();
     let rays = camera.init_rays();
     for s in 0..self.params.sample_count {
+      println!("Sample {s}");
       rays.into_par_iter().enumerate().for_each(|(px, ray)| {
+        let mut r = ray.clone();
         let pixel = glam::uvec2(px as u32 % resolution.x, px as u32 / resolution.x);
-        let path = self.generate_pixel_path(scene, ray, pixel);
-        ray.color += path.eye.alpha;
+        let path = self.generate_pixel_path(scene, &mut r, pixel);
+        ray.color += path.throughput(scene) / (self.params.sample_count as f32);
         // based on path add to vector
         // so should we do something like
         // sounds to easy here
@@ -191,8 +190,12 @@ impl Castable for LightRay {
 
 pub enum PathSurface<'a> {
   Light(&'a LightSource),
-  Body(&'a Body),
-  Camera(glam::UVec2),
+  Body(Interaction<'a>),
+  Camera(glam::UVec2), // TODO: replace pixel with world pos + direction
+}
+
+impl<'a> PathSurface<'a> {
+  pub fn from_interaction(intr: Interaction<'a>) -> Self { Self::Body(intr) }
 }
 
 pub struct PathVertex<'a> {
@@ -201,18 +204,12 @@ pub struct PathVertex<'a> {
   pub point:    PointGlobal,
   /// Whether the BSDF at the vertex is specular
   pub specular: bool,
-  #[deprecated(note = "use `radiance`")]
-  pub alpha:    f32,
   /// Unconditional probability of generating subpath in this vertex
   pub prob:     f32,
   pub light:    VecGlobal,
   pub eye:      VecGlobal,
   pub radiance: Spectrum, // Hit-space vectors may be required
-}
-
-impl<'a> PathVertex<'a> {
-  // TODO: add hit space vectors or normal to the PathVertex
-  pub fn jacobian(&self) -> f32 { todo!() }
+  pub normal:   VecGlobal,
 }
 
 pub trait PathTerminator: Sync {
@@ -252,13 +249,13 @@ impl<'a> BidirectionalPath<'a> {
   pub fn sample(
     scene: &'a Scene,
     sampler: &Sampler,
-    camera_term: &(impl PathTerminator + ?Sized),
-    light_term: &(impl PathTerminator + ?Sized),
+    camera_termination: &(impl PathTerminator + ?Sized),
+    light_termination: &(impl PathTerminator + ?Sized),
     ray: &mut CameraRay,
   ) -> Self {
-    let light = Self::sample_light_subpath(scene, sampler, light_term);
-    let eye = Self::sample_eye_subpath(scene, sampler, ray, light_term, glam::UVec2::ZERO);
-    todo!()
+    let light = Self::sample_light_subpath(scene, sampler, light_termination);
+    let eye = Self::sample_eye_subpath(scene, sampler, ray, camera_termination, glam::UVec2::ZERO);
+    Self { light, eye }
   }
 
   pub fn sample_light_subpath(
@@ -278,11 +275,11 @@ impl<'a> BidirectionalPath<'a> {
       surface:  PathSurface::Light(source.sample),
       point:    radiance.metadata.point,
       specular: false, // TODO
-      alpha:    1.0,
-      prob:     1.0, //radiance.metadata.point_prob,
+      prob:     1.0,   //radiance.metadata.point_prob,
       eye:      radiance.metadata.direction,
       light:    Vec3::ZERO.into(),
       radiance: radiance.sample,
+      normal:   source.sample.transform().v2world(radiance.metadata.normal),
     };
 
     let mut radiance_next = radiance.sample / radiance.metadata.point_prob;
@@ -303,14 +300,14 @@ impl<'a> BidirectionalPath<'a> {
         let out = intr.hit.global_to_hit((-*ray.direction).into());
         if let Some(bs) = bsdf.sample_bsdf(out, sampler.sample(), BSDFSampleContext::Light) {
           let new_vert = PathVertex {
-            surface:  PathSurface::Body(intr.body),
             point:    intr.hit.point_global(),
             specular: bs.metadata.dirac,
-            alpha:    1.0, // todo!
             prob:     prob_next,
             light:    ray.direction.neg().into(),
             eye:      intr.hit.to_global(bs.metadata.inc.normalize().into()),
             radiance: radiance_next,
+            normal:   intr.hit.normal_global(),
+            surface:  PathSurface::from_interaction(intr),
           };
           prob_next *= bs.prob * bs.metadata.jacobian_with(out);
           radiance_next *= /*last.radiance * */ bs.sample / bs.metadata.jacobian_with(out);
@@ -337,11 +334,11 @@ impl<'a> BidirectionalPath<'a> {
       surface:  PathSurface::Camera(pixel),
       point:    init_ray.origin,
       specular: false, // Depends on camera type, TODO
-      alpha:    1.0,
       prob:     1.0,
       light:    init_ray.direction.into(),
       eye:      Vec3::ZERO.into(),
-      radiance: INITIAL_IMPORTANCE, // TODO
+      radiance: INITIAL_IMPORTANCE,        // TODO
+      normal:   init_ray.direction.into(), // WHAT?
     };
 
     let mut prob_next = 1.0; // Isn't camera specular in such case? (or should we get sth like 1/PIXELS)
@@ -360,14 +357,14 @@ impl<'a> BidirectionalPath<'a> {
         let out = intr.hit.global_to_hit((-init_ray.direction).into());
         if let Some(bs) = bsdf.sample_bsdf(out, sampler.sample(), BSDFSampleContext::Camera) {
           let new_vert = PathVertex {
-            surface:  PathSurface::Body(intr.body),
             point:    intr.hit.point_global(),
             specular: bs.metadata.dirac,
-            alpha:    1.0, // todo!
             prob:     prob_next,
             eye:      init_ray.direction.neg().into(),
             light:    intr.hit.to_global(bs.metadata.inc.normalize().into()),
             radiance: importance_next,
+            normal:   intr.hit.normal_global(),
+            surface:  PathSurface::from_interaction(intr),
           };
           prob_next = bs.prob * bs.metadata.jacobian_with(out);
           importance_next = last.radiance * bs.sample / bs.metadata.jacobian_with(out);
@@ -383,17 +380,70 @@ impl<'a> BidirectionalPath<'a> {
   }
 
   pub fn mis_weight(&self) -> f32 { todo!() } // or should we return spectrum?
-  pub fn throughput(&self) -> Spectrum {
+  /// Evaluates the throughput along the given path
+  /// # Panics
+  /// This function will panic if ...
+  pub fn throughput(&self, scene: &Scene) -> Spectrum {
+    let cst = self.join_coeff(scene);
+    cst * self.eye.alpha * self.light.alpha
+  }
+
+  fn join_coeff(&self, scene: &Scene) -> Spectrum {
     match (self.eye.len(), self.light.len()) {
+      (1, 1) => Spectrum::ZERO,
       (1, _) => {
+        // Point at the eye and non-degenerate light path
+        let eye = self.eye.vertices.last().unwrap();
+        let light = self.light.vertices.last().unwrap();
+        // How to measure importance?
+        // I guess, we should know the direction of ray
+        let PathSurface::Camera(cam) = eye.surface else {
+          unreachable!()
+        };
         todo!()
       }
       (_, 1) => {
-        todo!()
+        // Point at the light and non-degenerate eye path
+        let eye = self.eye.vertices.last().unwrap();
+        let light = self.light.vertices.last().unwrap();
+        let PathSurface::Light(src) = light.surface else {
+          unreachable!()
+        };
+        let direction = src.transform().v2local(eye.point - light.point);
+        let point = src.transform().p2local(light.point);
+        let l = src.intensity(point, direction, src.transform().v2local(light.normal));
+        l
       }
       (_, _) => {
-        todo!()
+        let y = self.eye.vertices.last().unwrap();
+        let z = self.light.vertices.last().unwrap();
+        let PathSurface::Body(ref intr) = y.surface else {
+          unreachable!()
+        };
+        let y2z = z.point - y.point;
+        let bsdf_light = intr.body.material.bsdf().bsdf(
+          intr.hit.global_to_hit(pz(z.light)),
+          intr.hit.global_to_hit(pz(y2z)),
+          BSDFSampleContext::Light,
+        );
+        let PathSurface::Body(ref intr) = y.surface else {
+          unreachable!()
+        };
+        let bsdf_eye = intr.body.material.bsdf().bsdf(
+          intr.hit.global_to_hit(pz(y2z)),
+          intr.hit.global_to_hit(pz(y.eye)),
+          BSDFSampleContext::Camera,
+        );
+        let g = scene.geom_factor_vis(y.point, y.normal, z.point, z.normal);
+        bsdf_eye * bsdf_light * g
       }
     }
   }
+}
+
+fn pz(mut v: VecGlobal) -> VecGlobal {
+  if v.z < 0.0 {
+    v.z = -v.z;
+  }
+  v
 }

@@ -1,6 +1,8 @@
+mod blur;
 mod show_texture;
 mod texture_provider;
 
+pub use blur::*;
 pub use render_target::RenderTarget;
 pub use show_texture::*;
 pub use texture_provider::*;

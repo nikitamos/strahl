@@ -30,6 +30,7 @@ use crate::{
 };
 
 pub(crate) mod gpu_alloc;
+pub mod postprocessing;
 pub mod skybox;
 
 pub struct Rasterizer {

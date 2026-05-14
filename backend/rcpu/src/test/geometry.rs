@@ -1,17 +1,6 @@
-use glam::Vec3;
+use crate::RayGeneric;
 
-use crate::{Castable, PointGlobal, VecGlobal};
-
-struct TestRay {
-  origin: PointGlobal,
-  dir:    Vec3,
-}
-
-impl Castable for TestRay {
-  fn pos(&self) -> PointGlobal { self.origin }
-
-  fn direction(&self) -> VecGlobal { self.dir.into() }
-}
+pub type TestRay = RayGeneric;
 
 mod sphere {
   use std::assert_matches;
@@ -24,8 +13,8 @@ mod sphere {
   fn direct_origin_collision() {
     let s = Sphere { radius: 1.0 };
     let ray = TestRay {
-      origin: (2.0 * Vec3::Y).into(),
-      dir:    Vec3::NEG_Y,
+      position:  (2.0 * Vec3::Y).into(),
+      direction: Vec3::NEG_Y.into(),
     };
     let isect = s.try_intersect(
       crate::IntersectionContext {
@@ -48,8 +37,8 @@ mod sphere {
   fn miss() {
     let s = Sphere { radius: 1.0 };
     let ray = TestRay {
-      origin: (2.0 * Vec3::Y).into(),
-      dir:    Vec3::Y,
+      position:  (2.0 * Vec3::Y).into(),
+      direction: Vec3::Y.into(),
     };
     let isect = s.try_intersect(
       crate::IntersectionContext {
@@ -63,8 +52,8 @@ mod sphere {
   fn translated_hit() {
     let s = Sphere { radius: 1.0 };
     let ray = TestRay {
-      origin: (2.0 * Vec3::Y).into(),
-      dir:    Vec3::NEG_Y,
+      position:  (2.0 * Vec3::Y).into(),
+      direction: Vec3::NEG_Y.into(),
     };
     let isect = s.try_intersect(
       crate::IntersectionContext {
@@ -87,8 +76,8 @@ mod sphere {
   fn tangential_hit() {
     let s = Sphere { radius: 1.0 };
     let ray = TestRay {
-      origin: (2.0 * Vec3::Y).into(),
-      dir:    Vec3::NEG_Y,
+      position:  (2.0 * Vec3::Y).into(),
+      direction: Vec3::NEG_Y.into(),
     };
     let isect = s.try_intersect(
       crate::IntersectionContext {

@@ -6,6 +6,7 @@ pub struct UniformMedium {
 
 impl Medium for UniformMedium {}
 
+#[derive(Clone, Copy)]
 pub struct MediumInterface<'e, 'i> {
   pub from: &'e dyn Medium,
   pub to:   &'i dyn Medium,

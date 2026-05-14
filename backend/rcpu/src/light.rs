@@ -119,8 +119,18 @@ impl LightSource {
     }
   }
   /// TODO: name this function properly
-  pub fn intensity(&self, origin: PointLocal, direction: VecLocal, normal: VecLocal) -> Spectrum {
-    todo!()
+  pub fn intensity(&self, _origin: PointLocal, direction: VecLocal, normal: VecLocal) -> Spectrum {
+    if direction.dot(*normal) < 0.0 {
+      return Spectrum::ZERO;
+    }
+    match self.spectrum {
+      SurfaceProperty::Uniform(s) => match self.dir {
+        LightEmissionDirection::Omni => s,
+        LightEmissionDirection::Spot(_, _) => todo!(),
+        LightEmissionDirection::Directed(_) => todo!(),
+      },
+      SurfaceProperty::Texture(_) => todo!(),
+    }
   }
 
   pub fn sample_point_and_direction(

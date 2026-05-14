@@ -111,12 +111,39 @@ pub mod solver;
 type Spectrum = Vec3;
 
 /// Represents a castable ray, usually originating from camera or light source.
+#[deprecated(note = "Use [`RayGeneric`] instead")]
 pub trait Castable {
   /// Current position
   fn pos(&self) -> PointGlobal;
   /// Current direction
   fn direction(&self) -> VecGlobal;
+  /// Scatters the ray, i.e. makes it point to the new direction
+  /// and advances it by small length
+  fn scatter(&mut self, new_direction: VecGlobal);
 }
+
+#[derive(Debug, Default, Clone)]
+pub struct RayGeneric {
+  pub position:  PointGlobal,
+  pub direction: VecGlobal,
+}
+
+impl RayGeneric {
+  pub fn set_direction(&mut self, direction: VecGlobal) { self.direction = direction; }
+  pub fn set_position(&mut self, position: PointGlobal) { self.position = position; }
+}
+
+impl Castable for RayGeneric {
+  fn pos(&self) -> PointGlobal { self.position }
+
+  fn direction(&self) -> VecGlobal { self.direction }
+
+  fn scatter(&mut self, new_direction: VecGlobal) {
+    self.set_direction(new_direction);
+    self.position = (*self.position + *self.direction * 0.0001f32).into();
+  }
+}
+
 #[derive(Debug)]
 pub struct SurfaceHit {
   pub point:        PointLocal,
@@ -235,15 +262,15 @@ impl Body {
 
 pub mod light;
 
-struct OcclusionRay {
-  pub eye:       PointGlobal,
-  pub direction: VecGlobal,
-}
+pub type OcclusionRay = RayGeneric;
+//   pub position:  PointGlobal,
+//   pub direction: VecGlobal,
+// }
 
-impl Castable for OcclusionRay {
-  fn pos(&self) -> PointGlobal { self.eye }
-  fn direction(&self) -> VecGlobal { self.direction }
-}
+// impl Castable for OcclusionRay {
+//   fn pos(&self) -> PointGlobal { self.position }
+//   fn direction(&self) -> VecGlobal { self.direction }
+// }
 
 pub struct Scene {
   // TODO: RWLock/mutex on body or lights?
@@ -340,7 +367,7 @@ impl Scene {
     let distance = observed.xyz() - eye.xyz();
     let ray = OcclusionRay {
       direction: (observed.xyz() - eye.xyz()).into(),
-      eye,
+      position: eye,
     };
     for body in &self.bodies {
       if let Some(hit) = body.geometry.try_intersect(

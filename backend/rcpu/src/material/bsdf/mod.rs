@@ -1,9 +1,31 @@
-use crate::{Sample, SampleState, Spectrum, VecHit, material::medium::MediumInterface};
+use std::marker::PhantomData;
 
+use crate::{
+  Interaction, Sample, SampleState, Spectrum, VecGlobal, VecHit, material::medium::MediumInterface,
+};
+
+#[derive(Clone, Copy)]
 pub enum BSDFSampleContext<'a> {
   Camera,
   Light,
-  Context(MediumInterface<'a, 'a>),
+  Infallible(PhantomData<&'a ()>),
+}
+
+impl<'a> BSDFSampleContext<'a> {
+  pub fn light_direction(&self, intr: &Interaction, meta: &BsdfMetadata) -> VecGlobal {
+    match self {
+      BSDFSampleContext::Camera => intr.hit.transform.v2world(intr.ray_dir),
+      BSDFSampleContext::Light => intr.hit.to_global(meta.inc),
+      BSDFSampleContext::Infallible(_) => unreachable!(),
+    }
+  }
+  pub fn eye_direction(&self, intr: &Interaction, meta: &BsdfMetadata) -> VecGlobal {
+    match self {
+      BSDFSampleContext::Camera => intr.hit.to_global(meta.inc),
+      BSDFSampleContext::Light => intr.hit.transform.v2world(intr.ray_dir),
+      BSDFSampleContext::Infallible(_) => unreachable!(),
+    }
+  }
 }
 
 pub enum ScatteringEvent {

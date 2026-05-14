@@ -8,12 +8,32 @@ use rcpu::{
   camera::{Camera, CameraRay},
   light::LightEmissionDirection,
   material::{ConcreteMaterial, bsdf::lambertian::Lambertian, medium::UniformMedium},
+  solver::PathTerminator,
 };
+
+struct UniformLEqPath {
+  n:    usize,
+  prob: f32,
+}
+
+impl UniformLEqPath {
+  fn new(n: usize, prob: f32) -> Self { Self { n, prob } }
+}
+
+impl PathTerminator for UniformLEqPath {
+  fn should_terminate(
+    &self,
+    vertices: usize,
+    _gen_vertex: &rcpu::solver::PathVertex,
+    sampler: &Sampler,
+  ) -> bool {
+    sampler.sample().uniform_1d >= self.prob || self.n <= vertices
+  }
+}
 
 fn main() {
   let back = RayTracer::new();
   let mut scene = back.create_scene();
-  let solver = back.create_bdpt_solver(2, 2, 64);
   scene.add_sphere(1.0);
   let g: Arc<dyn Geometry> = back.create_sphere(0.4);
   scene.add_light(
@@ -72,7 +92,7 @@ fn main() {
       .for_each(|()| ());
   }
   */
-  
+
   let mut cam = Camera::new(
     (480, 480).into(),
     Vec3::Y,
@@ -80,8 +100,13 @@ fn main() {
     (5.0 * Vec3::NEG_Y).into(),
     rcpu::camera::CameraType::Perspective,
   );
-  solver.render(&scene, &mut cam);
-  let mut img = image::Rgb32FImage::new(480, 480);
-  cam.write_image(&mut img);
-  img.save("out.tiff").unwrap();
+  for l in 1..3 {
+    for e in 2..4 {
+      let solver = back.create_bdpt_solver(l, e, if l + e == 3 { 24 } else { 24 });
+      solver.render(&scene, &mut cam);
+      let mut img = image::Rgb32FImage::new(480, 480);
+      cam.write_image(&mut img);
+      img.save(format!("l{l}-e{e}.tiff")).unwrap();
+    }
+  }
 }

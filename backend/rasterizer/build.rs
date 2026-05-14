@@ -1,10 +1,26 @@
 use std::{collections::HashSet, path::Path, process::Command};
 
 fn main() {
+  println!("cargo:rerun-if-changed=build.rs");
+  if std::env::var("CARGO_FEATURE_RENDERDOC").is_ok() {
+    compile_renderdoc();
+  }
+  compile_shaders();
+}
+
+fn compile_renderdoc() {
+  cc::Build::new()
+    .std("c11")
+    .file("renderdoc.c")
+    .compile("amnis-rdoc");
+  println!("cargo::rerun-if-changed=renderdoc.c");
+  eprintln!()
+}
+
+fn compile_shaders() {
   let shaders_dir = Path::new("shaders");
   let dir_print = shaders_dir.display();
   println!("cargo:rerun-if-changed={}/*.slang", dir_print);
-  println!("cargo:rerun-if-changed=build.rs");
 
   if !check_slang_is_present() {
     println!(

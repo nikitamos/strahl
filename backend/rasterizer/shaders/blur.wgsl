@@ -17,6 +17,8 @@ struct Globals_std140_0
 };
 
 @binding(0) @group(2) var<uniform> g_0 : Globals_std140_0;
+@binding(1) @group(1) var origin_0 : texture_2d<f32>;
+
 var<private> ARRAY_LEN_0 : i32;
 
 var<private> DIM_LEN_0 : i32;
@@ -90,6 +92,10 @@ fn blur( _S1 : pixelInput_0, @builtin(position) clip_pos_0 : vec4<f32>) -> FOut_
         }
         px_0[i32(0)] = px_0[i32(0)] + 1.0f;
     }
+    var _S11 : vec3<f32> = o_0.norm_0.xyz + (textureSample((origin_0), (smp_0), (_S6))).xyz;
+    o_0.norm_0.x = _S11.x;
+    o_0.norm_0.y = _S11.y;
+    o_0.norm_0.z = _S11.z;
     o_0.norm_0[i32(3)] = _S7.w;
     return o_0;
 }
@@ -100,16 +106,16 @@ struct pixelInput_1
 };
 
 @fragment
-fn bright( _S11 : pixelInput_1, @builtin(position) clip_pos_1 : vec4<f32>) -> FOut_0
+fn bright( _S12 : pixelInput_1, @builtin(position) clip_pos_1 : vec4<f32>) -> FOut_0
 {
     var o_1 : FOut_0;
     o_1.norm_0 = vec4<f32>(0.0f, 0.0f, 0.0f, 1.0f);
-    var _S12 : vec3<f32> = (textureSample((unsmoothed_0), (smp_0), (_S11.texcoord_1.xy))).xyz;
-    if((dot(_S12, _S12)) > 0.60000002384185791f)
+    var _S13 : vec3<f32> = (textureSample((unsmoothed_0), (smp_0), (_S12.texcoord_1.xy))).xyz;
+    if((dot(_S13, _S13)) > 0.60000002384185791f)
     {
-        o_1.norm_0.x = _S12.x;
-        o_1.norm_0.y = _S12.y;
-        o_1.norm_0.z = _S12.z;
+        o_1.norm_0.x = _S13.x;
+        o_1.norm_0.y = _S13.y;
+        o_1.norm_0.z = _S13.z;
     }
     return o_1;
 }

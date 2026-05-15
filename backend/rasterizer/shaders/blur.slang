@@ -5,12 +5,15 @@ struct Globals
     uint2 viewport_size;
 };
 
-[[vk::binding(0, 0)]] Texture2D<float4> unsmoothed : register(t0);
-[[vk::binding(1, 0)]] SamplerState smp : register(s0);
+import tonemapping;
 
-[[vk::binding(0, 1)]] StructuredBuffer<float> kernel : register(t3);
+[[vk::binding(0, 0)]] Texture2D<float4> unsmoothed;
+[[vk::binding(1, 0)]] SamplerState smp;
 
-[[vk::binding(0, 2)]] ConstantBuffer<Globals> g : register(b0);
+[[vk::binding(0, 1)]] StructuredBuffer<float> kernel;
+[[vk::binding(1, 1)]] Texture2D<float4> origin;
+
+[[vk::binding(0, 2)]] ConstantBuffer<Globals> g;
 
 static int SIDE;
 static int2 CENTER;
@@ -69,6 +72,10 @@ FOut blur(VOut input)
             o.norm += sample * at(int2(px + CENTER));
         }
     }
+    
+    let originSample = origin.Sample(smp, input.texcoord.xy);
+    o.norm.xyz += originSample.xyz;
+    o.norm.xyz = tonemapping::AcesApprox(o.norm.xyz);
     o.norm.w = curSample.w;
     
     return o;

@@ -19,7 +19,7 @@ static int ARRAY_LEN;
 
 static float2 dh;
 static float2 dx;
-static const float THRESHOLD = 0.1;
+static const float THRESHOLD = 0.6;
 
 float at(int2 i)
 {
@@ -38,7 +38,7 @@ struct FOut
 };
 
 [shader("fragment")]
-FOut fs_main(VOut input)
+FOut blur(VOut input)
 {
     ARRAY_LEN = 0;
     uint stride;
@@ -49,13 +49,10 @@ FOut fs_main(VOut input)
     CENTER = int2(SIDE, SIDE);
     
     FOut o;
-    o.norm = float4(0.0f, 0.0f, 0.0f, 0.0f);
+    o.norm = float4(0.0,0.0,0.0,1.0);
 
-    let curSample = unsmoothed.Sample(smp, float2(input.texcoord));
-    if (dot(curSample.xyz, curSample.xyz) >= THRESHOLD) {
-        return o;
-    }
-    
+    let curSample = unsmoothed.Sample(smp, input.texcoord.xy);
+
     float2 size = float2(g.viewport_size.x, g.viewport_size.y);
     dx = float2(1.0f / size.x, 0.0f);
     float2 dy = float2(0.0f, 1.0f / size.y);
@@ -72,6 +69,20 @@ FOut fs_main(VOut input)
             o.norm += sample * at(int2(px + CENTER));
         }
     }
+    o.norm.w = curSample.w;
     
+    return o;
+}
+
+[shader("fragment")]
+FOut bright(VOut input) {
+    FOut o;
+    o.norm = float4(0.0,0.0,0.0,1.0);
+
+    let curSample = unsmoothed.Sample(smp, input.texcoord.xy);
+    let brightness = dot(curSample.xyz, curSample.xyz);
+    if (brightness > THRESHOLD) {
+        o.norm.xyz = curSample.xyz;
+    }
     return o;
 }

@@ -145,8 +145,8 @@ impl Rasterizer {
 
     let pp = BloomPostProcess::create(
       BloomCreateInfo {
-        kernel_depth: 8,
-        s:            3.0,
+        kernel_depth: 12,
+        s:            6.0,
       },
       PostProcessCreateInfoBase {
         target_dim:     buffer_side,
@@ -346,9 +346,11 @@ impl Rasterizer {
         (&self.target, &self.target2)
       };
       let viewport = self.info().viewport;
+      let dimensions = self.buffer_side;
       step.apply(origin, target, PostProcessInfo {
         viewport: glam::vec2(viewport.x as f32, viewport.y as f32),
         uniform:  &self.manager.uniforms(),
+        dimensions
       })
     })
   }
@@ -402,6 +404,7 @@ fn create_target(buffer_side: u32, dev: &wgpu::Device, label: &str) -> limne::Te
     format:          wgpu::TextureFormat::Rgba8Unorm,
     usage:           wgpu::TextureUsages::RENDER_ATTACHMENT
       | wgpu::TextureUsages::COPY_SRC
+      | wgpu::TextureUsages::COPY_DST
       | wgpu::TextureUsages::TEXTURE_BINDING,
     view_formats:    vec![wgpu::TextureFormat::Rgba8Unorm],
   })

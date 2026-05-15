@@ -88,16 +88,14 @@ pub async fn true_main() -> anyhow::Result<()> {
   })
   .await?;
   let loader = strahl.asset_loader();
-  let material =
-    loader.load_material("/HDD/home/nikita/BSUIR/strahl/strahl-import/assets/gas.zip")?;
-  let geometry =
-    loader.load_mesh("/HDD/home/nikita/BSUIR/strahl/strahl-import/assets/lava/Lava.gltf")?;
+  let material = loader.load_material("/home/m0sni/BSUIR/ExoplanetsCatalog/assets/Lava.zip")?;
+  let geometry = loader.load_mesh("/home/m0sni/BSUIR/ExoplanetsCatalog/assets/Lava.gltf")?;
   let mut scene = strahl.create_scene();
-  let skybox = loader.load_skybox("/HDD/home/nikita/BSUIR/ExoplanetsCatalog/assets/starbox")?;
+  let skybox = loader.load_skybox("/home/m0sni/BSUIR/ExoplanetsCatalog/assets/starbox")?;
   scene.set_skybox(skybox);
   let _body = scene.add_body(geometry, material);
   let aspect = (size.x as f32) / (size.y as f32);
-  const POINTS: usize = 10;
+  const POINTS: usize = 4;
   for i in 0..POINTS {
     #[cfg(feature = "renderdoc")]
     rdoc.start_frame_capture();

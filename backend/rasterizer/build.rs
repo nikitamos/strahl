@@ -26,6 +26,7 @@ fn compile_shaders() {
     println!(
       "cargo:warning=slangc seems to be absent on your system; shader compilation is disabled"
     );
+    return;
   }
 
   let ignored_files: HashSet<&str> = ["globals", "blur"].iter().cloned().collect();

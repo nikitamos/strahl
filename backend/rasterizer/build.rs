@@ -29,7 +29,7 @@ fn compile_shaders() {
     return;
   }
 
-  let ignored_files: HashSet<&str> = ["globals", "blur"].iter().cloned().collect();
+  let ignored_files: HashSet<&str> = ["globals", "blur", "raster-pipeline"].iter().cloned().collect();
 
   if !shaders_dir.exists() {
     println!(

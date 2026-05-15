@@ -4,13 +4,13 @@ use std::{
   path::Path,
 };
 
+use crate::Ktx2Texture;
 use anyhow::{Context, anyhow, bail};
 use gltf::{
   Accessor,
   accessor::{DataType, Dimensions},
 };
 use image::{DynamicImage, RgbaImage};
-use ktx2_rw::Ktx2Texture;
 use zip::ZipArchive;
 
 use crate::{MATERIAL_METADATA, MaterialComponentSource, TextureMetadata, per_texture::PerTexture};

@@ -4,7 +4,7 @@ use wgpu::{
   util::{BufferInitDescriptor, DeviceExt},
 };
 
-use crate::shader_manager::ShaderManager;
+use crate::{Camera, shader_manager::ShaderManager};
 
 // #[derive(Clone)]
 #[non_exhaustive]

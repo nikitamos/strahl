@@ -1,10 +1,11 @@
 use std::sync::{Arc, RwLock};
 
-use glam::Mat4;
+use glam::{Mat4, Vec3, Vec3Swizzles};
 use wgpu::RenderPipeline;
 use zerocopy::IntoBytes;
 
 use crate::{
+  Camera,
   geometry::Geometry,
   material::Material,
   shader_manager::ShaderManager,
@@ -52,9 +53,7 @@ impl Body {
     pass.set_pipeline(&self.pipeline);
     pass.set_bind_group(1, self.material.bind_group(), &[]);
     pass.set_bind_group(2, self.geometry.bind_group(), &[]);
-    let transform = Mat4::from_translation(self.translation())
-      * Mat4::from_quat(self.rotation())
-      * Mat4::from_scale(glam::Vec3::splat(self.scale()));
+    let transform = self.transform();
     pass.set_immediates(0, transform.as_bytes());
     pass.set_immediates(
       std::mem::size_of_val(&transform) as u32,
@@ -62,6 +61,12 @@ impl Body {
     );
     self.geometry.setup_attributes(pass);
     self.geometry.dispatch_draw(pass);
+  }
+
+  fn transform(&self) -> Mat4 {
+    Mat4::from_translation(self.translation())
+      * Mat4::from_quat(self.rotation())
+      * Mat4::from_scale(glam::Vec3::splat(self.scale()))
   }
 
   pub fn rotation(&self) -> glam::Quat { self.data.read().unwrap().rotation }
@@ -77,6 +82,62 @@ impl Body {
 
   pub fn material(&self) -> &Material { &self.material }
   pub fn geometry(&self) -> &Geometry { &self.geometry }
+
+  pub fn display_location(&self, camera: &Camera, viewport: glam::UVec2) -> Option<glam::UVec2> {
+    let transform = self.transform();
+    let origin = transform.transform_point3a(glam::Vec3A::ZERO);
+    let ndc = camera
+      .projection
+      .project_point3a(camera.camera.project_point3a(origin));
+    map_ndc(viewport, ndc)
+  }
+
+  pub fn display_radius(&self, camera: &Camera, viewport: glam::UVec2) -> f32 {
+    let transform = self.transform();
+    let origin = transform.transform_point3a(glam::Vec3A::ZERO);
+    let scale = self.scale();
+
+    let view_pos = camera.camera.project_point3a(origin);
+    let depth = view_pos.z.abs();
+
+    let proj_scale = camera.projection.col(1).y;
+
+    (scale * proj_scale / depth) * (viewport.y as f32 * 0.5)
+  }
+
+  pub fn location_radius(
+    &self,
+    camera: &Camera,
+    viewport: glam::UVec2,
+  ) -> (Option<glam::UVec2>, f32) {
+    let transform = self.transform();
+    let origin = transform.transform_point3a(glam::Vec3A::ZERO);
+    let ndc = camera
+      .projection
+      .project_point3a(camera.camera.project_point3a(origin));
+
+    let scale = self.scale();
+    let view_pos = camera.camera.project_point3a(origin);
+    let depth = view_pos.z.abs();
+    let proj_scale = camera.projection.col(1).y;
+
+    (
+      map_ndc(viewport, ndc),
+      (scale * proj_scale / depth) * (viewport.y as f32 * 0.5),
+    )
+  }
+}
+
+/// Maps normalized device coordinates to viewport cooridinates
+fn map_ndc(viewport: glam::UVec2, ndc: glam::Vec3A) -> Option<glam::UVec2> {
+  if 0.0 <= ndc.z && ndc.z <= 1.0 && ndc.x.abs() <= 1.0 && ndc.y.abs() <= 1.0 {
+    let viewport_mapped = 0.5 * (ndc.xy() * glam::vec2(1.0, -1.0) + glam::Vec2::ONE);
+    let viewport = glam::vec2(viewport.x as f32, viewport.y as f32);
+    let res = viewport * viewport_mapped;
+    Some(glam::uvec2(res.x as u32, res.y as u32))
+  } else {
+    None
+  }
 }
 
 pub struct Scene {
@@ -122,5 +183,5 @@ impl Scene {
       self.bodies.remove(index);
     }
   }
-  pub(crate) fn bodies(&self) -> &[Arc<Body>] { &self.bodies }
+  pub fn bodies(&self) -> &[Arc<Body>] { &self.bodies }
 }

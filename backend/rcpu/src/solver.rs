@@ -138,14 +138,15 @@ pub struct BidirectionalPathTracer<LT: PathTerminator, ET: PathTerminator> {
 type BSDFSample = Sample<Spectrum, BsdfMetadata>;
 
 struct SubpathConfig<'a, P: PathTerminator + ?Sized> {
-  scene:         &'a Scene,
-  sampler:       &'a Sampler,
-  term_cond:     &'a P,
-  init_vertex:   PathVertex<'a>,
-  init_radiance: Spectrum,
-  init_prob:     f32,
-  bsdf_context:  BSDFSampleContext<'a>,
-  update_state:  fn(&PathVertex, &BSDFSample, f32, f32, Spectrum) -> (f32, Spectrum),
+  scene:          &'a Scene,
+  sampler:        &'a Sampler,
+  term_cond:      &'a P,
+  init_vertex:    PathVertex<'a>,
+  init_direction: VecGlobal,
+  init_radiance:  Spectrum,
+  init_prob:      f32,
+  bsdf_context:   BSDFSampleContext<'a>,
+  update_state:   fn(&PathVertex, &BSDFSample, f32, f32, Spectrum) -> (f32, Spectrum),
 }
 
 fn sample_subpath<'a, P>(cfg: SubpathConfig<'a, P>) -> Subpath<'a>
@@ -153,6 +154,7 @@ where P: PathTerminator + ?Sized {
   let mut radiance = cfg.init_radiance;
   let mut prob = cfg.init_prob;
   let mut path = vec![cfg.init_vertex];
+  let mut last_ray_out = cfg.init_direction;
 
   while let Some(last) = path.last()
     && !cfg
@@ -161,11 +163,12 @@ where P: PathTerminator + ?Sized {
   {
     let ray = RayGeneric {
       position:  last.point,
-      direction: todo!(),
+      direction: last_ray_out,
     };
     if let Some(intr) = Solver::closest_hit(cfg.scene, &ray) {
       let bsdf = intr.body.material.bsdf();
       let out = intr.hit.global_to_hit((-ray.direction()).into());
+      last_ray_out = intr.hit.to_global(out);
       let jac = cfg.scene.geom_factor_skip(
         last.point,
         last.normal,
@@ -236,48 +239,7 @@ pub fn sample_light_subpath<'a>(
     update_state: |_last, bs, total_jac, prob, rad| {
       (prob * bs.prob * total_jac, rad * bs.sample * total_jac)
     },
-  })
-}
-
-pub fn sample_eye_subpath<'a>(
-  scene: &'a Scene,
-  sampler: &'a Sampler,
-  init_ray: &'a mut CameraRay,
-  term_cond: &'a (impl PathTerminator + ?Sized),
-  pixel: glam::UVec2,
-) -> Subpath<'a> {
-  const INITIAL_IMPORTANCE: Vec3 = Vec3::ONE;
-  let init_vertex = PathVertex {
-    surface:  PathSurface::Camera(pixel),
-    point:    init_ray.origin,
-    specular: false,
-    prob:     1.0,
-    light:    init_ray.direction.into(),
-    eye:      Vec3::ZERO.into(),
-    radiance: INITIAL_IMPORTANCE,
-    normal:   init_ray.direction.into(),
-  };
-
-  // We need to capture init_ray mutably for updates – we can clone or store in config.
-  // Let's store a mutable reference in a custom struct that implements Fn.
-  // For simplicity, we'll pass init_ray as part of the config via a closure that captures it.
-  // But the closure must be Fn, not FnMut, because we call it multiple times.
-  // Better: store the current ray direction in a Cell inside the config.
-  use std::cell::Cell;
-  let ray_dir = Cell::new(init_ray.direction);
-
-  sample_subpath(SubpathConfig {
-    scene,
-    sampler,
-    term_cond,
-    init_vertex,
-    init_radiance: INITIAL_IMPORTANCE,
-    init_prob: 1.0,
-    bsdf_context: BSDFSampleContext::Camera,
-    update_state: |last, bs, total_jac, _prob, rad| {
-      // Eye path: prob_next = bs.prob * total_jac, importance = last.radiance * bs.sample * total_jac
-      (bs.prob * total_jac, last.radiance * bs.sample * total_jac)
-    },
+    init_direction: radiance.metadata.direction,
   })
 }
 
@@ -391,10 +353,10 @@ impl<'a> Subpath<'a> {
 impl<'a> BidirectionalPath<'a> {
   pub fn sample(
     scene: &'a Scene,
-    sampler: &Sampler,
-    camera_termination: &(impl PathTerminator + ?Sized),
-    light_termination: &(impl PathTerminator + ?Sized),
-    ray: &mut CameraRay,
+    sampler: &'a Sampler,
+    camera_termination: &'a (impl PathTerminator + ?Sized),
+    light_termination: &'a (impl PathTerminator + ?Sized),
+    ray: &'a mut CameraRay,
   ) -> Self {
     let light = Self::sample_light_subpath(scene, sampler, light_termination);
     let eye = Self::sample_eye_subpath(scene, sampler, ray, camera_termination, glam::UVec2::ZERO);
@@ -402,144 +364,46 @@ impl<'a> BidirectionalPath<'a> {
   }
 
   pub fn sample_light_subpath(
-    scene: &'a Scene,
-    sampler: &Sampler,
-    term_cond: &(impl PathTerminator + ?Sized),
+    _scene: &'a Scene,
+    _sampler: &Sampler,
+    _term_cond: &(impl PathTerminator + ?Sized),
   ) -> Subpath<'a> {
-    let source = scene.sample_any_light_source(sampler);
-    let radiance = source
-      .sample
-      .sample_point_and_direction(sampler, LightSampleContext {
-        dst: Vec3::ZERO.into(),
-        scene,
-      });
-
-    let init = PathVertex {
-      surface:  PathSurface::Light(source.sample),
-      point:    radiance.metadata.point,
-      specular: false, // TODO
-      prob:     1.0,   //radiance.metadata.point_prob,
-      eye:      radiance.metadata.direction,
-      light:    Vec3::ZERO.into(),
-      radiance: radiance.sample,
-      normal:   source.sample.transform().v2world(radiance.metadata.normal),
-    };
-
-    let mut radiance_next = radiance.sample;
-    let mut prob_next = radiance.metadata.point_prob;
-
-    let mut path = vec![init];
-
-    while let Some(last) = path.last()
-      && !term_cond.should_terminate(path.len(), last, sampler)
-    {
-      // Cast ray and sample the BSDF
-      let ray = LightRay {
-        position:  (last.point.xyz() + last.eye.xyz() * 1E-4).into(),
-        direction: last.eye,
-      };
-      if let Some(intr) = Solver::closest_hit(scene, &ray) {
-        let bsdf = intr.body.material.bsdf();
-        let out = intr.hit.global_to_hit((-*ray.direction).into());
-        let jac = scene.geom_factor_skip(
-          last.point,
-          last.normal,
-          intr.hit.point_global(),
-          intr.hit.normal_global(),
-        );
-        if let Some(bs) = bsdf.sample_bsdf(out, sampler.sample(), BSDFSampleContext::Light) {
-          let bs_jac = bs.metadata.jacobian_with(out);
-          let new_vert = PathVertex {
-            point:    intr.hit.point_global(),
-            specular: bs.metadata.dirac,
-            prob:     prob_next,
-            light:    ray.direction.neg().into(),
-            eye:      intr.hit.to_global(bs.metadata.inc.normalize().into()),
-            radiance: radiance_next,
-            normal:   intr.hit.normal_global(),
-            surface:  PathSurface::from_interaction(intr),
-          };
-          let jac = jac;
-          // let jac = Vec3::splat(bs_jac);
-          prob_next *= bs.prob * jac.x;
-          radiance_next *= /*last.radiance * */ bs.sample* jac;
-          path.push(new_vert);
-        }
-      } // else {TODO: infinite light?}
-    }
-    Subpath {
-      vertices: path,
-      alpha:    radiance_next,
-      p:        prob_next,
-    }
+    todo!()
   }
 
   pub fn sample_eye_subpath(
     scene: &'a Scene,
-    sampler: &Sampler,
-    init_ray: &mut CameraRay,
-    term_cond: &(impl PathTerminator + ?Sized),
+    sampler: &'a Sampler,
+    init_ray: &'a mut CameraRay,
+    term_cond: &'a (impl PathTerminator + ?Sized),
     pixel: glam::UVec2,
   ) -> Subpath<'a> {
     const INITIAL_IMPORTANCE: Vec3 = Vec3::ONE;
-    let init = PathVertex {
+    let init_vertex = PathVertex {
       surface:  PathSurface::Camera(pixel),
       point:    init_ray.origin,
-      specular: false, // Depends on camera type, TODO
+      specular: false,
       prob:     1.0,
       light:    init_ray.direction.into(),
       eye:      Vec3::ZERO.into(),
-      radiance: INITIAL_IMPORTANCE,        // TODO
-      normal:   init_ray.direction.into(), // WHAT?
+      radiance: INITIAL_IMPORTANCE,
+      normal:   init_ray.direction.into(),
     };
 
-    let mut prob_next = 1.0; // Isn't camera specular in such case? (or should we get sth like 1/PIXELS)
-    let mut importance_next = INITIAL_IMPORTANCE;
-
-    let mut path = vec![init];
-
-    while let Some(last) = path.last()
-      && !term_cond.should_terminate(path.len(), last, sampler)
-    {
-      init_ray.origin = (last.point.xyz() + last.eye.xyz() * 1E-4).into();
-      init_ray.direction = last.light.into();
-      // Cast ray and sample the BSDF
-      if let Some(intr) = Solver::closest_hit(scene, init_ray) {
-        let bsdf = intr.body.material.bsdf();
-        let out = intr.hit.global_to_hit((-init_ray.direction).into());
-        let jac = scene.geom_factor_skip(
-          last.point,
-          last.normal,
-          intr.hit.point_global(),
-          intr.hit.normal_global(),
-        );
-        if let Some(bs) = bsdf.sample_bsdf(out, sampler.sample(), BSDFSampleContext::Camera) {
-          let bs_jac = bs.metadata.jacobian_with(out);
-          let new_vert = PathVertex {
-            point:    intr.hit.point_global(),
-            specular: bs.metadata.dirac,
-            prob:     prob_next,
-            eye:      init_ray.direction.neg().into(),
-            light:    intr.hit.to_global(bs.metadata.inc.normalize().into()),
-            radiance: importance_next,
-            normal:   intr.hit.normal_global(),
-            surface:  PathSurface::from_interaction(intr),
-          };
-          // Perharps here we should multiply something by cosine
-          // println!("{bs_jac:.2} {:.2}", jac.x);
-          let jac = jac;
-          // let jac = Vec3::splat(bs_jac);
-          prob_next = bs.prob * jac.x;
-          importance_next = last.radiance * bs.sample * jac;
-          path.push(new_vert);
-        }
-      } // else {TODO: infinite light?}
-    }
-    Subpath {
-      vertices: path,
-      alpha:    importance_next,
-      p:        prob_next,
-    }
+    sample_subpath(SubpathConfig {
+      scene,
+      sampler,
+      term_cond,
+      init_vertex,
+      init_radiance: INITIAL_IMPORTANCE,
+      init_prob: 1.0,
+      bsdf_context: BSDFSampleContext::Camera,
+      update_state: |last, bs, total_jac, _prob, rad| {
+        // Eye path: prob_next = bs.prob * total_jac, importance = last.radiance * bs.sample * total_jac
+        (bs.prob * total_jac, last.radiance * bs.sample * total_jac)
+      },
+      init_direction: init_ray.direction.into(),
+    })
   }
 
   pub fn mis_weight(&self) -> f32 { todo!() } // or should we return spectrum?

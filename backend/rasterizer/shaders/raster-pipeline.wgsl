@@ -1,6 +1,18 @@
-struct _MatrixStorage_float4x4std140_0
+struct _MatrixStorage_float4x4std430_0
 {
     @align(16) data_0 : array<vec4<f32>, i32(4)>,
+};
+
+struct Body_std430_0
+{
+    @align(16) body2world_0 : _MatrixStorage_float4x4std430_0,
+    @align(16) center_world_0 : vec3<f32>,
+};
+
+var<immediate> body_0 : Body_std430_0;
+struct _MatrixStorage_float4x4std140_0
+{
+    @align(16) data_1 : array<vec4<f32>, i32(4)>,
 };
 
 struct Globals_std140_0
@@ -64,7 +76,7 @@ struct vertexInput_0
 @vertex
 fn MeshGeometryVS( _S2 : vertexInput_0) -> VertexOutput_0
 {
-    var position_2 : vec4<f32> = ((((((mat4x4<f32>(mat4x4<f32>(global_0.projection_0.data_0[i32(0)][i32(0)], global_0.projection_0.data_0[i32(0)][i32(1)], global_0.projection_0.data_0[i32(0)][i32(2)], global_0.projection_0.data_0[i32(0)][i32(3)], global_0.projection_0.data_0[i32(1)][i32(0)], global_0.projection_0.data_0[i32(1)][i32(1)], global_0.projection_0.data_0[i32(1)][i32(2)], global_0.projection_0.data_0[i32(1)][i32(3)], global_0.projection_0.data_0[i32(2)][i32(0)], global_0.projection_0.data_0[i32(2)][i32(1)], global_0.projection_0.data_0[i32(2)][i32(2)], global_0.projection_0.data_0[i32(2)][i32(3)], global_0.projection_0.data_0[i32(3)][i32(0)], global_0.projection_0.data_0[i32(3)][i32(1)], global_0.projection_0.data_0[i32(3)][i32(2)], global_0.projection_0.data_0[i32(3)][i32(3)]))) * (mat4x4<f32>(mat4x4<f32>(global_0.camera_0.data_0[i32(0)][i32(0)], global_0.camera_0.data_0[i32(0)][i32(1)], global_0.camera_0.data_0[i32(0)][i32(2)], global_0.camera_0.data_0[i32(0)][i32(3)], global_0.camera_0.data_0[i32(1)][i32(0)], global_0.camera_0.data_0[i32(1)][i32(1)], global_0.camera_0.data_0[i32(1)][i32(2)], global_0.camera_0.data_0[i32(1)][i32(3)], global_0.camera_0.data_0[i32(2)][i32(0)], global_0.camera_0.data_0[i32(2)][i32(1)], global_0.camera_0.data_0[i32(2)][i32(2)], global_0.camera_0.data_0[i32(2)][i32(3)], global_0.camera_0.data_0[i32(3)][i32(0)], global_0.camera_0.data_0[i32(3)][i32(1)], global_0.camera_0.data_0[i32(3)][i32(2)], global_0.camera_0.data_0[i32(3)][i32(3)])))))) * (vec4<f32>(_S2.vertex_local_pos_0, 1.0f))));
+    var position_2 : vec4<f32> = (((((((((mat4x4<f32>(mat4x4<f32>(global_0.projection_0.data_1[i32(0)][i32(0)], global_0.projection_0.data_1[i32(0)][i32(1)], global_0.projection_0.data_1[i32(0)][i32(2)], global_0.projection_0.data_1[i32(0)][i32(3)], global_0.projection_0.data_1[i32(1)][i32(0)], global_0.projection_0.data_1[i32(1)][i32(1)], global_0.projection_0.data_1[i32(1)][i32(2)], global_0.projection_0.data_1[i32(1)][i32(3)], global_0.projection_0.data_1[i32(2)][i32(0)], global_0.projection_0.data_1[i32(2)][i32(1)], global_0.projection_0.data_1[i32(2)][i32(2)], global_0.projection_0.data_1[i32(2)][i32(3)], global_0.projection_0.data_1[i32(3)][i32(0)], global_0.projection_0.data_1[i32(3)][i32(1)], global_0.projection_0.data_1[i32(3)][i32(2)], global_0.projection_0.data_1[i32(3)][i32(3)]))) * (mat4x4<f32>(mat4x4<f32>(global_0.camera_0.data_1[i32(0)][i32(0)], global_0.camera_0.data_1[i32(0)][i32(1)], global_0.camera_0.data_1[i32(0)][i32(2)], global_0.camera_0.data_1[i32(0)][i32(3)], global_0.camera_0.data_1[i32(1)][i32(0)], global_0.camera_0.data_1[i32(1)][i32(1)], global_0.camera_0.data_1[i32(1)][i32(2)], global_0.camera_0.data_1[i32(1)][i32(3)], global_0.camera_0.data_1[i32(2)][i32(0)], global_0.camera_0.data_1[i32(2)][i32(1)], global_0.camera_0.data_1[i32(2)][i32(2)], global_0.camera_0.data_1[i32(2)][i32(3)], global_0.camera_0.data_1[i32(3)][i32(0)], global_0.camera_0.data_1[i32(3)][i32(1)], global_0.camera_0.data_1[i32(3)][i32(2)], global_0.camera_0.data_1[i32(3)][i32(3)])))))) * (mat4x4<f32>(mat4x4<f32>(body_0.body2world_0.data_0[i32(0)][i32(0)], body_0.body2world_0.data_0[i32(0)][i32(1)], body_0.body2world_0.data_0[i32(0)][i32(2)], body_0.body2world_0.data_0[i32(0)][i32(3)], body_0.body2world_0.data_0[i32(1)][i32(0)], body_0.body2world_0.data_0[i32(1)][i32(1)], body_0.body2world_0.data_0[i32(1)][i32(2)], body_0.body2world_0.data_0[i32(1)][i32(3)], body_0.body2world_0.data_0[i32(2)][i32(0)], body_0.body2world_0.data_0[i32(2)][i32(1)], body_0.body2world_0.data_0[i32(2)][i32(2)], body_0.body2world_0.data_0[i32(2)][i32(3)], body_0.body2world_0.data_0[i32(3)][i32(0)], body_0.body2world_0.data_0[i32(3)][i32(1)], body_0.body2world_0.data_0[i32(3)][i32(2)], body_0.body2world_0.data_0[i32(3)][i32(3)])))))) * (vec4<f32>(_S2.vertex_local_pos_0, 1.0f))));
     const _S3 : vec3<f32> = vec3<f32>(0.0f, 1.0f, 0.0f);
     var up_0 : vec3<f32>;
     if((abs(_S2.normal_1.y)) > 0.99900001287460327f)
@@ -78,7 +90,7 @@ fn MeshGeometryVS( _S2 : vertexInput_0) -> VertexOutput_0
     var tangent_0 : vec3<f32> = normalize(cross(_S2.normal_1, normalize(cross(up_0, _S2.normal_1))));
     var TBN_0 : mat3x3<f32> = transpose(mat3x3<f32>(tangent_0, cross(_S2.normal_1, tangent_0), _S2.normal_1));
     const light_dir_2 : vec3<f32> = vec3<f32>(0.0f, 0.0f, 1.0f);
-    var _S4 : vec3<f32> = (((vec4<f32>(0.0f, 0.0f, 0.0f, 1.0f)) * (mat4x4<f32>(mat4x4<f32>(global_0.camera_0.data_0[i32(0)][i32(0)], global_0.camera_0.data_0[i32(0)][i32(1)], global_0.camera_0.data_0[i32(0)][i32(2)], global_0.camera_0.data_0[i32(0)][i32(3)], global_0.camera_0.data_0[i32(1)][i32(0)], global_0.camera_0.data_0[i32(1)][i32(1)], global_0.camera_0.data_0[i32(1)][i32(2)], global_0.camera_0.data_0[i32(1)][i32(3)], global_0.camera_0.data_0[i32(2)][i32(0)], global_0.camera_0.data_0[i32(2)][i32(1)], global_0.camera_0.data_0[i32(2)][i32(2)], global_0.camera_0.data_0[i32(2)][i32(3)], global_0.camera_0.data_0[i32(3)][i32(0)], global_0.camera_0.data_0[i32(3)][i32(1)], global_0.camera_0.data_0[i32(3)][i32(2)], global_0.camera_0.data_0[i32(3)][i32(3)]))))).xyz - position_2.xyz;
+    var _S4 : vec3<f32> = (((vec4<f32>(0.0f, 0.0f, 0.0f, 1.0f)) * (mat4x4<f32>(mat4x4<f32>(global_0.camera_0.data_1[i32(0)][i32(0)], global_0.camera_0.data_1[i32(0)][i32(1)], global_0.camera_0.data_1[i32(0)][i32(2)], global_0.camera_0.data_1[i32(0)][i32(3)], global_0.camera_0.data_1[i32(1)][i32(0)], global_0.camera_0.data_1[i32(1)][i32(1)], global_0.camera_0.data_1[i32(1)][i32(2)], global_0.camera_0.data_1[i32(1)][i32(3)], global_0.camera_0.data_1[i32(2)][i32(0)], global_0.camera_0.data_1[i32(2)][i32(1)], global_0.camera_0.data_1[i32(2)][i32(2)], global_0.camera_0.data_1[i32(2)][i32(3)], global_0.camera_0.data_1[i32(3)][i32(0)], global_0.camera_0.data_1[i32(3)][i32(1)], global_0.camera_0.data_1[i32(3)][i32(2)], global_0.camera_0.data_1[i32(3)][i32(3)]))))).xyz - position_2.xyz;
     return VertexOutput_x24init_0(position_2, _S2.uv_2, (((light_dir_2) * (TBN_0))), (((normalize(light_dir_2 + normalize(_S4))) * (TBN_0))), (((_S4) * (TBN_0))));
 }
 

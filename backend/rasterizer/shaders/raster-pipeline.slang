@@ -38,7 +38,7 @@ uniform Texture2D normalTex;
 ConstantBuffer<Colors> colors;
 
 struct Body {
-    float4x4 body2world;
+    row_major float4x4 body2world;
     float3 center_world;
 };
 
@@ -101,7 +101,7 @@ VertexOutput MeshGeometryVS(
     float3 normal: POSITION1,
     float2 uv: POSITION2
 ) {
-    var transform = mul(global.camera, global.projection);
+    var transform = mul(body.body2world, mul(global.camera, global.projection));
     var position = mul(float4(vertex_local_pos, 1.0),
                    transform
     );

@@ -41,6 +41,7 @@ pub struct TextureDrawerResources<'a> {
   /// Bind groups for custom shading. The first group here has index `1`.
   pub bind_groups: &'a [&'a BindGroup],
   pub device:      &'a wgpu::Device, // pub blend:       Option<BlendState>,
+  pub immediates:  &'a [u8],
 }
 impl<'a> ExternalResources<'a> for TextureDrawerResources<'a> {}
 
@@ -84,6 +85,7 @@ pub struct TextureDrawerInitRes<'a> {
   pub layout:          &'a [BindGroupLayout],
   pub unclipped_depth: bool,
   pub blend:           Option<wgpu::BlendState>,
+  pub immediate_size:  u32,
 }
 
 impl<'a> RenderTarget<'a> for TextureDrawer {
@@ -109,6 +111,9 @@ impl<'a> RenderTarget<'a> for TextureDrawer {
     pass.set_bind_group(0, bg as &BindGroup, &[]);
     for (i, &g) in resources.bind_groups.iter().enumerate() {
       pass.set_bind_group((i + 1) as u32, g, &[]);
+    }
+    if resources.immediates.len() > 0 {
+      pass.set_immediates(0, resources.immediates);
     }
     pass.draw(0..4, 0..1);
     self.bg.replace(opt_bg);
@@ -154,7 +159,7 @@ impl TextureDrawer {
         .chain(init_res.layout)
         .map(Some)
         .collect::<Vec<_>>(),
-      immediate_size:     0,
+      immediate_size:     init_res.immediate_size,
     });
 
     let shader = device.create_shader_module(wgpu::include_wgsl!("show-texture.wgsl"));

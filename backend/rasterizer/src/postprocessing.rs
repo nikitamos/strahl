@@ -1,11 +1,8 @@
-use std::{
-  cell::{Cell, RefCell},
-  num::NonZero,
-};
+use std::{cell::RefCell, num::NonZero};
 
 use glam::Vec2;
 use wgpu::{BlendState, util::DeviceExt};
-use zerocopy::IntoBytes;
+use zerocopy::{Immutable, IntoBytes};
 
 use crate::limne::{
   Blur, GaussianBlur, RenderTarget, TextureDrawer, TextureDrawerResources, TextureProvider,
@@ -41,18 +38,27 @@ pub trait PostProcessStep: Send {
 }
 
 pub struct BloomPostProcess {
-  drawer:               TextureDrawer,
   device:               wgpu::Device,
+  #[deprecated]
   kernel_buffer:        wgpu::Buffer,
   kernel_layout:        wgpu::BindGroupLayout,
   kernel_group:         RefCell<Option<wgpu::BindGroup>>,
   bright_regions:       TextureProvider,
   brightness_extractor: TextureDrawer,
+  blur_horizontal:      TextureDrawer,
+  blur_vertical:        TextureDrawer,
+  temp_texture:         TextureProvider,
 }
 
 pub struct BloomCreateInfo {
   pub kernel_depth: u32,
   pub s:            f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, IntoBytes, Immutable)]
+struct PushConstants {
+  horizontal: u32,
 }
 
 impl PostProcessStep for BloomPostProcess {
@@ -63,15 +69,17 @@ impl PostProcessStep for BloomPostProcess {
     let blur = GaussianBlur {
       s:    ci.s,
       side: ci.kernel_depth as usize,
-      dh:   Vec2::ONE, // TODO
+      dh:   Vec2::ONE,
     };
     let shader = base_info
       .device
       .create_shader_module(wgpu::include_wgsl!("../shaders/blur.wgsl"));
-    let (kernel_buffer, kernel_layout, blur) = prepare_blur(&base_info, blur, &shader);
+    let (kernel_buffer, kernel_layout, blur_horizontal, blur_vertical) =
+      prepare_blur(&base_info, blur, &shader);
+
     let bright_regions =
       TextureProvider::new(&base_info.device, crate::limne::TextureProviderDescriptor {
-        label:           Some("birght regions".to_string()),
+        label:           Some("bright regions".to_string()),
         size:            wgpu::Extent3d {
           width:                 base_info.target_dim,
           height:                base_info.target_dim,
@@ -85,6 +93,25 @@ impl PostProcessStep for BloomPostProcess {
           | wgpu::TextureUsages::TEXTURE_BINDING,
         view_formats:    vec![],
       });
+
+    // Temporary texture for intermediate blur pass
+    let temp_texture =
+      TextureProvider::new(&base_info.device, crate::limne::TextureProviderDescriptor {
+        label:           Some("bloom temp".to_string()),
+        size:            wgpu::Extent3d {
+          width:                 base_info.target_dim,
+          height:                base_info.target_dim,
+          depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count:    1,
+        dimension:       wgpu::TextureDimension::D2,
+        format:          base_info.texture_format,
+        usage:           wgpu::TextureUsages::RENDER_ATTACHMENT
+          | wgpu::TextureUsages::TEXTURE_BINDING,
+        view_formats:    vec![],
+      });
+
     let brightness_extractor = TextureDrawer::new(
       &base_info.device,
       &bright_regions.format(),
@@ -102,16 +129,20 @@ impl PostProcessStep for BloomPostProcess {
         ..Default::default()
       },
     );
+
     Self {
-      drawer: blur,
       device: base_info.device,
       kernel_buffer,
       kernel_layout,
       kernel_group: RefCell::new(None),
       bright_regions,
       brightness_extractor,
+      blur_horizontal,
+      blur_vertical,
+      temp_texture,
     }
   }
+
   fn apply(
     &self,
     origin: &wgpu::TextureView,
@@ -147,33 +178,19 @@ impl PostProcessStep for BloomPostProcess {
         src:         origin,
         bind_groups: &[],
         device:      &self.device,
+        immediates: &[]
       });
     drop(pass);
-    // encoder.copy_texture_to_texture(
-    //   wgpu::TexelCopyTextureInfoBase {
-    //     texture:   origin.texture(),
-    //     mip_level: 0,
-    //     origin:    wgpu::Origin3d::ZERO,
-    //     aspect:    wgpu::TextureAspect::All,
-    //   },
-    //   wgpu::TexelCopyTextureInfoBase {
-    //     texture:   target.texture(),
-    //     mip_level: 0,
-    //     origin:    wgpu::Origin3d::ZERO,
-    //     aspect:    wgpu::TextureAspect::All,
-    //   },
-    //   wgpu::Extent3d {
-    //     width:                 info.dimensions,
-    //     height:                info.dimensions,
-    //     depth_or_array_layers: 1,
-    //   },
-    // );
 
-    // 2. Apply blur
+    let kernel_group = self.kernel_group.borrow();
+    let bind_groups = [kernel_group.as_ref().unwrap(), info.uniform.bind_group()];
+
+    // 2. Horizontal blur pass (bright_regions -> temp_texture)
+
     let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-      label: Some("bloom pass"),
+      label: Some("bloom horizontal blur"),
       color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-        view:           target,
+        view:           &self.temp_texture,
         depth_slice:    None,
         resolve_target: None,
         ops:            wgpu::Operations {
@@ -186,14 +203,42 @@ impl PostProcessStep for BloomPostProcess {
       occlusion_query_set: None,
       multiview_mask: None,
     });
-    // pass.set_viewport(0.0, 0.0, info.viewport.x, info.viewport.y, 0.0, 1.0);
-    let kernel_group = self.kernel_group.borrow();
+
     self
-      .drawer
+      .blur_horizontal
       .render_into_pass(&mut pass, &TextureDrawerResources {
         src:         &self.bright_regions,
-        bind_groups: &[kernel_group.as_ref().unwrap(), info.uniform.bind_group()],
+        bind_groups: &bind_groups,
         device:      &self.device,
+        immediates:  PushConstants { horizontal: 1 }.as_bytes(),
+      });
+    drop(pass);
+
+    // 3. Vertical blur pass (temp_texture -> target)
+    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+      label: Some("bloom vertical blur"),
+      color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+        view:           target,
+        depth_slice:    None,
+        resolve_target: None,
+        ops:            wgpu::Operations {
+          load:  wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+          store: wgpu::StoreOp::Store,
+        },
+      })],
+      depth_stencil_attachment: None,
+      timestamp_writes: None,
+      occlusion_query_set: None,
+      multiview_mask: None,
+    });
+
+    self
+      .blur_vertical
+      .render_into_pass(&mut pass, &TextureDrawerResources {
+        src:         &self.temp_texture,
+        bind_groups: &bind_groups,
+        device:      &self.device,
+        immediates:  PushConstants { horizontal: 0 }.as_bytes(),
       });
 
     drop(pass);
@@ -220,29 +265,26 @@ fn prepare_blur<B: Blur>(
   base_info: &PostProcessCreateInfoBase<'_>,
   blur: B,
   shader: &wgpu::ShaderModule,
-) -> (wgpu::Buffer, wgpu::BindGroupLayout, TextureDrawer) {
+) -> (
+  wgpu::Buffer,
+  wgpu::BindGroupLayout,
+  TextureDrawer,
+  TextureDrawer,
+) {
   let kernel = blur.full_kernel();
   let device = &base_info.device;
   let kernel_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
     label:    Some("bloom kernel"),
-    contents: kernel.as_bytes(), // TODO: does it do what I think
+    contents: kernel.as_bytes(),
     usage:    wgpu::BufferUsages::STORAGE,
   });
+
+  // Bind group layout for kernel and origin texture
   let kernel_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
     label:   Some("bloom kernel"),
     entries: &[
       wgpu::BindGroupLayoutEntry {
         binding:    0,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty:         wgpu::BindingType::Buffer {
-          ty:                 wgpu::BufferBindingType::Storage { read_only: true },
-          has_dynamic_offset: false,
-          min_binding_size:   NonZero::new((kernel.len() * std::mem::size_of::<f32>()) as u64),
-        },
-        count:      None,
-      },
-      wgpu::BindGroupLayoutEntry {
-        binding:    1,
         visibility: wgpu::ShaderStages::FRAGMENT,
         ty:         wgpu::BindingType::Texture {
           sample_type:    wgpu::TextureSampleType::Float { filterable: true },
@@ -254,7 +296,13 @@ fn prepare_blur<B: Blur>(
     ],
   });
 
-  let drawer = TextureDrawer::new(
+  // Bind group layouts for the blur passes
+  let bind_group_layouts = [
+    kernel_layout.clone(),
+    base_info.uniform.bind_group_layout().clone(),
+  ];
+
+  let blur_horizontal = TextureDrawer::new(
     &base_info.device,
     &base_info.texture_format,
     crate::limne::TextureDrawerInitRes {
@@ -276,12 +324,36 @@ fn prepare_blur<B: Blur>(
           write_mask: Default::default(),
         })],
       }),
-      layout:          &[kernel_layout.clone(), base_info.uniform.bind_group_layout().clone()],
+      layout:          &bind_group_layouts, // Pass the bind group layouts
       unclipped_depth: false,
       blend:           None,
+      immediate_size:  std::mem::size_of::<PushConstants>() as u32, // Size of push constants
     },
   );
-  (kernel_buffer, kernel_layout, drawer)
+
+  let blur_vertical = TextureDrawer::new(
+    &base_info.device,
+    &base_info.texture_format,
+    crate::limne::TextureDrawerInitRes {
+      stencil:         None,
+      fragment:        Some(wgpu::FragmentState {
+        module:              shader,
+        entry_point:         Some("blur"),
+        compilation_options: Default::default(),
+        targets:             &[Some(wgpu::ColorTargetState {
+          format:     base_info.texture_format,
+          blend:      Some(wgpu::BlendState::REPLACE),
+          write_mask: Default::default(),
+        })],
+      }),
+      layout:          &bind_group_layouts, // Pass the bind group layouts
+      unclipped_depth: false,
+      blend:           None,
+      immediate_size:  std::mem::size_of::<PushConstants>() as u32, // Size of push constants
+    },
+  );
+
+  (kernel_buffer, kernel_layout, blur_horizontal, blur_vertical)
 }
 
 fn kernel_group(
@@ -296,14 +368,6 @@ fn kernel_group(
     entries: &[
       wgpu::BindGroupEntry {
         binding:  0,
-        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-          buffer: kernel_buffer,
-          offset: 0,
-          size:   None,
-        }),
-      },
-      wgpu::BindGroupEntry {
-        binding:  1,
         resource: wgpu::BindingResource::TextureView(origin),
       },
     ],

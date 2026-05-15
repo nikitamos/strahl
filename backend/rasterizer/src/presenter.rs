@@ -327,6 +327,7 @@ impl<'w> SurfacePresenter<'w> {
         src:         &backbuffer.create_view(&Default::default()),
         bind_groups: &[],
         device:      &self.device,
+        immediates: &[]
       });
   }
 }
@@ -397,48 +398,5 @@ impl<'w> Presenter for SurfacePresenter<'w> {
         alpha_mode: wgpu::CompositeAlphaMode::Opaque,
         view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
       });
-  }
-}
-
-#[cfg(false)]
-impl<'w> SurfacePresenter<'w> {
-  fn vulkan_blit(
-    src: vk::Image,
-    dst: vk::Image,
-    dev: &ash::Device,
-    command_buffer: &vk::CommandBuffer,
-  ) {
-    let region = vk::ImageBlit2::default()
-      .dst_offsets([vk::Offset3D::default(), vk::Offset3D {
-        x: 1212,
-        y: 1212,
-        z: 1212,
-      }])
-      .src_offsets([vk::Offset3D::default(), vk::Offset3D {
-        x: 1212,
-        y: 1212,
-        z: 1212,
-      }])
-      .src_subresource(vk::ImageSubresourceLayers {
-        aspect_mask:      vk::ImageAspectFlags::COLOR,
-        mip_level:        0,
-        base_array_layer: 0,
-        layer_count:      1,
-      })
-      .dst_subresource(vk::ImageSubresourceLayers {
-        aspect_mask:      vk::ImageAspectFlags::COLOR,
-        mip_level:        0,
-        base_array_layer: 0,
-        layer_count:      1,
-      });
-
-    let info = vk::BlitImageInfo2::default()
-      .src_image(src)
-      .src_image_layout(todo!())
-      .dst_image(dst)
-      .dst_image_layout(todo!())
-      .regions(&[region])
-      .filter(vk::Filter::LINEAR);
-    unsafe { dev.cmd_blit_image2(*command_buffer, &info) }
   }
 }

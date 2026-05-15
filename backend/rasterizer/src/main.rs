@@ -79,12 +79,12 @@ pub async fn true_main() -> anyhow::Result<()> {
 
   let size = glam::uvec2(1024, 1024);
   let mut strahl = Rasterizer::new(RasterizerCreateInfo {
-    state: RasterizerStateInfo { viewport: size },
-    wgpu:  RasterizerWgpuInfo {
+    state:       RasterizerStateInfo { viewport: size },
+    wgpu:        RasterizerWgpuInfo {
       wgpu_setup: WgpuSetup::Managed,
       target:     PresentTarget::ManagedMappedRam,
     },
-    buffer_side: 1024
+    buffer_side: 1024,
   })
   .await?;
   let loader = strahl.asset_loader();
@@ -101,24 +101,13 @@ pub async fn true_main() -> anyhow::Result<()> {
   for i in 0..POINTS {
     #[cfg(feature = "renderdoc")]
     rdoc.start_frame_capture();
-    log::trace!("rendering image {i}, of {POINTS}");
+    log::trace!("rendering image {i} of {POINTS}");
     let phi = i as f32 / TAU;
 
     let eye = glam::vec3(0.0, phi.cos(), phi.sin());
     let camera = Camera {
-      projection: dbg!(Mat4::orthographic_lh(
-        -1.0,
-        1.0,
-        -1.0 / aspect,
-        1.0 / aspect,
-        0.0,
-        3.0
-      )),
-      camera:     dbg!(Mat4::look_at_lh(
-        eye,
-        glam::Vec3::ZERO,
-        eye.cross(glam::Vec3::X),
-      )),
+      projection: (Mat4::orthographic_lh(-1.0, 1.0, -1.0 / aspect, 1.0 / aspect, 0.0, 3.0)),
+      camera:     (Mat4::look_at_lh(eye, glam::Vec3::ZERO, eye.cross(glam::Vec3::X))),
     };
 
     let PresentationResult::Mapped(test) = strahl.render(&scene, &camera) else {

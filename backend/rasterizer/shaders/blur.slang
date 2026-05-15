@@ -19,6 +19,7 @@ static int ARRAY_LEN;
 
 static float2 dh;
 static float2 dx;
+static const float THRESHOLD = 0.1;
 
 float at(int2 i)
 {
@@ -33,7 +34,6 @@ struct VOut
 
 struct FOut
 {
-    float depth : SV_DEPTH;
     float4 norm : SV_TARGET0;
 };
 
@@ -49,8 +49,12 @@ FOut fs_main(VOut input)
     CENTER = int2(SIDE, SIDE);
     
     FOut o;
-    o.depth = 0.0f;
     o.norm = float4(0.0f, 0.0f, 0.0f, 0.0f);
+
+    let curSample = unsmoothed.Sample(smp, float2(input.texcoord));
+    if (dot(curSample.xyz, curSample.xyz) >= THRESHOLD) {
+        return o;
+    }
     
     float2 size = float2(g.viewport_size.x, g.viewport_size.y);
     dx = float2(1.0f / size.x, 0.0f);
@@ -64,7 +68,8 @@ FOut fs_main(VOut input)
         {
             float2 pos = float2(px);
             float2 samplePos = input.texcoord.xy + dh * pos; 
-            o.norm += float4(unsmoothed.Sample(smp, samplePos).xyzw) * at(int2(px + CENTER));
+            float4 sample = unsmoothed.Sample(smp, samplePos);
+            o.norm += sample * at(int2(px + CENTER));
         }
     }
     

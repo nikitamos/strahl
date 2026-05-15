@@ -19,11 +19,13 @@ pub struct PostProcessCreateInfoBase<'a> {
   pub uniform:        &'a crate::uniform::GlobalUniformsWrapper,
 }
 
-pub trait PostProcessStep {
-  type CreateInfo;
+pub trait PostProcessStep: Send {
+  type CreateInfo
+  where Self: Sized;
 
   fn create(ci: Self::CreateInfo, base_info: PostProcessCreateInfoBase) -> Self
   where Self: Sized;
+  #[must_use]
   fn apply(
     &self,
     origin: &wgpu::TextureView,
@@ -32,7 +34,7 @@ pub trait PostProcessStep {
   ) -> wgpu::CommandBuffer;
 }
 
-struct BloomPostProcess {
+pub struct BloomPostProcess {
   drawer:        TextureDrawer,
   device:        wgpu::Device,
   kernel_buffer: wgpu::Buffer,
@@ -103,7 +105,7 @@ impl PostProcessStep for BloomPostProcess {
             write_mask: Default::default(),
           })],
         }),
-        layout:          &[base_info.uniform.bind_group_layout().clone(), kernel_layout],
+        layout:          &[kernel_layout, base_info.uniform.bind_group_layout().clone()],
         unclipped_depth: false,
         blend:           None,
       },
@@ -121,6 +123,7 @@ impl PostProcessStep for BloomPostProcess {
     target: &wgpu::TextureView,
     info: PostProcessInfo,
   ) -> wgpu::CommandBuffer {
+    log::trace!("applying bloom");
     let mut encoder = self
       .device
       .create_command_encoder(&wgpu::wgt::CommandEncoderDescriptor {
@@ -143,12 +146,12 @@ impl PostProcessStep for BloomPostProcess {
       occlusion_query_set: None,
       multiview_mask: None,
     });
-    pass.set_viewport(0.0, 0.0, info.viewport.x, info.viewport.y, 0.0, 1.0);
+    // pass.set_viewport(0.0, 0.0, info.viewport.x, info.viewport.y, 0.0, 1.0);
     self
       .drawer
       .render_into_pass(&mut pass, &TextureDrawerResources {
         src:         origin,
-        bind_groups: &[&self.kernel_group],
+        bind_groups: &[&self.kernel_group, info.uniform.bind_group()],
         device:      &self.device,
       });
 

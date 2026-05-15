@@ -24,6 +24,9 @@ use wgpu::{Backends, hal::vulkan as wgvk, wgt::WgpuHasDisplayHandle};
 
 use crate::{
   geometry::Geometry,
+  postprocessing::{
+    BloomCreateInfo, BloomPostProcess, PostProcessCreateInfoBase, PostProcessInfo, PostProcessStep,
+  },
   presenter::{PresentationResult, Presenter, SurfacePresenter, TexturePresenter},
   scene::Scene,
   shader_manager::ShaderManager,
@@ -34,17 +37,19 @@ pub mod postprocessing;
 pub mod skybox;
 
 pub struct Rasterizer {
-  i:         wgpu::Instance,
-  queue:     wgpu::Queue,
-  dev:       wgpu::Device,
-  presenter: Box<dyn Presenter>,
-  target:    limne::TextureProvider,
-  drawer:    Option<limne::TextureDrawer>,
-  manager:   Arc<ShaderManager>,
-  info:      RwLock<RasterizerStateInfo>,
-  loader:    loader::AssetLoader,
-  depth:     limne::TextureProvider,
-  buffer_side: u32
+  i:           wgpu::Instance,
+  queue:       wgpu::Queue,
+  dev:         wgpu::Device,
+  presenter:   Box<dyn Presenter>,
+  postprocess: Vec<Box<dyn postprocessing::PostProcessStep>>,
+  target:      limne::TextureProvider,
+  target2:     limne::TextureProvider,
+  drawer:      Option<limne::TextureDrawer>,
+  manager:     Arc<ShaderManager>,
+  info:        RwLock<RasterizerStateInfo>,
+  loader:      loader::AssetLoader,
+  depth:       limne::TextureProvider,
+  buffer_side: u32,
 }
 
 pub mod geometry;
@@ -69,9 +74,9 @@ pub enum PresentTarget {
 }
 
 pub struct RasterizerCreateInfo {
-  pub state: RasterizerStateInfo,
-  pub wgpu:  RasterizerWgpuInfo,
-  pub buffer_side: u32
+  pub state:       RasterizerStateInfo,
+  pub wgpu:        RasterizerWgpuInfo,
+  pub buffer_side: u32,
 }
 
 pub struct RasterizerStateInfo {
@@ -104,7 +109,7 @@ impl Rasterizer {
     RasterizerCreateInfo {
       state: info,
       wgpu: wgpu_info,
-      buffer_side
+      buffer_side,
     }: RasterizerCreateInfo,
   ) -> anyhow::Result<Rasterizer> {
     log::info!("Creating Rasterizer backend?");
@@ -116,22 +121,8 @@ impl Rasterizer {
       presenter,
     } = Self::create_wgpu_state(wgpu_info, &info).await?;
 
-    let target = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
-      label:           Some(" a kind of render target".to_string()),
-      size:            wgpu::Extent3d {
-        width:                 buffer_side,
-        height:                buffer_side,
-        depth_or_array_layers: 1,
-      },
-      mip_level_count: 1,
-      sample_count:    1,
-      dimension:       wgpu::TextureDimension::D2,
-      format:          wgpu::TextureFormat::Rgba8Unorm,
-      usage:           wgpu::TextureUsages::RENDER_ATTACHMENT
-        | wgpu::TextureUsages::COPY_SRC
-        | wgpu::TextureUsages::TEXTURE_BINDING,
-      view_formats:    vec![wgpu::TextureFormat::Rgba8Unorm],
-    });
+    let target = create_target(buffer_side, &dev, "target 1");
+    let target2 = create_target(buffer_side, &dev, "target 2");
     let depth = limne::TextureProvider::new(&dev, limne::TextureProviderDescriptor {
       label:           Some("depth".to_string()),
       size:            wgpu::Extent3d {
@@ -152,6 +143,20 @@ impl Rasterizer {
       wgpu::TextureFormat::Depth16Unorm,
     ));
 
+    let pp = BloomPostProcess::create(
+      BloomCreateInfo {
+        kernel_depth: 8,
+        s:            3.0,
+      },
+      PostProcessCreateInfoBase {
+        target_dim:     buffer_side,
+        texture_format: target.format(),
+        depth_format:   wgpu::TextureFormat::Depth16Unorm,
+        device:         dev.clone(),
+        uniform:        &manager.uniforms(),
+      },
+    );
+
     // On wgpu shutdown device is dropped earlier than callback is called for some reason
     Ok(Rasterizer {
       i: instance,
@@ -161,10 +166,12 @@ impl Rasterizer {
       drawer: None,
       dev,
       target,
+      target2,
       manager,
       info: RwLock::new(info),
       depth,
-      buffer_side
+      buffer_side,
+      postprocess: vec![Box::new(pp)],
     })
   }
 
@@ -248,7 +255,8 @@ impl Rasterizer {
   pub fn render(&self, scene: &Scene, camera: &Camera) -> PresentationResult<'_> {
     let begin = SystemTime::now();
     let viewport = self.info.read().viewport;
-    let viewport_size = viewport.clamp(UVec2::ZERO, glam::uvec2(self.buffer_side, self.buffer_side));
+    let viewport_size =
+      viewport.clamp(UVec2::ZERO, glam::uvec2(self.buffer_side, self.buffer_side));
     if viewport_size != viewport {
       log::warn!("Viewport is too large; its size is clamped to texture dimensions");
     }
@@ -298,15 +306,18 @@ impl Rasterizer {
       scene.draw_skybox(&mut pass);
     }
     let res = self.copy_to_presenter(&mut encoder);
-    let index = self.queue.submit(std::iter::once(encoder.finish()));
+    let postprocess = self.postprocess();
+    let index = self
+      .queue
+      .submit(std::iter::once(encoder.finish()).chain(postprocess));
     self.presenter.post_submit();
     log::trace!("work submitted to the GPU");
 
     // TODO: wait asynchronously (?)
-    // let _ = self.dev.poll(wgpu::wgt::PollType::Wait {
-    //   submission_index: Some(index),
-    //   timeout:          None,
-    // });
+    let _ = self.dev.poll(wgpu::wgt::PollType::Wait {
+      submission_index: Some(index),
+      timeout:          None,
+    });
 
     let end = SystemTime::now();
     let dur = end.duration_since(begin).unwrap().as_millis_f32();
@@ -320,11 +331,34 @@ impl Rasterizer {
   fn copy_to_presenter(&self, encoder: &mut wgpu::CommandEncoder) -> PresentationResult<'_> {
     let viewport = self.info().viewport;
     self.presenter.present(
-      self.target.texture(),
+      self.get_presenting_target().tex(),
       encoder,
       glam::uvec2(self.buffer_side, self.buffer_side),
       glam::uvec4(0, 0, viewport.x, viewport.y),
     )
+  }
+
+  fn postprocess(&self) -> impl Iterator<Item = wgpu::CommandBuffer> {
+    self.postprocess.iter().enumerate().map(|(i, step)| {
+      let (origin, target) = if i % 2 == 0 {
+        (&self.target, &self.target2)
+      } else {
+        (&self.target, &self.target2)
+      };
+      let viewport = self.info().viewport;
+      step.apply(origin, target, PostProcessInfo {
+        viewport: glam::vec2(viewport.x as f32, viewport.y as f32),
+        uniform:  &self.manager.uniforms(),
+      })
+    })
+  }
+
+  fn get_presenting_target(&self) -> &limne::TextureProvider {
+    if self.postprocess.len() % 2 == 0 {
+      &self.target
+    } else {
+      &self.target2
+    }
   }
 
   pub fn required_features() -> wgpu::Features {
@@ -352,6 +386,25 @@ impl Rasterizer {
       device: dev,
     })
   }
+}
+
+fn create_target(buffer_side: u32, dev: &wgpu::Device, label: &str) -> limne::TextureProvider {
+  limne::TextureProvider::new(dev, limne::TextureProviderDescriptor {
+    label:           Some(label.to_string()),
+    size:            wgpu::Extent3d {
+      width:                 buffer_side,
+      height:                buffer_side,
+      depth_or_array_layers: 1,
+    },
+    mip_level_count: 1,
+    sample_count:    1,
+    dimension:       wgpu::TextureDimension::D2,
+    format:          wgpu::TextureFormat::Rgba8Unorm,
+    usage:           wgpu::TextureUsages::RENDER_ATTACHMENT
+      | wgpu::TextureUsages::COPY_SRC
+      | wgpu::TextureUsages::TEXTURE_BINDING,
+    view_formats:    vec![wgpu::TextureFormat::Rgba8Unorm],
+  })
 }
 
 pub mod loader;

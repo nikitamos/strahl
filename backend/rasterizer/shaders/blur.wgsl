@@ -36,7 +36,6 @@ fn at_0( i_0 : vec2<i32>) -> f32
 
 struct FOut_0
 {
-    @builtin(frag_depth) depth_0 : f32,
     @location(0) norm_0 : vec4<f32>,
 };
 
@@ -58,7 +57,6 @@ fn fs_main( _S1 : pixelInput_0, @builtin(position) clip_pos_0 : vec4<f32>) -> FO
     SIDE_0 = _S5;
     CENTER_0 = vec2<i32>(_S5, _S5);
     var o_0 : FOut_0;
-    o_0.depth_0 = 0.0f;
     o_0.norm_0 = vec4<f32>(0.0f, 0.0f, 0.0f, 0.0f);
     var _S6 : f32 = f32(g_0.viewport_size_0.y);
     var _S7 : vec2<f32> = vec2<f32>(1.0f / f32(g_0.viewport_size_0.x), 0.0f);
@@ -85,7 +83,12 @@ fn fs_main( _S1 : pixelInput_0, @builtin(position) clip_pos_0 : vec4<f32>) -> FO
             {
                 break;
             }
-            o_0.norm_0 = o_0.norm_0 + (textureSample((unsmoothed_0), (smp_0), (_S1.texcoord_0.xy + dh_0 * px_0))).xyzw * vec4<f32>(at_0(vec2<i32>(px_0 + vec2<f32>(CENTER_0))));
+            var sample_0 : vec4<f32> = (textureSample((unsmoothed_0), (smp_0), (_S1.texcoord_0.xy + dh_0 * px_0)));
+            var _S9 : vec3<f32> = sample_0.xyz;
+            if((dot(_S9, _S9)) >= 0.10000000149011612f)
+            {
+                o_0.norm_0 = o_0.norm_0 + sample_0 * vec4<f32>(at_0(vec2<i32>(px_0 + vec2<f32>(CENTER_0))));
+            }
             px_0[i32(1)] = px_0[i32(1)] + 1.0f;
         }
         px_0[i32(0)] = px_0[i32(0)] + 1.0f;

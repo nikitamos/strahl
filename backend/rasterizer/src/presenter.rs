@@ -1,4 +1,4 @@
-use std::{cell::Cell, pin::Pin, slice};
+use std::{cell::Cell, slice};
 
 use crate::{
   gpu_alloc::Allocator,
@@ -349,23 +349,23 @@ impl<'w> Presenter for SurfacePresenter<'w> {
     match self.surface.get_current_texture() {
       wgpu::CurrentSurfaceTexture::Timeout => {
         log::warn!("Swapchain timed out?");
-        return PresentationResult::Ignored;
+        PresentationResult::Ignored
       }
       wgpu::CurrentSurfaceTexture::Occluded => {
         log::warn!("The window is occluded");
-        return PresentationResult::ReconfigurationRequired(None);
+        PresentationResult::ReconfigurationRequired(None)
       }
       wgpu::CurrentSurfaceTexture::Outdated => {
         log::warn!("Surface outdated");
-        return PresentationResult::ReconfigurationRequired(None);
+        PresentationResult::ReconfigurationRequired(None)
       }
       wgpu::CurrentSurfaceTexture::Lost => {
         log::warn!("Surface lost");
-        return PresentationResult::ReconfigurationRequired(None);
+        PresentationResult::ReconfigurationRequired(None)
       }
       wgpu::CurrentSurfaceTexture::Validation => {
         log::warn!("Surface validation error");
-        return PresentationResult::Ignored;
+        PresentationResult::Ignored
       }
       wgpu::CurrentSurfaceTexture::Suboptimal(tex) => {
         log::warn!("Surface is suboptimal");

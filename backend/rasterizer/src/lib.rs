@@ -357,7 +357,7 @@ impl Rasterizer {
   }
 
   fn get_presenting_target(&self) -> &limne::TextureProvider {
-    if self.postprocess.len() % 2 == 0 {
+    if self.postprocess.len().is_multiple_of(2) {
       &self.target
     } else {
       &self.target2

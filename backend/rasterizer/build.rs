@@ -53,8 +53,8 @@ fn compile_dir(ignored_files: HashSet<&str>, shaders_dir: &Path) -> i32 {
     for entry in entries.filter_map(|e| e.ok()) {
       let path = entry.path();
 
-      if path.extension().and_then(|e| e.to_str()) == Some("slang") {
-        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+      if path.extension().and_then(|e| e.to_str()) == Some("slang")
+        && let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
           if ignored_files.contains(stem) {
             continue;
           }
@@ -64,7 +64,6 @@ fn compile_dir(ignored_files: HashSet<&str>, shaders_dir: &Path) -> i32 {
           compile_shader(path, output_path);
           compiled_count += 1;
         }
-      }
     }
   }
   compiled_count

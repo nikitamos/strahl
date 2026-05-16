@@ -112,7 +112,7 @@ impl<'a> RenderTarget<'a> for TextureDrawer {
     for (i, &g) in resources.bind_groups.iter().enumerate() {
       pass.set_bind_group((i + 1) as u32, g, &[]);
     }
-    if resources.immediates.len() > 0 {
+    if !resources.immediates.is_empty() {
       pass.set_immediates(0, resources.immediates);
     }
     pass.draw(0..4, 0..1);

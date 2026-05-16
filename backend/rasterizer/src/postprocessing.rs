@@ -414,7 +414,7 @@ fn prepare_blur<B: Blur>(
 fn kernel_group(
   origin: &wgpu::TextureView,
   device: &wgpu::Device,
-  kernel_buffer: &wgpu::Buffer,
+  _kernel_buffer: &wgpu::Buffer,
   kernel_layout: &wgpu::BindGroupLayout,
 ) -> wgpu::BindGroup {
   device.create_bind_group(&wgpu::BindGroupDescriptor {

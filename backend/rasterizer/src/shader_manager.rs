@@ -1,5 +1,5 @@
 use crate::{geometry::Geometry, skybox::Skybox, uniform::GlobalUniformsWrapper};
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 use wgpu::include_wgsl;
 
 pub(crate) struct ShaderEntryPoint {

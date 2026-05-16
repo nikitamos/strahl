@@ -1,7 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use glam::{Mat4, Vec3, Vec3Swizzles};
-use wgpu::RenderPipeline;
+use glam::{Mat4, Vec3Swizzles};
 use zerocopy::IntoBytes;
 
 use crate::{
@@ -9,7 +8,7 @@ use crate::{
   geometry::Geometry,
   material::Material,
   shader_manager::ShaderManager,
-  skybox::{self, Skybox},
+  skybox::Skybox,
 };
 
 #[repr(C)]
@@ -158,7 +157,7 @@ impl Scene {
     let pipeline = self.manager.create_pipeline_for_skybox(&skybox);
     self.skybox = Some((skybox, pipeline));
   }
-  pub fn take_skybox(&mut self, skybox: Arc<Skybox>) -> Option<Arc<Skybox>> {
+  pub fn take_skybox(&mut self, _skybox: Arc<Skybox>) -> Option<Arc<Skybox>> {
     self.skybox.take().map(|x| x.0)
   }
   pub fn draw_skybox(&self, pass: &mut wgpu::RenderPass) {
@@ -177,7 +176,7 @@ impl Scene {
     let item = self
       .bodies
       .iter()
-      .find(|x| Arc::as_ptr(x) == Arc::as_ptr(&body));
+      .find(|x| Arc::as_ptr(x) == Arc::as_ptr(body));
     if let Some(element) = item {
       let index = self.bodies.element_offset(element).unwrap();
       self.bodies.remove(index);

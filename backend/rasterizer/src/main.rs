@@ -78,7 +78,7 @@ pub async fn true_main() -> anyhow::Result<()> {
   std::io::stdin().read_line(&mut s)?;
 
   let size = glam::uvec2(1024, 1024);
-  let mut strahl = Rasterizer::new(RasterizerCreateInfo {
+  let strahl = Rasterizer::new(RasterizerCreateInfo {
     state:       RasterizerStateInfo { viewport: size },
     wgpu:        RasterizerWgpuInfo {
       wgpu_setup: WgpuSetup::Managed,

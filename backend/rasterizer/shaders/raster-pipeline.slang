@@ -1,6 +1,5 @@
 import globals;
 
-
 [SpecializationConstant]
 uint32_t COLORS;
 
@@ -138,10 +137,16 @@ float4 RasterizerPbrFS(VertexOutput in) : SV_Target {
     float3 light_specular = float3(0.4, 0.4, 0.4);
 
     float3 diffuse = albedo * diffuseness;
+    var base = max(dot(in.camera_dir, in.light_dir), 0.0);
+    if (base < 0.00001 && shininess < 0.00001) {
+        base = 1;
+        shininess = 0;
+    }
     float3 specular = light_specular *
         GetSpecular(in.uv).rgb *
-        pow(max(dot(in.camera_dir, in.light_dir), 0.0), shininess); // light is pure white
+        pow(base, shininess); // light is pure white
     float3 emission = GetEmission(in.uv).rgb;
-
-    return float4(diffuse + specular + emission, 1.0);
+    var color = diffuse + specular + emission;
+    color = tanh(color);
+    return float4(color, 1.0);
 }

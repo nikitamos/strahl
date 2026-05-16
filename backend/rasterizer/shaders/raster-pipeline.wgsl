@@ -157,7 +157,32 @@ struct pixelInput_0
 @fragment
 fn RasterizerPbrFS( _S5 : pixelInput_0, @builtin(position) position_3 : vec4<f32>) -> pixelOutput_0
 {
-    var _S6 : pixelOutput_0 = pixelOutput_0( vec4<f32>(GetDiffuse_0(_S5.uv_8).xyz * vec3<f32>(saturate(dot(GetNormal_0(_S5.uv_8).xyz * vec3<f32>(2.0f) - vec3<f32>(1.0f), _S5.light_dir_3))) + vec3<f32>(0.40000000596046448f, 0.40000000596046448f, 0.40000000596046448f) * GetSpecular_0(_S5.uv_8).xyz * vec3<f32>(pow(max(dot(_S5.camera_dir_2, _S5.light_dir_3), 0.0f), GetGlossy_0(_S5.uv_8).x)) + GetEmission_0(_S5.uv_8).xyz, 1.0f) );
-    return _S6;
+    var shininess_0 : f32 = GetGlossy_0(_S5.uv_8).x;
+    const light_specular_0 : vec3<f32> = vec3<f32>(0.40000000596046448f, 0.40000000596046448f, 0.40000000596046448f);
+    var diffuse_1 : vec3<f32> = GetDiffuse_0(_S5.uv_8).xyz * vec3<f32>(saturate(dot(GetNormal_0(_S5.uv_8).xyz * vec3<f32>(2.0f) - vec3<f32>(1.0f), _S5.light_dir_3)));
+    var _S6 : f32 = max(dot(_S5.camera_dir_2, _S5.light_dir_3), 0.0f);
+    var _S7 : bool;
+    if(_S6 < 0.00000999999974738f)
+    {
+        _S7 = shininess_0 < 0.00000999999974738f;
+    }
+    else
+    {
+        _S7 = false;
+    }
+    var base_0 : f32;
+    var shininess_1 : f32;
+    if(_S7)
+    {
+        base_0 = 1.0f;
+        shininess_1 = 0.0f;
+    }
+    else
+    {
+        base_0 = _S6;
+        shininess_1 = shininess_0;
+    }
+    var _S8 : pixelOutput_0 = pixelOutput_0( vec4<f32>(tanh(diffuse_1 + light_specular_0 * GetSpecular_0(_S5.uv_8).xyz * vec3<f32>(pow(base_0, shininess_1)) + GetEmission_0(_S5.uv_8).xyz), 1.0f) );
+    return _S8;
 }
 

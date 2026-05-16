@@ -1,4 +1,4 @@
-use std::f32::consts::TAU;
+use std::{f32::consts::TAU, path::Path};
 
 use anyhow::anyhow;
 use glam::Mat4;
@@ -87,11 +87,14 @@ pub async fn true_main() -> anyhow::Result<()> {
     buffer_side: 1024,
   })
   .await?;
-  let loader = strahl.asset_loader();
-  let material = loader.load_material("/home/nikita/BSUIR/ExoplanetsCatalog/assets/Lava.zip")?;
-  let geometry = loader.load_mesh("/home/nikita/BSUIR/ExoplanetsCatalog/assets/Lava.gltf")?;
+  let mut loader = strahl.asset_loader();
+  loader.set_prefix(
+    Path::new(&std::env::var_os("HOME").unwrap()).join("BSUIR/ExoplanetsCatalog/assets"),
+  );
+  let material = loader.load_material("Lava.zip")?;
+  let geometry = loader.load_mesh("Lava.gltf")?;
   let mut scene = strahl.create_scene();
-  let skybox = loader.load_skybox("/home/nikita/BSUIR/ExoplanetsCatalog/assets/starbox")?;
+  let skybox = loader.load_skybox("starbox")?;
   scene.set_skybox(skybox);
   let _body = scene.add_body(geometry, material);
   let aspect = (size.x as f32) / (size.y as f32);

@@ -79,9 +79,9 @@ FOut blur(VOut input)
     // Vertical pass is the second.
     // If blur is applied multiple times, the finalization and tone mapping should
     // be moved into a separate shader stage
-    if (push.horizontal == 0) {
-        o.norm.xyz = tonemapping::AcesApprox(origin.Sample(smp, input.texcoord.xy).xyz + o.norm.xyz);
-    }
+    // if (push.horizontal == 0) {
+    //     o.norm.xyz = tonemapping::AcesApprox(origin.Sample(smp, input.texcoord.xy).xyz + o.norm.xyz);
+    // }
     
     return o;
 }
@@ -98,5 +98,15 @@ FOut bright(VOut input)
     {
         o.norm.xyz = curSample.xyz;
     }
+    return o;
+}
+
+[shader("fragment")]
+FOut merge(VOut input) {
+    FOut o;
+    let unsmoothedSample = unsmoothed.Sample(smp, input.texcoord.xy);
+    let origingSample = origin.Sample(smp, input.texcoord.xy);
+    o.norm.xyz = tanh(unsmoothedSample.xyz + origingSample.xyz);
+    o.norm.w = 1.0;
     return o;
 }

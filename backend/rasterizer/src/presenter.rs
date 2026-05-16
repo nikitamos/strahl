@@ -1,4 +1,4 @@
-use std::{cell::Cell, slice};
+use std::{cell::Cell, pin::Pin, slice};
 
 use crate::{
   gpu_alloc::Allocator,
@@ -327,7 +327,7 @@ impl<'w> SurfacePresenter<'w> {
         src:         &backbuffer.create_view(&Default::default()),
         bind_groups: &[],
         device:      &self.device,
-        immediates: &[]
+        immediates:  &[],
       });
   }
 }

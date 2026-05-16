@@ -80,12 +80,14 @@ impl PostProcessStep for BloomPostProcess {
     let (kernel_buffer, kernel_layout, blur_horizontal, blur_vertical) =
       prepare_blur(&base_info, blur, &shader);
 
+    let downscaled_dim = base_info.target_dim / 2;
+
     let bright_regions =
       TextureProvider::new(&base_info.device, crate::limne::TextureProviderDescriptor {
         label:           Some("bright regions".to_string()),
         size:            wgpu::Extent3d {
-          width:                 base_info.target_dim,
-          height:                base_info.target_dim,
+          width:                 downscaled_dim,
+          height:                downscaled_dim,
           depth_or_array_layers: 1,
         },
         mip_level_count: 1,
@@ -102,8 +104,8 @@ impl PostProcessStep for BloomPostProcess {
       TextureProvider::new(&base_info.device, crate::limne::TextureProviderDescriptor {
         label:           Some("bloom temp".to_string()),
         size:            wgpu::Extent3d {
-          width:                 base_info.target_dim,
-          height:                base_info.target_dim,
+          width:                 downscaled_dim,
+          height:                downscaled_dim,
           depth_or_array_layers: 1,
         },
         mip_level_count: 1,

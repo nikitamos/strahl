@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write, ops::Neg};
+use std::{fs::File, io::Write};
 
 use super::{Interaction, IntersectionContext, Scene, Spectrum};
 use crate::{
@@ -146,7 +146,6 @@ struct SubpathConfig<'a, P: PathTerminator + ?Sized> {
   init_radiance:  Spectrum,
   init_prob:      f32,
   bsdf_context:   BSDFSampleContext<'a>,
-  update_state:   fn(&PathVertex, &BSDFSample, f32, f32, Spectrum) -> (f32, Spectrum),
 }
 
 fn sample_subpath<'a, P>(cfg: SubpathConfig<'a, P>) -> Subpath<'a>
@@ -178,7 +177,7 @@ where P: PathTerminator + ?Sized {
       if let Some(bs) = bsdf.sample_bsdf(out, cfg.sampler.sample(), cfg.bsdf_context) {
         let bs_jac = bs.metadata.jacobian_with(out);
         let total_jac = jac.x * bs_jac;
-        let (new_prob, new_radiance) = (cfg.update_state)(last, &bs, total_jac, prob, radiance);
+        let (new_prob, new_radiance) = (bs.prob * total_jac, radiance * bs.sample * total_jac);
         let new_vert = PathVertex {
           point: intr.hit.point_global(),
           specular: bs.metadata.dirac,
@@ -204,45 +203,6 @@ where P: PathTerminator + ?Sized {
   }
 }
 
-pub fn sample_light_subpath<'a>(
-  scene: &'a Scene,
-  sampler: &'a Sampler,
-  term_cond: &'a (impl PathTerminator + ?Sized),
-) -> Subpath<'a> {
-  let source = scene.sample_any_light_source(sampler);
-  let radiance = source
-    .sample
-    .sample_point_and_direction(sampler, LightSampleContext {
-      dst: Vec3::ZERO.into(),
-      scene,
-    });
-
-  let init_vertex = PathVertex {
-    surface:  PathSurface::Light(source.sample),
-    point:    radiance.metadata.point,
-    specular: false,
-    prob:     1.0,
-    eye:      radiance.metadata.direction,
-    light:    Vec3::ZERO.into(),
-    radiance: radiance.sample,
-    normal:   source.sample.transform().v2world(radiance.metadata.normal),
-  };
-
-  sample_subpath(SubpathConfig {
-    scene,
-    sampler,
-    term_cond,
-    init_vertex,
-    init_radiance: radiance.sample,
-    init_prob: radiance.metadata.point_prob,
-    bsdf_context: BSDFSampleContext::Light,
-    update_state: |_last, bs, total_jac, prob, rad| {
-      (prob * bs.prob * total_jac, rad * bs.sample * total_jac)
-    },
-    init_direction: radiance.metadata.direction,
-  })
-}
-
 impl<LT, ET> BidirectionalPathTracer<LT, ET>
 where
   LT: PathTerminator,
@@ -261,7 +221,7 @@ where
         let mut r = ray.clone();
         let pixel = glam::uvec2(px as u32 % resolution.x, px as u32 / resolution.x);
         let path = self.generate_pixel_path(scene, &mut r, pixel);
-        ray.color += path.throughput(scene); // / (self.params.sample_count as f32);
+        ray.color += path.throughput(scene) / (self.params.sample_count as f32);
         // based on path add to vector
         // so should we do something like
         // sounds to easy here
@@ -271,9 +231,9 @@ where
   }
   #[inline]
   fn generate_pixel_path<'s>(
-    &self,
+    &'s self,
     scene: &'s Scene,
-    ray: &mut CameraRay,
+    ray: &'s mut CameraRay,
     pixel: glam::UVec2,
   ) -> BidirectionalPath<'s> {
     BidirectionalPath::sample(
@@ -364,11 +324,39 @@ impl<'a> BidirectionalPath<'a> {
   }
 
   pub fn sample_light_subpath(
-    _scene: &'a Scene,
-    _sampler: &Sampler,
-    _term_cond: &(impl PathTerminator + ?Sized),
+    scene: &'a Scene,
+    sampler: &'a Sampler,
+    term_cond: &'a (impl PathTerminator + ?Sized),
   ) -> Subpath<'a> {
-    todo!()
+    let source = scene.sample_any_light_source(sampler);
+    let radiance = source
+      .sample
+      .sample_point_and_direction(sampler, LightSampleContext {
+        dst: Vec3::ZERO.into(),
+        scene,
+      });
+
+    let init_vertex = PathVertex {
+      surface:  PathSurface::Light(source.sample),
+      point:    radiance.metadata.point,
+      specular: false,
+      prob:     1.0,
+      eye:      radiance.metadata.direction,
+      light:    Vec3::ZERO.into(),
+      radiance: radiance.sample,
+      normal:   source.sample.transform().v2world(radiance.metadata.normal),
+    };
+
+    sample_subpath(SubpathConfig {
+      scene,
+      sampler,
+      term_cond,
+      init_vertex,
+      init_radiance: radiance.sample,
+      init_prob: radiance.metadata.point_prob,
+      bsdf_context: BSDFSampleContext::Light,
+      init_direction: radiance.metadata.direction,
+    })
   }
 
   pub fn sample_eye_subpath(
@@ -398,10 +386,6 @@ impl<'a> BidirectionalPath<'a> {
       init_radiance: INITIAL_IMPORTANCE,
       init_prob: 1.0,
       bsdf_context: BSDFSampleContext::Camera,
-      update_state: |last, bs, total_jac, _prob, rad| {
-        // Eye path: prob_next = bs.prob * total_jac, importance = last.radiance * bs.sample * total_jac
-        (bs.prob * total_jac, last.radiance * bs.sample * total_jac)
-      },
       init_direction: init_ray.direction.into(),
     })
   }

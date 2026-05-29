@@ -22,7 +22,7 @@ impl Solver {
   }
   pub fn render(&self, scene: &Scene, cam: &mut camera::Camera) {
     let rays = cam.init_rays();
-    const SAMPLES: i32 = 128;
+    const SAMPLES: i32 = 256;
     rays.into_par_iter().enumerate().for_each(|(_i, ray)| {
       for _ in 0..SAMPLES {
         self.trace_camera_ray(scene, ray);

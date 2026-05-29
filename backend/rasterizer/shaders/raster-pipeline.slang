@@ -10,6 +10,8 @@ static const uint32_t DIFFUSE = 0x08;
 static const uint32_t EMISSION = 0x10;
 static const uint32_t NORMAL = 0x20;  // Added for completeness
 
+static const float PI = 3.14159265358;
+
 struct Colors {
     float4 roughness;
     float4 specular;
@@ -91,7 +93,7 @@ struct VertexOutput {
     float2 uv: TEXCOORD0;
     float3 light_dir: TEXCOORD2;
     float3 halfway_dir: TEXCOORD3;
-    float3 camera_dir: TEXCOORD4;
+    float3 camera_dir : TEXCOORD4;
 };
 
 [shader("vertex")]
@@ -114,7 +116,9 @@ VertexOutput MeshGeometryVS(
     float3x3 TBN = float3x3(tangent, cross(normal, tangent), normal);
     TBN = transpose(TBN);
 
-    float3 light_dir = float3(0.0, 0.0, 1.0);
+    float4 sun_pos = mul(float4(0.0), transform);
+    float3 light_dir = normalize(position.xyz - sun_pos.xyz);
+
     float3 camera_pos = mul(global.camera, float4(0.0, 0.0, 0.0, 1.0)).xyz;
     float3 view_dir = normalize(camera_pos - position.xyz);
     float3 halfway_dir = normalize(light_dir + view_dir);
@@ -128,25 +132,24 @@ VertexOutput MeshGeometryVS(
 
 [shader("fragment")]
 float4 RasterizerPbrFS(VertexOutput in) : SV_Target {
+    float3 light_color = float3(1.0, 1.0, 1.0);
+
     float3 normal = GetNormal(in.uv).rgb * 2.0 - 1.0;
-    float3 albedo = GetDiffuse(in.uv).rgb;
-    float shininess = GetGlossy(in.uv).r;
-    float diffuseness = saturate(dot(normal, in.light_dir));
-    float glossiness = pow(max(dot(normal, in.halfway_dir), 0.0), shininess);
+    float3 light_dir = in.light_dir;
+    float3 halfway_dir = in.halfway_dir;
 
-    float3 light_specular = float3(0.4, 0.4, 0.4);
+    float diff = max(dot(normal, light_dir), 0.0);
+    float3 diffuse = diff * light_color;
 
-    float3 diffuse = albedo * diffuseness;
-    var base = max(dot(in.camera_dir, in.light_dir), 0.0);
-    if (base < 0.00001 && shininess < 0.00001) {
-        base = 1;
-        shininess = 0;
-    }
-    float3 specular = light_specular *
-        GetSpecular(in.uv).rgb *
-        pow(base, shininess); // light is pure white
+    float3 reflect_dir = reflect(-light_dir, normal);
+    float spec = pow(max(dot(normal, halfway_dir), 0.0), 16.0);
+    float3 glossiness = GetGlossy(in.uv).rgb;
+    float3 specular = glossiness * spec * light_color;
+
     float3 emission = GetEmission(in.uv).rgb;
-    var color = diffuse + specular + emission;
+    float3 albedo = GetDiffuse(in.uv).rgb;
+    float3 color = (diffuse + specular) * albedo + emission;
+
     color = tanh(color);
     return float4(color, 1.0);
 }

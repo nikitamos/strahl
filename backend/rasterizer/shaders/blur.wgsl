@@ -40,45 +40,35 @@ struct pixelInput_0
 fn blur( _S1 : pixelInput_0, @builtin(position) clip_pos_0 : vec4<f32>) -> FOut_0
 {
     var o_0 : FOut_0;
-    const _S2 : vec4<f32> = vec4<f32>(0.0f, 0.0f, 0.0f, 1.0f);
-    texelSize_0 = vec2<f32>(1.0f / f32(g_0.viewport_size_0.x), 1.0f / f32(g_0.viewport_size_0.y));
+    o_0.norm_0 = vec4<f32>(0.0f, 0.0f, 0.0f, 1.0f);
+    var _S2 : vec2<f32> = vec2<f32>(2.0f);
+    texelSize_0 = _S2 * vec2<f32>(1.0f / f32(g_0.viewport_size_0.x), 1.0f / f32(g_0.viewport_size_0.y));
     var _S3 : vec2<f32> = _S1.texcoord_0.xy;
     var curSample_0 : vec4<f32> = (textureSample((unsmoothed_0), (smp_0), (_S3)));
-    o_0.norm_0 = _S2 + curSample_0 * vec4<f32>(0.22702699899673462f);
-    var i_0 : i32;
+    var _S4 : vec2<f32>;
     if((push_0.horizontal_0) == u32(1))
     {
-        i_0 = i32(1);
-        for(;;)
-        {
-            if(i_0 < i32(5))
-            {
-            }
-            else
-            {
-                break;
-            }
-            var offset_0 : vec2<f32> = vec2<f32>(texelSize_0.x * f32(i_0), 0.0f);
-            o_0.norm_0 = o_0.norm_0 + ((textureSample((unsmoothed_0), (smp_0), (_S3 + offset_0))) + (textureSample((unsmoothed_0), (smp_0), (_S3 - offset_0)))) * vec4<f32>(weights_0[i_0]);
-            i_0 = i_0 + i32(1);
-        }
+        _S4 = vec2<f32>(texelSize_0.x, 0.0f);
     }
     else
     {
-        i_0 = i32(1);
-        for(;;)
+        _S4 = vec2<f32>(0.0f, texelSize_0.y);
+    }
+    var _S5 : vec2<f32> = _S2 * _S4;
+    o_0.norm_0 = o_0.norm_0 + curSample_0 * vec4<f32>(0.22702699899673462f);
+    var i_0 : i32 = i32(1);
+    for(;;)
+    {
+        if(i_0 < i32(5))
         {
-            if(i_0 < i32(5))
-            {
-            }
-            else
-            {
-                break;
-            }
-            var offset_1 : vec2<f32> = vec2<f32>(0.0f, texelSize_0.y * f32(i_0));
-            o_0.norm_0 = o_0.norm_0 + ((textureSample((unsmoothed_0), (smp_0), (_S3 + offset_1))) + (textureSample((unsmoothed_0), (smp_0), (_S3 - offset_1)))) * vec4<f32>(weights_0[i_0]);
-            i_0 = i_0 + i32(1);
         }
+        else
+        {
+            break;
+        }
+        var _S6 : vec2<f32> = _S5 * vec2<f32>(f32(i_0));
+        o_0.norm_0 = o_0.norm_0 + ((textureSample((unsmoothed_0), (smp_0), (_S3 + _S6))) + (textureSample((unsmoothed_0), (smp_0), (_S3 - _S6)))) * vec4<f32>(weights_0[i_0]);
+        i_0 = i_0 + i32(1);
     }
     o_0.norm_0[i32(3)] = curSample_0.w;
     return o_0;
@@ -90,16 +80,16 @@ struct pixelInput_1
 };
 
 @fragment
-fn bright( _S4 : pixelInput_1, @builtin(position) clip_pos_1 : vec4<f32>) -> FOut_0
+fn bright( _S7 : pixelInput_1, @builtin(position) clip_pos_1 : vec4<f32>) -> FOut_0
 {
     var o_1 : FOut_0;
     o_1.norm_0 = vec4<f32>(0.0f, 0.0f, 0.0f, 1.0f);
-    var _S5 : vec3<f32> = (textureSample((unsmoothed_0), (smp_0), (_S4.texcoord_1.xy))).xyz;
-    if((dot(_S5, _S5)) > 0.60000002384185791f)
+    var _S8 : vec3<f32> = (textureSample((unsmoothed_0), (smp_0), (_S7.texcoord_1.xy))).xyz;
+    if((dot(_S8, _S8)) >= 0.60000002384185791f)
     {
-        o_1.norm_0.x = _S5.x;
-        o_1.norm_0.y = _S5.y;
-        o_1.norm_0.z = _S5.z;
+        o_1.norm_0.x = _S8.x;
+        o_1.norm_0.y = _S8.y;
+        o_1.norm_0.z = _S8.z;
     }
     return o_1;
 }
@@ -110,14 +100,14 @@ struct pixelInput_2
 };
 
 @fragment
-fn merge( _S6 : pixelInput_2, @builtin(position) clip_pos_2 : vec4<f32>) -> FOut_0
+fn merge( _S9 : pixelInput_2, @builtin(position) clip_pos_2 : vec4<f32>) -> FOut_0
 {
-    var _S7 : vec2<f32> = _S6.texcoord_2.xy;
+    var _S10 : vec2<f32> = _S9.texcoord_2.xy;
     var o_2 : FOut_0;
-    var _S8 : vec3<f32> = tanh((textureSample((unsmoothed_0), (smp_0), (_S7))).xyz + (textureSample((origin_0), (smp_0), (_S7))).xyz);
-    o_2.norm_0.x = _S8.x;
-    o_2.norm_0.y = _S8.y;
-    o_2.norm_0.z = _S8.z;
+    var _S11 : vec3<f32> = tanh((textureSample((unsmoothed_0), (smp_0), (_S10))).xyz + (textureSample((origin_0), (smp_0), (_S10))).xyz);
+    o_2.norm_0.x = _S11.x;
+    o_2.norm_0.y = _S11.y;
+    o_2.norm_0.z = _S11.z;
     o_2.norm_0[i32(3)] = 1.0f;
     return o_2;
 }

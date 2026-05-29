@@ -45,44 +45,21 @@ FOut blur(VOut input)
     o.norm = float4(0.0, 0.0, 0.0, 1.0);
 
     float2 size = float2(g.viewport_size.x, g.viewport_size.y);
-    texelSize = float2(1.0f / size.x, 1.0f / size.y);
+    texelSize = 2*float2(1.0f / size.x, 1.0f / size.y); // textures are 0.5x scaled
 
     float4 curSample = unsmoothed.Sample(smp, input.texcoord.xy);
+    float2 offset = 2*(push.horizontal == 1 ? float2(texelSize.x, 0.0) : float2(0.0, texelSize.y));
     
-    // Start with center sample weighted by weights[0]
     o.norm += curSample * weights[0];
-    
-    if (push.horizontal == 1)
+    for (int i = 1; i < WEIGHT_COUNT; i++)
     {
-        // Horizontal blur
-        for (int i = 1; i < WEIGHT_COUNT; i++)
-        {
-            float2 offset = float2(texelSize.x * float(i), 0.0f);
-            float4 sample1 = unsmoothed.Sample(smp, input.texcoord.xy + offset);
-            float4 sample2 = unsmoothed.Sample(smp, input.texcoord.xy - offset);
-            o.norm += (sample1 + sample2) * weights[i];
-        }
-    }
-    else
-    {
-        // Vertical blur
-        for (int i = 1; i < WEIGHT_COUNT; i++)
-        {
-            float2 offset = float2(0.0f, texelSize.y * float(i));
-            float4 sample1 = unsmoothed.Sample(smp, input.texcoord.xy + offset);
-            float4 sample2 = unsmoothed.Sample(smp, input.texcoord.xy - offset);
-            o.norm += (sample1 + sample2) * weights[i];
-        }
+        float4 sample1 = unsmoothed.Sample(smp, input.texcoord.xy + offset * i);
+        float4 sample2 = unsmoothed.Sample(smp, input.texcoord.xy - offset * i);
+        o.norm += (sample1 + sample2) * weights[i];
     }
     
     o.norm.w = curSample.w;
-    // Vertical pass is the second.
-    // If blur is applied multiple times, the finalization and tone mapping should
-    // be moved into a separate shader stage
-    // if (push.horizontal == 0) {
-    //     o.norm.xyz = tonemapping::AcesApprox(origin.Sample(smp, input.texcoord.xy).xyz + o.norm.xyz);
-    // }
-    
+
     return o;
 }
 
@@ -94,9 +71,8 @@ FOut bright(VOut input)
 
     let curSample = unsmoothed.Sample(smp, input.texcoord.xy);
     let brightness = dot(curSample.xyz, curSample.xyz);
-    if (brightness > THRESHOLD)
-    {
-        o.norm.xyz = curSample.xyz;
+    if (brightness >= THRESHOLD) {
+        o.norm.xyz = curSample.xyz; // * (1.2 + smoothstep(THRESHOLD, 1.0, brightness));
     }
     return o;
 }
@@ -105,8 +81,8 @@ FOut bright(VOut input)
 FOut merge(VOut input) {
     FOut o;
     let unsmoothedSample = unsmoothed.Sample(smp, input.texcoord.xy);
-    let origingSample = origin.Sample(smp, input.texcoord.xy);
-    o.norm.xyz = tanh(unsmoothedSample.xyz + origingSample.xyz);
+    let originSample = origin.Sample(smp, input.texcoord.xy);
+    o.norm.xyz = tanh(unsmoothedSample.xyz + originSample.xyz);
     o.norm.w = 1.0;
     return o;
 }

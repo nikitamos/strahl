@@ -71,11 +71,18 @@ pub fn main() -> anyhow::Result<()> {
   Ok(())
 }
 
+#[cfg(feature = "renderdoc")]
+fn renderdoc_init() -> renderdoc::Api {
+  let rdoc = renderdoc::Api::new().unwrap();
+
+  let mut s = String::new();
+  std::io::stdin().read_line(&mut s).unwrap();
+  rdoc
+}
+
 pub async fn true_main() -> anyhow::Result<()> {
   #[cfg(feature = "renderdoc")]
-  let mut rdoc = renderdoc::Api::new().unwrap();
-  let mut s = String::new();
-  std::io::stdin().read_line(&mut s)?;
+  let mut rdoc = renderdoc_init();
 
   let size = glam::uvec2(1024, 1024);
   let strahl = Rasterizer::new(RasterizerCreateInfo {

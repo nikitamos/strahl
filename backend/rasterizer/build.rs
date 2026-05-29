@@ -10,10 +10,10 @@ fn main() {
 
 fn compile_renderdoc() {
   cc::Build::new()
-    .std("c11")
-    .file("renderdoc.c")
+    .std("c++17")
+    .file("renderdoc.cc")
     .compile("amnis-rdoc");
-  println!("cargo::rerun-if-changed=renderdoc.c");
+  println!("cargo::rerun-if-changed=renderdoc.cc");
   eprintln!()
 }
 

@@ -147,7 +147,7 @@ impl Rasterizer {
       BloomCreateInfo {
         kernel_depth: 12,
         s:            6.0,
-        blur_iterations: 2
+        blur_iterations: 1
       },
       PostProcessCreateInfoBase {
         target_dim:     buffer_side,

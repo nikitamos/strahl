@@ -58,6 +58,8 @@ pub struct BloomCreateInfo {
   pub blur_iterations: u32, // Configure how many times to apply the blur
 }
 
+const INTERMEDIATE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+
 #[repr(C)]
 #[derive(Clone, Copy, IntoBytes, Immutable)]
 struct PushConstants {
@@ -93,7 +95,7 @@ impl PostProcessStep for BloomPostProcess {
         mip_level_count: 1,
         sample_count:    1,
         dimension:       wgpu::TextureDimension::D2,
-        format:          base_info.texture_format,
+        format:          INTERMEDIATE_FORMAT,
         usage:           wgpu::TextureUsages::RENDER_ATTACHMENT
           | wgpu::TextureUsages::TEXTURE_BINDING,
         view_formats:    vec![],
@@ -111,7 +113,7 @@ impl PostProcessStep for BloomPostProcess {
         mip_level_count: 1,
         sample_count:    1,
         dimension:       wgpu::TextureDimension::D2,
-        format:          base_info.texture_format,
+        format:          INTERMEDIATE_FORMAT,
         usage:           wgpu::TextureUsages::RENDER_ATTACHMENT
           | wgpu::TextureUsages::TEXTURE_BINDING,
         view_formats:    vec![],
@@ -178,7 +180,6 @@ impl PostProcessStep for BloomPostProcess {
     target: &wgpu::TextureView,
     info: PostProcessInfo,
   ) -> wgpu::CommandBuffer {
-    log::trace!("applying bloom with {} iterations", self.blur_iterations);
     self.ensure_kernel_group_created(origin);
 
     let mut encoder = self
@@ -367,7 +368,7 @@ fn prepare_blur<B: Blur>(
         entry_point:         Some("blur"),
         compilation_options: Default::default(),
         targets:             &[Some(wgpu::ColorTargetState {
-          format:     base_info.texture_format,
+          format:     INTERMEDIATE_FORMAT,
           blend:      Some(wgpu::BlendState {
             color: wgpu::BlendComponent {
               src_factor: wgpu::BlendFactor::One,
@@ -396,7 +397,7 @@ fn prepare_blur<B: Blur>(
         entry_point:         Some("blur"),
         compilation_options: Default::default(),
         targets:             &[Some(wgpu::ColorTargetState {
-          format:     base_info.texture_format,
+          format:     INTERMEDIATE_FORMAT,
           blend:      Some(wgpu::BlendState::REPLACE),
           write_mask: Default::default(),
         })],

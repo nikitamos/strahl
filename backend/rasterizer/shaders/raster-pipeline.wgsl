@@ -152,4 +152,3 @@ fn RasterizerPbrFS( _S6 : pixelInput_0, @builtin(position) position_3 : vec4<f32
     var _S7 : pixelOutput_0 = pixelOutput_0( vec4<f32>(tanh((vec3<f32>(max(dot(normal_2, _S6.light_dir_3), 0.0f)) + GetGlossy_0(_S6.uv_7).xyz * vec3<f32>(pow(max(dot(normal_2, _S6.halfway_dir_2), 0.0f), 16.0f))) * GetDiffuse_0(_S6.uv_7).xyz + GetEmission_0(_S6.uv_7).xyz), 1.0f) );
     return _S7;
 }
-

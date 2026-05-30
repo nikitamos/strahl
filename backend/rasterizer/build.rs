@@ -29,7 +29,7 @@ fn compile_shaders() {
     return;
   }
 
-  let ignored_files: HashSet<&str> = ["globals", "blur", "raster-pipeline"].iter().cloned().collect();
+  let ignored_files: HashSet<&str> = ["globals"].iter().cloned().collect();
 
   if !shaders_dir.exists() {
     println!(
@@ -54,39 +54,34 @@ fn compile_dir(ignored_files: HashSet<&str>, shaders_dir: &Path) -> i32 {
       let path = entry.path();
 
       if path.extension().and_then(|e| e.to_str()) == Some("slang")
-        && let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-          if ignored_files.contains(stem) {
-            continue;
-          }
-
-          let output_path = shaders_dir.join(format!("{}.wgsl", stem));
-
-          compile_shader(path, output_path);
-          compiled_count += 1;
+        && let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+      {
+        if ignored_files.contains(stem) {
+          continue;
         }
+
+        let output_path = shaders_dir.join(format!("{}.wgsl", stem));
+
+        compile_shader(path.clone(), output_path.clone());
+
+        // Post-process specific shaders to apply Makefile-style sed replacements
+        post_process_shader(stem, &output_path);
+
+        compiled_count += 1;
+      }
     }
   }
   compiled_count
 }
 
 fn compile_shader(path: std::path::PathBuf, output_path: std::path::PathBuf) {
-  // println!(
-  //   "cargo:warning=Compiling shader: {} -> {}",
-  //   path.display(),
-  //   output_path.display()
-  // );
   match Command::new("slangc")
     .arg(&path)
     .arg("-o")
     .arg(&output_path)
     .status()
   {
-    Ok(status) if status.success() => {
-      // println!(
-      //   "cargo:warning=Successfully compiled: {}",
-      //   output_path.display()
-      // );
-    }
+    Ok(status) if status.success() => {}
     Ok(status) => {
       panic!(
         "Failed to compile shader '{}'. slangc exited with: {}",
@@ -102,6 +97,55 @@ fn compile_shader(path: std::path::PathBuf, output_path: std::path::PathBuf) {
       );
     }
   }
+}
+
+fn post_process_shader(stem: &str, output_path: &Path) {
+  match stem {
+    "raster-pipeline" => {
+      replace_line_containing(
+        output_path,
+        "var<uniform> body_0 : Body_std430_0;",
+        "var<immediate> body_0 : Body_std430_0;",
+      );
+    }
+    "blur" => {
+      replace_line_containing(
+        output_path,
+        "var<uniform> push_0 : PushConstants_std430_0;",
+        "var<immediate> push_0 : PushConstants_std430_0;",
+      );
+    }
+    _ => {}
+  }
+}
+
+fn replace_line_containing(path: &Path, pattern: &str, replacement: &str) {
+  let content = std::fs::read_to_string(path)
+    .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
+
+  let has_trailing_newline = content.ends_with('\n');
+
+  let new_content = content
+    .lines()
+    .map(|line| {
+      if line.contains(pattern) {
+        replacement.to_string()
+      } else {
+        line.to_string()
+      }
+    })
+    .collect::<Vec<_>>()
+    .join("\n");
+
+  // Preserve original trailing newline behavior
+  let new_content = if has_trailing_newline && !new_content.ends_with('\n') {
+    format!("{}\n", new_content)
+  } else {
+    new_content
+  };
+
+  std::fs::write(path, new_content)
+    .unwrap_or_else(|e| panic!("Failed to write {}: {}", path.display(), e));
 }
 
 fn check_slang_is_present() -> bool {

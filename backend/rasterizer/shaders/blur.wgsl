@@ -111,4 +111,3 @@ fn merge( _S9 : pixelInput_2, @builtin(position) clip_pos_2 : vec4<f32>) -> FOut
     o_2.norm_0[i32(3)] = 1.0f;
     return o_2;
 }
-

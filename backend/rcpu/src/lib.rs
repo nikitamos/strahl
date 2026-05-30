@@ -19,7 +19,11 @@ pub use geometry::*;
 
 use crate::{
   light::LightSource,
-  material::{ConcreteMaterial, Material, bsdf::lambertian::Lambertian, medium::UniformMedium},
+  material::{
+    ConcreteMaterial, Material,
+    bsdf::{BSDFSampleContext, lambertian::Lambertian},
+    medium::UniformMedium,
+  },
   solver::{BDPTParams, PathTerminator},
 };
 pub mod camera;
@@ -185,6 +189,19 @@ pub struct Interaction<'a> {
   pub body:    &'a Body,
   /// Normalized direction of ray intersected the surfaces, pointing to the surface
   pub ray_dir: VecLocal,
+}
+
+impl<'a> Interaction<'a> {
+  pub fn sample_bsdf(
+    &self,
+    ctx: BSDFSampleContext,
+    u: SampleState,
+  ) -> Option<Sample<Vec3, material::bsdf::BsdfMetadata>> {
+    let bsdf = self.body.material.bsdf();
+    // self.hit points TO the surface, buf bsdf expects vector pointing FROM it
+    let out = (-*self.hit.to_hit(self.ray_dir)).into();
+    bsdf.sample_bsdf(out, u, ctx)
+  }
 }
 
 pub struct IntersectionContext {
@@ -367,7 +384,7 @@ impl Scene {
     let distance = observed.xyz() - eye.xyz();
     let ray = OcclusionRay {
       direction: (observed.xyz() - eye.xyz()).into(),
-      position: eye,
+      position:  eye,
     };
     for body in &self.bodies {
       if let Some(hit) = body.geometry.try_intersect(

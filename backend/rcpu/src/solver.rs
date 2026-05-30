@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write};
+use std::{fs::File, io::Write, marker::PhantomData};
 
 use super::{Interaction, IntersectionContext, Scene, Spectrum};
 use crate::{
@@ -461,4 +461,35 @@ fn pz(mut v: VecGlobal) -> VecGlobal {
     v.z = -v.z;
   }
   v
+}
+
+pub struct SampledVertex<'a> {
+  /// Direction of outgoing castable
+  outgoing_dir: VecGlobal,
+  position:     PointGlobal,
+  normal:       VecGlobal,
+  phantom:      PhantomData<&'a ()>,
+}
+
+impl<'a> SampledVertex<'a> {
+  pub fn ray(&self) -> RayGeneric {
+    RayGeneric { position: self.position, direction: self.outgoing_dir }
+  }
+}
+
+pub struct PathSampler<'s> {
+  scene:   &'s Scene,
+  sampler: Sampler,
+}
+
+impl<'s> PathSampler<'s> {
+  pub fn sample(&self, origin: SampledVertex, ctx: BSDFSampleContext) {
+    let mut castable = origin.ray();
+    if let Some(intr) = Solver::closest_hit(self.scene, &castable) {
+      if let Some(bsdf) = intr.sample_bsdf(ctx, self.sampler.sample()) {
+        bsdf.
+      }
+    }
+    // origin is our alpha_1
+  }
 }

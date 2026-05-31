@@ -35,10 +35,10 @@ fn main() {
   let back = RayTracer::new();
   let mut scene = back.create_scene();
   scene.add_sphere(1.0);
-  let g: Arc<dyn Geometry> = back.create_sphere(0.4);
+  let g: Arc<dyn Geometry> = back.create_sphere(0.3);
   scene.add_light(
     Arc::clone(&g),
-    SurfaceProperty::Uniform(Vec3::splat(10.0)),
+    SurfaceProperty::Uniform(Vec3::splat(7.0)),
     LightEmissionDirection::Omni,
   );
   scene.add_body(

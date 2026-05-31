@@ -37,11 +37,13 @@ pub struct Sphere {
 }
 impl Geometry for Sphere {
   fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata> {
-    state.sphere_uniform().map_all(|x, _| {
+    let mut sample = state.sphere_uniform().map_all(|x, _| {
       ((x.deref() * self.radius).into(), GeometrySampleMetadata {
         normal: (*x).into(),
       })
-    })
+    });
+    sample.prob /= self.radius.powi(2);
+    sample
   }
 
   fn try_intersect(&self, ctx: IntersectionContext, ray: &dyn Castable) -> Option<SurfaceHit> {

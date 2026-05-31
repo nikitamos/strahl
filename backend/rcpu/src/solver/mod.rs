@@ -135,7 +135,7 @@ impl Solver2 {
 
   pub fn render(&self, scene: &Scene, cam: &mut Camera) {
     let rays = cam.init_rays();
-    const SAMPLES: i32 = 256;
+    const SAMPLES: i32 = 8;
     rays.into_par_iter().enumerate().for_each(|(_i, ray)| {
       for _ in 0..SAMPLES {
         ray.color += self.trace_ray(&RayGeneric::from_castable(ray), 0, scene);
@@ -175,6 +175,8 @@ impl Solver2 {
     let intersected_point = interaction.hit.point_global();
     let hit_normal = interaction.hit.normal_global();
     let material = interaction.material();
+    // here: trace refracted & reflected rays?
+    // Or should BSDF sample a single direction
   }
 
   #[inline(always)]
@@ -202,7 +204,7 @@ impl Solver2 {
           point.metadata.normal,
         );
         let cosine = interaction.hit.global_to_hit(shadow_direction).z.abs();
-        *cumulative_color += interaction
+        let bsdf = interaction
           .bsdf()
           .bsdf2(
             interaction.hit.global_to_hit(shadow_direction),
@@ -210,12 +212,12 @@ impl Solver2 {
             BSDFSampleContext::Camera,
           )
           .map(Sample::value)
-          .unwrap_or_default()
-          * radiance
-          * cosine;
+          .unwrap_or_default();
+        *cumulative_color += bsdf * radiance * cosine / point.prob;
       }
     }
-    *cumulative_color /= scene.lights.len().max(1) as f32;
+    // Who invented it?
+    // *cumulative_color /= scene.lights.len().max(1) as f32;
   }
 
   #[inline(always)]

@@ -8,7 +8,6 @@ use crate::{
   camera::{self, CameraRay},
   light::{LightSampleContext, LightSource},
   material::bsdf::{BSDFSampleContext, BsdfMetadata},
-  solver::Solver,
 };
 
 pub struct BDPTParams<LT: PathTerminator, ET: PathTerminator> {
@@ -51,7 +50,7 @@ where P: PathTerminator + ?Sized {
       position:  last.point,
       direction: last_ray_out,
     };
-    if let Some(intr) = Solver::closest_hit(cfg.scene, &ray) {
+    if let Some(intr) = super::closest_hit(cfg.scene, &ray) {
       let bsdf = intr.body.material.bsdf();
       let out = intr.hit.global_to_hit((-ray.direction()).into());
       last_ray_out = intr.hit.to_global(out);

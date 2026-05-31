@@ -38,8 +38,9 @@ fn main() {
   let g: Arc<dyn Geometry> = back.create_sphere(0.35);
   scene.add_light(
     Arc::clone(&g),
-    SurfaceProperty::Uniform(Vec3::splat(7.2)),
+    SurfaceProperty::Uniform(Vec3::splat(1.2)),
     LightEmissionDirection::Omni,
+    -2.0 * glam::vec3(1.0, 1.0, 0.4),
   );
   scene.add_body(
     back.create_sphere(20.0),
@@ -63,7 +64,7 @@ fn main() {
       },
     }),
     rcpu::TransformParts {
-      pos:      glam::vec3(0.0, -0.4, -3.0).into(),
+      pos:      glam::vec3(0.0, 0.4, -3.0).into(),
       rotation: Quat::IDENTITY,
     },
   );
@@ -117,7 +118,7 @@ fn bdpt_solve(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
 }
 
 fn solve2(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
-  let solver = back.create_solver2(16, 16);
+  let solver = back.create_solver2(6, 32);
   solver.render(&scene, &mut cam);
   let mut img = image::Rgb32FImage::new(480, 480);
   cam.write_image(&mut img);

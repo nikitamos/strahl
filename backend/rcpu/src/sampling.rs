@@ -2,7 +2,7 @@ use rand::seq::IndexedRandom;
 use rand_distr::{Distribution, Uniform};
 
 use crate::VecHit;
-use std::f32::consts::{FRAC_1_PI, TAU};
+use std::f32::consts::{FRAC_1_PI, PI, TAU};
 
 pub struct Sampler {
   x: Uniform<f32>,
@@ -73,9 +73,17 @@ impl<'a> SampleState<'a> {
   /// according to the cosine-weighted distribution, i.e.
   /// $$ p(X=(\theta, \phi)) = \frac{1}{\pi} \cos\theta \sin\theta $$
   pub fn hemisphere_cosine(self) -> Sample<VecHit, &'a Sampler> {
-    self
-      .disk_uniform()
-      .map(|d| d.extend((1.0 - d.length_squared()).sqrt()).into())
+    let u1: f32 = self.uniform_2d.x;
+    let u2: f32 = self.uniform_2d.y;
+
+    let r = u1.sqrt();
+    let theta = TAU * u2;
+
+    let x = r * theta.cos();
+    let y = r * theta.sin();
+    let z = (1.0 - u1).sqrt();
+
+    self.make_sample(glam::vec3(x, y, z).into(), z / PI)
   }
   /// Samples a uniformly distributed point within the $\mathcal{S}^2$.
   pub fn sphere_uniform(self) -> Sample<VecHit, &'a Sampler> {

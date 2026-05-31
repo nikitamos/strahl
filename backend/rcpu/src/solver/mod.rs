@@ -128,20 +128,26 @@ pub mod bdpt;
 pub struct Solver2 {
   pub(crate) sampler: Sampler,
   max_depth:          u32,
+  samples:            u32,
 }
 
 impl Solver2 {
-  pub fn new(sampler: Sampler, max_depth: u32) -> Self { Self { sampler, max_depth } }
+  pub fn new(sampler: Sampler, max_depth: u32, samples: u32) -> Self {
+    Self {
+      sampler,
+      max_depth,
+      samples,
+    }
+  }
 
   pub fn render(&self, scene: &Scene, cam: &mut Camera) {
     let rays = cam.init_rays();
-    const SAMPLES: i32 = 8;
     rays.into_par_iter().enumerate().for_each(|(_i, ray)| {
-      for _ in 0..SAMPLES {
+      for _ in 0..self.samples {
         ray.color += self.trace_ray(&RayGeneric::from_castable(ray), 0, scene);
         ray.reset_direction();
       }
-      ray.color /= SAMPLES as f32;
+      ray.color /= self.samples as f32;
     });
   }
 
@@ -160,7 +166,7 @@ impl Solver2 {
     // TODO: emission?
     let mut cumulative_color = Spectrum::ZERO;
     self.sample_direct_lighting(scene, &interaction, &mut cumulative_color);
-    self.sample_indirect_lighting(scene, &interaction, &mut cumulative_color);
+    self.sample_indirect_lighting(scene, &interaction, &mut cumulative_color, depth);
 
     cumulative_color
   }
@@ -171,12 +177,22 @@ impl Solver2 {
     scene: &Scene,
     interaction: &Interaction,
     cumulative_color: &mut Spectrum,
+    depth: u32,
   ) {
     let intersected_point = interaction.hit.point_global();
-    let hit_normal = interaction.hit.normal_global();
     let material = interaction.material();
-    // here: trace refracted & reflected rays?
-    // Or should BSDF sample a single direction
+    let Some(bsdf) = material.bsdf().sample_bsdf(
+      interaction.caused_by(),
+      self.sampler.sample(),
+      BSDFSampleContext::Camera,
+    ) else {
+      return;
+    };
+    let direction = interaction.hit.to_global(bsdf.metadata.inc);
+    let ray = RayGeneric::new_stepped(intersected_point, direction);
+    let cosine = bsdf.metadata.inc.z.abs();
+    let rt = self.trace_ray(&ray, depth + 1, scene);
+    *cumulative_color += rt * bsdf.sample * cosine; // bsdf.prob;
   }
 
   #[inline(always)]
@@ -208,7 +224,7 @@ impl Solver2 {
           .bsdf()
           .bsdf2(
             interaction.hit.global_to_hit(shadow_direction),
-            interaction.incoming(),
+            interaction.caused_by(),
             BSDFSampleContext::Camera,
           )
           .map(Sample::value)

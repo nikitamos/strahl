@@ -52,6 +52,7 @@ pub trait BSDF {
   /// Evaluates the BSDF given incident and exitant direction
   fn bsdf(&self, out: VecHit, inc: VecHit, ctx: BSDFSampleContext) -> Spectrum;
   /// Samples the BSDF given the exitant direction. It uses pre-generated state from a sampler
+  #[must_use]
   fn sample_bsdf(
     &self,
     out: VecHit,

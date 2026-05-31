@@ -92,8 +92,8 @@ impl RayTracer {
   pub fn new() -> Self { Self {} }
   pub fn create_scene(&self) -> Scene { Scene::new() }
   pub fn create_solver(&self) -> solver::Solver { solver::Solver::new() }
-  pub fn create_solver2(&self, max_depth: u32) -> solver::Solver2 {
-    solver::Solver2::new(Sampler::new(), max_depth)
+  pub fn create_solver2(&self, max_depth: u32, samples: u32) -> solver::Solver2 {
+    solver::Solver2::new(Sampler::new(), max_depth, samples)
   }
   pub fn create_bdpt_solver<LT: PathTerminator, ET: PathTerminator>(
     &self,
@@ -153,6 +153,13 @@ impl RayGeneric {
       position,
       direction,
     }
+  }
+  pub fn new_stepped(position: PointGlobal, direction: VecGlobal) -> Self {
+    Self {
+      position,
+      direction,
+    }
+    .step()
   }
 
   pub fn step(mut self) -> RayGeneric {
@@ -232,7 +239,7 @@ impl<'a> Interaction<'a> {
   pub fn bsdf(&self) -> &dyn BSDF { self.material().bsdf() }
   /// Returns direction of ray caused the intersection,
   /// pointing **FROM** the surface
-  pub fn incoming(&self) -> VecHit { self.hit.to_hit(-self.ray_dir) }
+  pub fn caused_by(&self) -> VecHit { self.hit.to_hit(-self.ray_dir) }
 }
 
 pub struct IntersectionContext {
@@ -416,7 +423,8 @@ impl Scene {
     let ray = OcclusionRay {
       direction: (observed.xyz() - eye.xyz()).into(),
       position:  eye,
-    }.step();
+    }
+    .step();
     for body in &self.bodies {
       if let Some(hit) = body.geometry.try_intersect(
         IntersectionContext {

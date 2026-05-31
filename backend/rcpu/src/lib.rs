@@ -91,8 +91,8 @@ impl Default for RayTracer {
 impl RayTracer {
   pub fn new() -> Self { Self {} }
   pub fn create_scene(&self) -> Scene { Scene::new() }
-  pub fn create_solver2(&self, max_depth: u32, samples: u32) -> solver::Solver2 {
-    solver::Solver2::new(Sampler::new(), max_depth, samples)
+  pub fn create_solver2(&self, max_depth: u32, samples: u32) -> solver::ForwardPathTracer {
+    solver::ForwardPathTracer::new(Sampler::new(), max_depth, samples)
   }
   pub fn create_bdpt_solver<LT: PathTerminator, ET: PathTerminator>(
     &self,

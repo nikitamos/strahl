@@ -38,12 +38,12 @@ fn main() {
   let g: Arc<dyn Geometry> = back.create_sphere(0.35);
   scene.add_light(
     Arc::clone(&g),
-    SurfaceProperty::Uniform(Vec3::splat(1.2)),
+    SurfaceProperty::Uniform(Vec3::splat(3.2)),
     LightEmissionDirection::Omni,
     -2.0 * glam::vec3(1.0, 1.0, 0.4),
   );
   scene.add_body(
-    back.create_sphere(20.0),
+    back.create_sphere(28.0),
     Arc::new(ConcreteMaterial {
       medium: UniformMedium { ior: 1.0 },
       bsdf:   Lambertian {
@@ -51,7 +51,7 @@ fn main() {
       },
     }),
     rcpu::TransformParts {
-      pos:      Vec3::ZERO.into(),
+      pos:      (glam::vec3(30.0, 0.0, 4.0)).into(),
       rotation: Quat::IDENTITY,
     },
   );
@@ -118,7 +118,7 @@ fn bdpt_solve(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
 }
 
 fn solve2(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
-  let solver = back.create_solver2(6, 32);
+  let solver = back.create_solver2(3, 32);
   solver.render(&scene, &mut cam);
   let mut img = image::Rgb32FImage::new(480, 480);
   cam.write_image(&mut img);

@@ -18,7 +18,7 @@ mod sphere {
     };
     let isect = s.try_intersect(
       crate::IntersectionContext {
-        transform: Transform::from_w2l(Mat4::IDENTITY)
+        transform: Transform::from_w2l(Mat4::IDENTITY),
       },
       &ray,
     );
@@ -42,7 +42,7 @@ mod sphere {
     };
     let isect = s.try_intersect(
       crate::IntersectionContext {
-        transform: Transform::from_w2l(Mat4::IDENTITY)
+        transform: Transform::from_w2l(Mat4::IDENTITY),
       },
       &ray,
     );
@@ -57,7 +57,7 @@ mod sphere {
     };
     let isect = s.try_intersect(
       crate::IntersectionContext {
-        transform: Transform::from_w2l(Mat4::from_translation(Vec3::Y))
+        transform: Transform::from_w2l(Mat4::from_translation(Vec3::Y)),
       },
       &ray,
     );
@@ -81,7 +81,7 @@ mod sphere {
     };
     let isect = s.try_intersect(
       crate::IntersectionContext {
-        transform: Transform::from_w2l(Mat4::from_translation(Vec3::X))
+        transform: Transform::from_w2l(Mat4::from_translation(Vec3::X)),
       },
       &ray,
     );

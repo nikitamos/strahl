@@ -24,7 +24,7 @@ use crate::{
     bsdf::{BSDFSampleContext, lambertian::Lambertian},
     medium::UniformMedium,
   },
-  solver::{BDPTParams, PathTerminator},
+  solver::bdpt::{BDPTParams, PathTerminator},
 };
 pub mod camera;
 
@@ -97,9 +97,9 @@ impl RayTracer {
     light: LT,
     eye: ET,
     samples: usize,
-  ) -> solver::BidirectionalPathTracer<LT, ET> {
-    solver::BidirectionalPathTracer::new(
-      BDPTParams {
+  ) -> solver::bdpt::BidirectionalPathTracer<LT, ET> {
+    solver::bdpt::BidirectionalPathTracer::new(
+      solver::bdpt::BDPTParams {
         light_terminator: light,
         eye_terminator:   eye,
         sample_count:     samples,

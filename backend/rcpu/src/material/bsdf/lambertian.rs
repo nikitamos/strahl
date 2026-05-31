@@ -12,7 +12,12 @@ pub struct Lambertian {
 }
 
 impl BSDF for Lambertian {
-  fn bsdf(&self, out: crate::VecHit, inc: crate::VecHit, _tm: super::BSDFSampleContext) -> Spectrum {
+  fn bsdf(
+    &self,
+    out: crate::VecHit,
+    inc: crate::VecHit,
+    _tm: super::BSDFSampleContext,
+  ) -> Spectrum {
     if out.z * inc.z < 0.0 {
       Spectrum::ZERO
     } else {

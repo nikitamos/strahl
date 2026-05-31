@@ -8,7 +8,7 @@ use rcpu::{
   camera::{Camera, CameraRay},
   light::LightEmissionDirection,
   material::{ConcreteMaterial, bsdf::lambertian::Lambertian, medium::UniformMedium},
-  solver::PathTerminator,
+  solver::bdpt::PathTerminator,
 };
 
 struct UniformLEqPath {
@@ -24,7 +24,7 @@ impl PathTerminator for UniformLEqPath {
   fn should_terminate(
     &self,
     vertices: usize,
-    _gen_vertex: &rcpu::solver::PathVertex,
+    _gen_vertex: &rcpu::solver::bdpt::PathVertex,
     sampler: &Sampler,
   ) -> bool {
     sampler.sample().uniform_1d >= self.prob || self.n <= vertices

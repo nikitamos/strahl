@@ -1,128 +1,15 @@
-use std::{fs::File, io::Write, marker::PhantomData};
+use std::marker::PhantomData;
 
-use super::{Interaction, IntersectionContext, Scene, Spectrum};
+use glam::Vec3;
+use rayon::prelude::*;
+
 use crate::{
-  Castable, PointGlobal, RayGeneric, Sample, Sampler, VecGlobal,
+  Castable, Interaction, PointGlobal, RayGeneric, Sample, Sampler, Scene, Spectrum, VecGlobal,
   camera::{self, CameraRay},
-  light::{LightSampleContext, LightSampleMetadata, LightSource},
+  light::{LightSampleContext, LightSource},
   material::bsdf::{BSDFSampleContext, BsdfMetadata},
+  solver::Solver,
 };
-use glam::{Vec3, Vec3Swizzles};
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-
-pub struct Solver {
-  pub(crate) sampler: Sampler,
-}
-
-impl Solver {
-  pub(crate) fn new() -> Self {
-    Self {
-      sampler: Sampler::default(),
-    }
-  }
-  pub fn render(&self, scene: &Scene, cam: &mut camera::Camera) {
-    let rays = cam.init_rays();
-    const SAMPLES: i32 = 256;
-    rays.into_par_iter().enumerate().for_each(|(_i, ray)| {
-      for _ in 0..SAMPLES {
-        self.trace_camera_ray(scene, ray);
-        ray.reset_direction();
-      }
-      ray.color /= SAMPLES as f32;
-    });
-    #[cfg(false)]
-    Self::dump_rays(rays);
-  }
-
-  fn dump_rays(rays: &[CameraRay]) {
-    let mut file = File::create("scatter.csv").unwrap();
-    for r in rays {
-      let next = r.origin.xyz() + r.direction;
-      let _ = writeln!(
-        file,
-        "{},{},{},{},{},{}",
-        r.origin.x, r.origin.y, r.origin.z, next.x, next.y, next.z
-      );
-    }
-  }
-
-  fn trace_camera_ray(&self, scene: &Scene, ray: &mut CameraRay) {
-    let mut throughput = Vec3::ONE;
-    const BOUNCES: u32 = 1;
-    for _b in 0..BOUNCES {
-      let Some(isect) = Self::closest_hit(scene, ray) else {
-        // Infinite lights
-        // println!("no hit, exiting {b}");
-        break;
-      };
-      // if emissive then L += beta * interaction.emission(-ray.dir) w.r.t. spectrum
-      // if b == BOUNCES break;
-      let bsdf = isect.body.material.bsdf();
-      let cur_ray = isect.hit.to_hit((-ray.direction).into());
-      if let Some(light) = self.sample_light(scene, isect.hit.point_global())
-        && light.prob != 0.0
-      {
-        let wi = isect.hit.global_to_hit(
-          (light.metadata.point.xyz() - isect.hit.point_global().xyz())
-            .normalize()
-            .into(),
-        );
-        if let Some(bsdf2) = bsdf.bsdf2(cur_ray, wi, BSDFSampleContext::Camera) {
-          // In hit space wi.z corresponds to dot(wi, normal)
-          // Note that if using normal mapping that's generally not the case.
-          let f = bsdf2.sample * cur_ray.z.abs(); // is this really *that* angle?
-          ray.color += throughput * f * light.sample / (light.prob) / 4.0;
-        }
-      }
-      // Sample a new direction
-      let Some(bs) = bsdf.sample_bsdf(cur_ray, self.sampler.sample(), BSDFSampleContext::Camera)
-      else {
-        break;
-      };
-      throughput *= bs.sample * bs.metadata.inc.z.abs() / bs.prob;
-      ray.direction = isect.hit.to_global(bs.metadata.inc).normalize();
-      ray.origin = (isect.hit.point_global().xyz() + ray.direction * 0.0001).into();
-    }
-  }
-  fn sample_light(
-    &self,
-    scene: &Scene,
-    dest: PointGlobal,
-  ) -> Option<Sample<Spectrum, LightSampleMetadata>> {
-    scene
-      .sample_light_source(&self.sampler, dest)
-      .and_then(|src, ()| {
-        src.sample(self.sampler.sample(), LightSampleContext {
-          dst: dest,
-          scene,
-        })
-      })
-  }
-  pub(crate) fn hit_light(&self, scene: &Scene, ray: &dyn Castable) -> Option<Spectrum> {
-    let light = &scene.lights[0];
-    light.try_intersect(ray).map(|_hit| light.spectrum.get())
-  }
-  pub(crate) fn closest_hit<'a>(scene: &'a Scene, r: &impl Castable) -> Option<Interaction<'a>> {
-    let mut x = 0;
-    scene
-      .bodies
-      .iter()
-      .filter_map(|b| {
-        let ctx = IntersectionContext {
-          transform: b.transform(),
-        };
-        b.geometry
-          .try_intersect(ctx, r)
-          .map(|hit| Interaction {
-            body: b,
-            ray_dir: hit.transform.v2local(r.direction()),
-            hit,
-          })
-          .inspect(|_| x += 1)
-      })
-      .min_by(|a, b| a.hit.ray_distance.partial_cmp(&b.hit.ray_distance).unwrap())
-  }
-}
 
 pub struct BDPTParams<LT: PathTerminator, ET: PathTerminator> {
   pub light_terminator: LT,
@@ -131,24 +18,24 @@ pub struct BDPTParams<LT: PathTerminator, ET: PathTerminator> {
 }
 
 pub struct BidirectionalPathTracer<LT: PathTerminator, ET: PathTerminator> {
-  params:  BDPTParams<LT, ET>, // TODO: cache of subpaths?
-  sampler: Sampler,
+  pub(crate) params:  BDPTParams<LT, ET>, // TODO: cache of subpaths?
+  pub(crate) sampler: Sampler,
 }
 
-type BSDFSample = Sample<Spectrum, BsdfMetadata>;
+pub(crate) type BSDFSample = Sample<Spectrum, BsdfMetadata>;
 
-struct SubpathConfig<'a, P: PathTerminator + ?Sized> {
-  scene:          &'a Scene,
-  sampler:        &'a Sampler,
-  term_cond:      &'a P,
-  init_vertex:    PathVertex<'a>,
-  init_direction: VecGlobal,
-  init_radiance:  Spectrum,
-  init_prob:      f32,
-  bsdf_context:   BSDFSampleContext<'a>,
+pub(crate) struct SubpathConfig<'a, P: PathTerminator + ?Sized> {
+  pub(crate) scene:          &'a Scene,
+  pub(crate) sampler:        &'a Sampler,
+  pub(crate) term_cond:      &'a P,
+  pub(crate) init_vertex:    PathVertex<'a>,
+  pub(crate) init_direction: VecGlobal,
+  pub(crate) init_radiance:  Spectrum,
+  pub(crate) init_prob:      f32,
+  pub(crate) bsdf_context:   BSDFSampleContext<'a>,
 }
 
-fn sample_subpath<'a, P>(cfg: SubpathConfig<'a, P>) -> Subpath<'a>
+pub(crate) fn sample_subpath<'a, P>(cfg: SubpathConfig<'a, P>) -> Subpath<'a>
 where P: PathTerminator + ?Sized {
   let mut radiance = cfg.init_radiance;
   let mut prob = cfg.init_prob;
@@ -230,7 +117,7 @@ where
     });
   }
   #[inline]
-  fn generate_pixel_path<'s>(
+  pub(crate) fn generate_pixel_path<'s>(
     &'s self,
     scene: &'s Scene,
     ray: &'s mut CameraRay,
@@ -296,14 +183,14 @@ impl PathTerminator for usize {
 }
 
 pub struct BidirectionalPath<'a> {
-  light: Subpath<'a>,
-  eye:   Subpath<'a>,
+  pub(crate) light: Subpath<'a>,
+  pub(crate) eye:   Subpath<'a>,
 }
 
 pub struct Subpath<'a> {
-  pub vertices: Vec<PathVertex<'a>>,
-  alpha:        Spectrum,
-  p:            f32,
+  pub vertices:     Vec<PathVertex<'a>>,
+  pub(crate) alpha: Spectrum,
+  pub(crate) p:     f32,
 }
 
 impl<'a> Subpath<'a> {
@@ -366,7 +253,7 @@ impl<'a> BidirectionalPath<'a> {
     term_cond: &'a (impl PathTerminator + ?Sized),
     pixel: glam::UVec2,
   ) -> Subpath<'a> {
-    const INITIAL_IMPORTANCE: Vec3 = Vec3::ONE;
+    pub(crate) const INITIAL_IMPORTANCE: Vec3 = Vec3::ONE;
     let init_vertex = PathVertex {
       surface:  PathSurface::Camera(pixel),
       point:    init_ray.origin,
@@ -399,7 +286,7 @@ impl<'a> BidirectionalPath<'a> {
     cst * self.eye.alpha * self.light.alpha
   }
 
-  fn join_coeff(&self, scene: &Scene) -> Spectrum {
+  pub(crate) fn join_coeff(&self, scene: &Scene) -> Spectrum {
     match (self.eye.len(), self.light.len()) {
       (1, 1) => Spectrum::ZERO,
       (1, _) => {
@@ -456,7 +343,7 @@ impl<'a> BidirectionalPath<'a> {
   }
 }
 
-fn pz(mut v: VecGlobal) -> VecGlobal {
+pub(crate) fn pz(mut v: VecGlobal) -> VecGlobal {
   if v.z < 0.0 {
     v.z = -v.z;
   }
@@ -465,31 +352,17 @@ fn pz(mut v: VecGlobal) -> VecGlobal {
 
 pub struct SampledVertex<'a> {
   /// Direction of outgoing castable
-  outgoing_dir: VecGlobal,
-  position:     PointGlobal,
-  normal:       VecGlobal,
-  phantom:      PhantomData<&'a ()>,
+  pub(crate) outgoing_dir: VecGlobal,
+  pub(crate) position:     PointGlobal,
+  pub(crate) normal:       VecGlobal,
+  pub(crate) phantom:      PhantomData<&'a ()>,
 }
 
 impl<'a> SampledVertex<'a> {
   pub fn ray(&self) -> RayGeneric {
-    RayGeneric { position: self.position, direction: self.outgoing_dir }
-  }
-}
-
-pub struct PathSampler<'s> {
-  scene:   &'s Scene,
-  sampler: Sampler,
-}
-
-impl<'s> PathSampler<'s> {
-  pub fn sample(&self, origin: SampledVertex, ctx: BSDFSampleContext) {
-    let mut castable = origin.ray();
-    if let Some(intr) = Solver::closest_hit(self.scene, &castable) {
-      if let Some(bsdf) = intr.sample_bsdf(ctx, self.sampler.sample()) {
-        bsdf.
-      }
+    RayGeneric {
+      position:  self.position,
+      direction: self.outgoing_dir,
     }
-    // origin is our alpha_1
   }
 }

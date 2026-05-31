@@ -107,8 +107,8 @@ impl Camera {
         let point = top_left + (i as f32) * x_step + (j as f32) * y_step;
         let ray_direction = (point - cam_pos).normalize();
         self.rays.push(CameraRay {
-          origin:     point.into(),
-          direction:  ray_direction,
+          origin: point.into(),
+          direction: ray_direction,
           camera_dir: ray_direction.into(),
           ..Default::default()
         });

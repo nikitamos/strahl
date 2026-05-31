@@ -3,7 +3,8 @@ use std::ops::Deref;
 use glam::Vec3;
 
 use crate::{
-  Castable, IntersectionContext, SurfaceHit, VecLocal, are_codirectional,
+  Castable, Interaction, IntersectionContext, PointGlobal, RayGeneric, SurfaceHit, Transform,
+  VecLocal, are_codirectional,
   points::PointLocal,
   sampling::{Sample, SampleState},
 };
@@ -116,4 +117,32 @@ impl Geometry for Point {
       None
     }
   }
+}
+
+pub trait HasGeometry {
+  fn geometry(&self) -> &dyn Geometry;
+}
+
+pub trait HasTransform {
+  fn transform(&self) -> Transform;
+}
+
+fn closest_hit<'a, T: HasGeometry + HasTransform>(
+  geometries: impl Iterator<Item = &'a T>,
+  ray: RayGeneric,
+) -> Option<Interaction<'a, T>> {
+  geometries
+    .filter_map(|b| {
+      let ctx = IntersectionContext {
+        transform: b.transform(),
+      };
+      b.geometry()
+        .try_intersect(ctx, &ray)
+        .map(|hit| Interaction {
+          body: b,
+          ray_dir: hit.transform.v2local(ray.direction()),
+          hit,
+        })
+    })
+    .min_by(|a, b| a.hit.ray_distance.partial_cmp(&b.hit.ray_distance).unwrap())
 }

@@ -38,7 +38,7 @@ fn main() {
   let g: Arc<dyn Geometry> = back.create_sphere(0.4);
   scene.add_light(
     Arc::clone(&g),
-    SurfaceProperty::Uniform(Vec3::ONE),
+    SurfaceProperty::Uniform(Vec3::splat(10.0)),
     LightEmissionDirection::Omni,
   );
   scene.add_body(
@@ -93,13 +93,18 @@ fn main() {
   }
   */
 
-  let mut cam = Camera::new(
+  let cam = Camera::new(
     (480, 480).into(),
     Vec3::Y,
     Vec3::X,
     (5.0 * Vec3::NEG_Y).into(),
     rcpu::camera::CameraType::Perspective,
   );
+  // bdpt_solve(back, scene, cam);
+  solve2(back, scene, cam);
+}
+
+fn bdpt_solve(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
   for l in 1..3 {
     for e in 2..4 {
       let solver = back.create_bdpt_solver(l, e, if l + e == 3 { 24 } else { 24 });
@@ -109,4 +114,12 @@ fn main() {
       img.save(format!("l{l}-e{e}.tiff")).unwrap();
     }
   }
+}
+
+fn solve2(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
+  let solver = back.create_solver2(1);
+  solver.render(&scene, &mut cam);
+  let mut img = image::Rgb32FImage::new(480, 480);
+  cam.write_image(&mut img);
+  img.save(format!("solver2.tiff")).unwrap();
 }

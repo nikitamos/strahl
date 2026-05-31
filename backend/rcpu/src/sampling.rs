@@ -111,6 +111,7 @@ pub struct Sample<T, M = ()> {
 }
 
 impl<T, M> Sample<T, M> {
+  pub fn value(self) -> T { self.sample }
   pub fn map<U>(self, mapper: impl Fn(T) -> U) -> Sample<U, M> {
     Sample {
       prob:     self.prob,

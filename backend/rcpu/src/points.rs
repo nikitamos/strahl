@@ -27,6 +27,11 @@ macro_rules! vec_wrapper {
     impl From<$underlying> for $name {
       fn from(value: $underlying) -> $name { Self(value) }
     }
+    impl Neg for $name {
+      type Output = $name;
+
+      fn neg(self) -> Self::Output { (-*self).into() }
+    }
     $($(
       impl From<$conv> for $name {
         fn from(value: $conv) -> Self{
@@ -66,10 +71,4 @@ impl Sub for PointGlobal {
   type Output = VecGlobal;
 
   fn sub(self, rhs: Self) -> Self::Output { (*self - *rhs).into() }
-}
-
-impl Neg for VecGlobal {
-  type Output = VecGlobal;
-
-  fn neg(self) -> Self::Output { (-*self).into() }
 }

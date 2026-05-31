@@ -70,6 +70,9 @@ impl LightSource {
   pub fn transform(&self) -> Transform {
     Transform::from_w2l(Mat4::from_translation(-self.translation))
   }
+  pub fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata> {
+    self.geometry.sample_point(state)
+  }
   pub fn sample(
     &self,
     state: SampleState,
@@ -118,19 +121,29 @@ impl LightSource {
       SurfaceProperty::Texture(_) => todo!(),
     }
   }
-  /// TODO: name this function properly
-  pub fn intensity(&self, _origin: PointLocal, direction: VecLocal, normal: VecLocal) -> Spectrum {
+  /// Returns the radiance emitted in given direction from given
+  /// point at the surface. This is equivalent to
+  ///
+  /// $$ \texttt{color}(\texttt{origin}) \cdot \langle\texttt{direction}, \texttt{normal}\rangle $$
+  pub fn emitted_radiance(
+    &self,
+    _origin: PointLocal,
+    direction: VecLocal,
+    normal: VecLocal,
+  ) -> Spectrum {
+    let factor = direction.dot(*normal);
     if direction.dot(*normal) < 0.0 {
       return Spectrum::ZERO;
     }
-    match self.spectrum {
+    let surface  = match self.spectrum {
       SurfaceProperty::Uniform(s) => match self.dir {
         LightEmissionDirection::Omni => s,
         LightEmissionDirection::Spot(_, _) => todo!(),
         LightEmissionDirection::Directed(_) => todo!(),
       },
       SurfaceProperty::Texture(_) => todo!(),
-    }
+    };
+    surface * factor
   }
 
   pub fn sample_point_and_direction(

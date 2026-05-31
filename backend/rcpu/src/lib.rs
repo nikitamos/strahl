@@ -21,7 +21,7 @@ use crate::{
   light::LightSource,
   material::{
     ConcreteMaterial, Material,
-    bsdf::{BSDFSampleContext, lambertian::Lambertian},
+    bsdf::{BSDF, BSDFSampleContext, lambertian::Lambertian},
     medium::UniformMedium,
   },
   solver::bdpt::{BDPTParams, PathTerminator},
@@ -92,6 +92,9 @@ impl RayTracer {
   pub fn new() -> Self { Self {} }
   pub fn create_scene(&self) -> Scene { Scene::new() }
   pub fn create_solver(&self) -> solver::Solver { solver::Solver::new() }
+  pub fn create_solver2(&self, max_depth: u32) -> solver::Solver2 {
+    solver::Solver2::new(Sampler::new(), max_depth)
+  }
   pub fn create_bdpt_solver<LT: PathTerminator, ET: PathTerminator>(
     &self,
     light: LT,
@@ -133,6 +136,29 @@ pub struct RayGeneric {
 }
 
 impl RayGeneric {
+  #[allow(deprecated)]
+  fn from_castable(value: &impl Castable) -> Self {
+    Self {
+      position:  value.pos(),
+      direction: value.direction(),
+    }
+  }
+}
+
+pub const RAY_EPSILON: f32 = 0.001;
+
+impl RayGeneric {
+  pub fn new(position: PointGlobal, direction: VecGlobal) -> Self {
+    Self {
+      position,
+      direction,
+    }
+  }
+
+  pub fn step(mut self) -> RayGeneric {
+    self.position = (*self.position + *self.direction * RAY_EPSILON).into();
+    self
+  }
   pub fn set_direction(&mut self, direction: VecGlobal) { self.direction = direction; }
   pub fn set_position(&mut self, position: PointGlobal) { self.position = position; }
 }
@@ -184,9 +210,9 @@ impl SurfaceHit {
   }
 }
 
-pub struct Interaction<'a> {
+pub struct Interaction<'a, T = Body> {
   pub hit:     SurfaceHit,
-  pub body:    &'a Body,
+  pub body:    &'a T,
   /// Normalized direction of ray intersected the surfaces, pointing to the surface
   pub ray_dir: VecLocal,
 }
@@ -202,6 +228,11 @@ impl<'a> Interaction<'a> {
     let out = (-*self.hit.to_hit(self.ray_dir)).into();
     bsdf.sample_bsdf(out, u, ctx)
   }
+  pub fn material(&self) -> &dyn Material { self.body.material.as_ref() }
+  pub fn bsdf(&self) -> &dyn BSDF { self.material().bsdf() }
+  /// Returns direction of ray caused the intersection,
+  /// pointing **FROM** the surface
+  pub fn incoming(&self) -> VecHit { self.hit.to_hit(-self.ray_dir) }
 }
 
 pub struct IntersectionContext {
@@ -385,7 +416,7 @@ impl Scene {
     let ray = OcclusionRay {
       direction: (observed.xyz() - eye.xyz()).into(),
       position:  eye,
-    };
+    }.step();
     for body in &self.bodies {
       if let Some(hit) = body.geometry.try_intersect(
         IntersectionContext {

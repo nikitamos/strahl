@@ -2,8 +2,8 @@ use std::{fs::File, io::Write, marker::PhantomData};
 
 use super::{Interaction, IntersectionContext, Scene, Spectrum};
 use crate::{
-  Castable, PointGlobal, Sample, Sampler,
-  camera::{self, CameraRay},
+  Castable, PointGlobal, RayGeneric, Sample, Sampler, VecGlobal,
+  camera::{self, Camera, CameraRay},
   light::{LightSampleContext, LightSampleMetadata},
   material::bsdf::BSDFSampleContext,
 };
@@ -125,3 +125,102 @@ impl Solver {
 }
 
 pub mod bdpt;
+pub struct Solver2 {
+  pub(crate) sampler: Sampler,
+  max_depth:          u32,
+}
+
+impl Solver2 {
+  pub fn new(sampler: Sampler, max_depth: u32) -> Self { Self { sampler, max_depth } }
+
+  pub fn render(&self, scene: &Scene, cam: &mut Camera) {
+    let rays = cam.init_rays();
+    const SAMPLES: i32 = 256;
+    rays.into_par_iter().enumerate().for_each(|(_i, ray)| {
+      for _ in 0..SAMPLES {
+        ray.color += self.trace_ray(&RayGeneric::from_castable(ray), 0, scene);
+        ray.reset_direction();
+      }
+      ray.color /= SAMPLES as f32;
+    });
+  }
+
+  #[must_use = "Raytracing has no side-effects except mutating thread's RNG"]
+  pub fn trace_ray(&self, ray: &RayGeneric, depth: u32, scene: &Scene) -> Spectrum {
+    if self.should_terminate(depth) {
+      return Spectrum::ZERO;
+    }
+    let ray = ray.clone().step();
+
+    let Some(interaction) = Solver::closest_hit(scene, &ray) else {
+      return Spectrum::ZERO;
+    };
+
+    // culling not required
+    // TODO: emission?
+    let mut cumulative_color = Spectrum::ZERO;
+    self.sample_direct_lighting(scene, &interaction, &mut cumulative_color);
+    self.sample_indirect_lighting(scene, &interaction, &mut cumulative_color);
+
+    cumulative_color
+  }
+
+  #[inline(always)]
+  fn sample_indirect_lighting(
+    &self,
+    scene: &Scene,
+    interaction: &Interaction,
+    cumulative_color: &mut Spectrum,
+  ) {
+    let intersected_point = interaction.hit.point_global();
+    let hit_normal = interaction.hit.normal_global();
+    let material = interaction.material();
+  }
+
+  #[inline(always)]
+  fn sample_direct_lighting(
+    &self,
+    scene: &Scene,
+    interaction: &Interaction,
+    cumulative_color: &mut Spectrum,
+  ) {
+    let hit_point = interaction.hit.point_global();
+    for light in &scene.lights {
+      let point = light.sample_point(self.sampler.sample());
+      let light_point = light.transform().p2world(point.sample);
+      let light_normal = light.transform().v2world(point.metadata.normal);
+
+      if scene.is_visible(hit_point, light_point) {
+        let shadow_direction: VecGlobal = (light_point - hit_point).normalize().into();
+        let light_factor = -shadow_direction.dot(*light_normal);
+        if light_factor <= 0.0 {
+          continue;
+        }
+        let radiance = light.emitted_radiance(
+          point.sample,
+          light.transform().v2local(-shadow_direction),
+          point.metadata.normal,
+        );
+        let cosine = interaction.hit.global_to_hit(shadow_direction).z.abs();
+        *cumulative_color += interaction
+          .bsdf()
+          .bsdf2(
+            interaction.hit.global_to_hit(shadow_direction),
+            interaction.incoming(),
+            BSDFSampleContext::Camera,
+          )
+          .map(Sample::value)
+          .unwrap_or_default()
+          * radiance
+          * cosine;
+      }
+    }
+    *cumulative_color /= scene.lights.len().max(1) as f32;
+  }
+
+  #[inline(always)]
+  fn should_terminate(&self, depth: u32) -> bool { depth == self.max_depth }
+
+  pub fn max_depth(&self) -> u32 { self.max_depth }
+  pub fn set_max_depth(&mut self, max_depth: u32) { self.max_depth = max_depth; }
+}

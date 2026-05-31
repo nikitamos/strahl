@@ -313,7 +313,7 @@ impl<'a> BidirectionalPath<'a> {
         };
         let direction = src.transform().v2local(eye.point - light.point);
         let point = src.transform().p2local(light.point);
-        let l = src.intensity(point, direction, src.transform().v2local(light.normal));
+        let l = src.emitted_radiance(point, direction, src.transform().v2local(light.normal));
         l
       }
       (_, _) => {

@@ -319,6 +319,7 @@ impl Body {
 }
 
 pub mod light;
+pub mod scenedes;
 
 pub type OcclusionRay = RayGeneric;
 //   pub position:  PointGlobal,

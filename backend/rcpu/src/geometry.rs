@@ -137,23 +137,23 @@ impl Quad {
     Self::new(origin.into(), (u_dir * side).into(), (v_dir * side).into())
   }
 
-  // /// Helper: Square in the XY plane (normal points along +Z)
-  // #[must_use]
-  // pub fn xy_square(center: Vec3, side: f32) -> Self {
-  //   Self::axis_aligned_square(center, Vec3::Z, side)
-  // }
+  /// Square in the XY plane (normal points along +Z)
+  #[must_use]
+  pub fn xy_square(center: VecGlobal, side: f32) -> Self {
+    Self::axis_aligned_square(center, Vec3::Z.into(), side)
+  }
 
-  /// Helper: Square in the YZ plane (normal points along +X)
+  /// Square in the YZ plane (normal points along +X)
   #[must_use]
   pub fn yz_square(center: VecGlobal, side: f32) -> Self {
     Self::axis_aligned_square(center, Vec3::X.into(), side)
   }
 
-  // /// Helper: Square in the ZX plane (normal points along +Y)
-  // #[must_use]
-  // pub fn zx_square(center: Vec3, side: f32) -> Self {
-  //   Self::axis_aligned_square(center, Vec3::Y, side)
-  // }
+  /// Square in the ZX plane (normal points along +Y)
+  #[must_use]
+  pub fn zx_square(center: VecGlobal, side: f32) -> Self {
+    Self::axis_aligned_square(center, Vec3::Y.into(), side)
+  }
 }
 
 impl Geometry for Quad {

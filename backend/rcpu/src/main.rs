@@ -4,7 +4,7 @@ use std::{io::Write, sync::Arc};
 
 use glam::{Quat, Vec3};
 use rcpu::{
-  Geometry, Quad, RayTracer, Sampler, SurfaceProperty, TransformParts,
+  Geometry, Quad, RayTracer, Sampler, Scene, SurfaceProperty, TransformParts,
   camera::{Camera, CameraRay},
   light::LightEmissionDirection,
   material::{
@@ -12,6 +12,7 @@ use rcpu::{
     bsdf::{lambertian::Lambertian, specular::Specular},
     medium::UniformMedium,
   },
+  scene_loader::{SceneLoadError, SceneLoader},
   solver::bdpt::PathTerminator,
 };
 
@@ -82,6 +83,7 @@ fn main() {
       rotation: Quat::IDENTITY,
     },
   );
+  let s = read_scene_from_file().unwrap();
 
   let cam = Camera::new(
     (480, 480).into(),
@@ -91,11 +93,16 @@ fn main() {
     rcpu::camera::CameraType::Perspective,
   );
   // bdpt_solve(back, scene, cam);
-  solve2(back, scene, cam);
+  solve2(back, s, cam);
+}
+
+fn read_scene_from_file() -> Result<Scene, SceneLoadError> {
+  let mut loader = SceneLoader::new();
+  loader.load("test-scene.toml")
 }
 
 fn solve2(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
-  let solver = back.create_solver2(8, 8);
+  let solver = back.create_solver2(3, 64);
   solver.render(&scene, &mut cam);
   let mut img = image::Rgb32FImage::new(480, 480);
   cam.write_image(&mut img);

@@ -1,4 +1,4 @@
-pub trait Medium {}
+pub trait Medium: Send + Sync {}
 
 pub struct UniformMedium {
   pub ior: f32,

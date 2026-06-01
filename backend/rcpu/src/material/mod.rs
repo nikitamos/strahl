@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use bsdf::BSDF;
 use medium::Medium;
 
@@ -7,6 +9,21 @@ pub mod medium;
 pub trait Material: Send + Sync {
   fn medium(&self) -> &dyn Medium;
   fn bsdf(&self) -> &dyn BSDF;
+}
+
+pub struct TypeErasedMaterial {
+  bsdf:   Arc<dyn BSDF>,
+  medium: Arc<dyn Medium>,
+}
+
+impl TypeErasedMaterial {
+  pub fn new(bsdf: Arc<dyn BSDF>, medium: Arc<dyn Medium>) -> Self { Self { bsdf, medium } }
+}
+
+impl Material for TypeErasedMaterial {
+  fn medium(&self) -> &dyn Medium { self.medium.as_ref() }
+
+  fn bsdf(&self) -> &dyn BSDF { self.bsdf.as_ref() }
 }
 
 pub trait TypedMaterial {

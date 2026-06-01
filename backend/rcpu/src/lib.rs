@@ -319,7 +319,7 @@ impl Body {
 }
 
 pub mod light;
-pub mod scenedes;
+pub mod scene_loader;
 
 pub type OcclusionRay = RayGeneric;
 //   pub position:  PointGlobal,
@@ -399,6 +399,8 @@ impl Scene {
     });
     self.bodies.last().unwrap()
   }
+  pub fn push_body(&mut self, body: Body) { self.bodies.push(body) }
+  pub fn push_light(&mut self, light: LightSource) { self.lights.push(light); }
 
   /// Samples a light source present on the scene.
   /// For now the sampling is uniform, that is, each light source has

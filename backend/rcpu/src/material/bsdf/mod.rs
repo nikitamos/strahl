@@ -48,7 +48,7 @@ impl BsdfMetadata {
 }
 
 /// Bidirectional scattering distribution functions
-pub trait BSDF {
+pub trait BSDF: Sync + Send {
   /// Evaluates the BSDF given incident and exitant direction
   fn bsdf(&self, out: VecHit, inc: VecHit, ctx: BSDFSampleContext) -> Spectrum;
   /// Samples the BSDF given the exitant direction. It uses pre-generated state from a sampler

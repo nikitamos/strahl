@@ -21,7 +21,7 @@ impl CameraRay {
       origin,
       direction: direction.into(),
       color: Default::default(),
-      camera_dir: direction.into(),
+      camera_dir: direction,
     }
   }
 }

@@ -1,17 +1,10 @@
 #![feature(iter_map_windows)]
 
-use std::{io::Write, sync::Arc};
 
-use glam::{Quat, Vec3};
+use glam::Vec3;
 use rcpu::{
-  Geometry, Quad, RayTracer, Sampler, Scene, SurfaceProperty, TransformParts,
-  camera::{Camera, CameraRay},
-  light::LightEmissionDirection,
-  material::{
-    ConcreteMaterial,
-    bsdf::{lambertian::Lambertian, specular::Specular},
-    medium::UniformMedium,
-  },
+  RayTracer, Sampler, Scene,
+  camera::Camera,
   scene_loader::{SceneLoadError, SceneLoader},
   solver::bdpt::PathTerminator,
 };

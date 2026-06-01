@@ -3,8 +3,8 @@ use std::ops::Deref;
 use glam::Vec3;
 
 use crate::{
-  Castable, Interaction, IntersectionContext, PointGlobal, RayGeneric, SurfaceHit, Transform,
-  VecGlobal, VecLocal, are_codirectional,
+  Castable, Interaction, IntersectionContext, RayGeneric, SurfaceHit, Transform,
+  VecGlobal, VecLocal,
   points::PointLocal,
   sampling::{Sample, SampleState},
 };

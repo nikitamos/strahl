@@ -52,7 +52,7 @@ where P: PathTerminator + ?Sized {
     };
     if let Some(intr) = super::closest_hit(cfg.scene, &ray) {
       let bsdf = intr.body.material.bsdf();
-      let out = intr.hit.global_to_hit((-ray.direction()).into());
+      let out = intr.hit.global_to_hit(-ray.direction() );
       last_ray_out = intr.hit.to_global(out);
       let jac = cfg.scene.geom_factor_skip(
         last.point,
@@ -103,7 +103,7 @@ where
     let rays = camera.init_rays();
     rays.into_par_iter().enumerate().for_each(|(px, ray)| {
       ray.color = Spectrum::ZERO;
-      for s in 0..self.params.sample_count {
+      for _s in 0..self.params.sample_count {
         let mut r = ray.clone();
         let pixel = glam::uvec2(px as u32 % resolution.x, px as u32 / resolution.x);
         let path = self.generate_pixel_path(scene, &mut r, pixel);
@@ -120,7 +120,7 @@ where
     &'s self,
     scene: &'s Scene,
     ray: &'s mut CameraRay,
-    pixel: glam::UVec2,
+    _pixel: glam::UVec2,
   ) -> BidirectionalPath<'s> {
     BidirectionalPath::sample(
       scene,
@@ -291,8 +291,8 @@ impl<'a> BidirectionalPath<'a> {
       (1, _) => {
         // FIXME: it doesn't work properly.
         // One point at the eye and non-degenerate light path
-        let eye = self.eye.vertices.last().unwrap();
-        let light = self.light.vertices.last().unwrap();
+        let _eye = self.eye.vertices.last().unwrap();
+        let _light = self.light.vertices.last().unwrap();
         // Spectrum::splat(
         //   eye
         //     .light
@@ -312,8 +312,8 @@ impl<'a> BidirectionalPath<'a> {
         };
         let direction = src.transform().v2local(eye.point - light.point);
         let point = src.transform().p2local(light.point);
-        let l = src.emitted_radiance(point, direction, src.transform().v2local(light.normal));
-        l
+        
+        src.emitted_radiance(point, direction, src.transform().v2local(light.normal))
       }
       (_, _) => {
         let y = self.eye.vertices.last().unwrap();

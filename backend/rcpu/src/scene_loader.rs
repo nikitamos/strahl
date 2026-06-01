@@ -313,6 +313,12 @@ pub struct SceneLoader {
   source_path:   Option<PathBuf>,
 }
 
+impl Default for SceneLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SceneLoader {
   pub fn new() -> Self {
     Self {

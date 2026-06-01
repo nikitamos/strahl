@@ -24,7 +24,7 @@ use crate::{
     bsdf::{BSDF, BSDFSampleContext, lambertian::Lambertian},
     medium::UniformMedium,
   },
-  solver::bdpt::{BDPTParams, PathTerminator},
+  solver::bdpt::PathTerminator,
 };
 pub mod camera;
 
@@ -412,7 +412,7 @@ impl Scene {
     self.sample_any_light_source(sampler)
   }
   pub fn sample_any_light_source(&self, sampler: &Sampler) -> Sample<&LightSource> {
-    if self.lights.len() > 0 {
+    if !self.lights.is_empty() {
       sampler.sample_element(&self.lights)
     } else {
       panic!("`sample_light_source` called on scene without light sources")

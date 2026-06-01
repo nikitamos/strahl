@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-  Interaction, Sample, SampleState, Spectrum, VecGlobal, VecHit, material::medium::MediumInterface,
+  Interaction, Sample, SampleState, Spectrum, VecGlobal, VecHit,
 };
 
 #[derive(Clone, Copy)]

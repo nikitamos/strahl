@@ -28,6 +28,13 @@ variant = "yz_square"
 center = [0.0, 0.0, 0.0]
 side = 15.0
 
+[geometries.lamp]
+type = "sphere"
+radius = 1.0
+# variant = "xy_square"
+# center = [0.0, 0.0, 0.0]
+# side = 3.0
+
 [[bodies]]
 geometry = "floor"
 material = "white"
@@ -40,7 +47,7 @@ position = [0.0, 7.5, 7.5]
 
 [[bodies]]
 geometry = "side_wall"
-material = { type = "lambertian", spectrum = [0.8, 0.0, 0.0] }
+material = { type = "lambertian", spectrum = [0.6, 0.0, 0.0] }
 position = [7.5, 0.0, 7.5]
 
 [[bodies]]
@@ -60,6 +67,6 @@ material = "spec"
 position = [0.0, 0.0, 15.0]
 
 [[lights]]
-geometry = { type = "sphere", radius = 1.0 }
+geometry = "lamp"
 spectrum = [0.9, 0.9, 0.9]
-position = [0.0, -2.0, 5.0]
+position = [0.0, 0.0, 5.0]

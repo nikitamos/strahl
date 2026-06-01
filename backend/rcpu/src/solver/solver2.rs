@@ -46,7 +46,6 @@ impl ForwardPathTracer {
     };
 
     // culling not required
-    // TODO: emission?
     let mut cumulative_color = Spectrum::ZERO;
     self.sample_direct_lighting(scene, &interaction, &mut cumulative_color);
     self.sample_indirect_lighting(scene, &interaction, &mut cumulative_color, depth);

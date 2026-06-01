@@ -28,11 +28,6 @@ impl<'a> BSDFSampleContext<'a> {
   }
 }
 
-pub enum ScatteringEvent {
-  Reflection,
-  Transmission,
-}
-
 #[derive(Default)]
 pub struct BsdfMetadata {
   /// Sampled direction of incoming light.

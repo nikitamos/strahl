@@ -33,7 +33,7 @@ impl BSDF for Lambertian {
   ) -> Option<crate::Sample<Spectrum, super::BsdfMetadata>> {
     Some(u.hemisphere_cosine().map_all(|mut inc, _| {
       if out.z < 0.0 {
-        inc.z *= -1.0; // Why?
+        inc.z *= -1.0;
       }
       (self.s * FRAC_1_PI, BsdfMetadata {
         inc,

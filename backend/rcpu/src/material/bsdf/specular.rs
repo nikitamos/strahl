@@ -13,7 +13,7 @@ pub struct Specular {
 }
 
 impl BSDF for Specular {
-  fn bsdf(&self, out: VecHit, inc: VecHit, _tm: super::BSDFSampleContext) -> Spectrum {
+  fn bsdf(&self, out: VecHit, inc: VecHit, _tm: &super::BSDFSampleContext) -> Spectrum {
     if inc.reflect(Vec3::Z) == out.into() {
       self.r
     } else {
@@ -25,7 +25,7 @@ impl BSDF for Specular {
     &self,
     out: VecHit,
     _u: crate::SampleState,
-    _tm: super::BSDFSampleContext,
+    _tm: &super::BSDFSampleContext,
   ) -> Option<crate::Sample<Spectrum, super::BsdfMetadata>> {
     Some(Sample {
       prob:     1.0,
@@ -42,7 +42,7 @@ impl BSDF for Specular {
     &self,
     out: VecHit,
     inc: VecHit,
-    _ctx: super::BSDFSampleContext,
+    _ctx: &super::BSDFSampleContext,
   ) -> Option<Sample<Spectrum, super::BsdfMetadata>> {
     if inc.reflect(Vec3::Z) == out.into() {
       Some(Sample {
@@ -59,7 +59,7 @@ impl BSDF for Specular {
     }
   }
 
-  fn pdf(&self, out: VecHit, inc: VecHit, _tm: super::BSDFSampleContext) -> f32 {
+  fn pdf(&self, out: VecHit, inc: VecHit, _tm: &super::BSDFSampleContext) -> f32 {
     if inc.reflect(Vec3::Z) == out.into() {
       1.0
     } else {

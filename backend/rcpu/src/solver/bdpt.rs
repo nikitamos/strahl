@@ -60,7 +60,7 @@ where P: PathTerminator + ?Sized {
         intr.hit.point_global(),
         intr.hit.normal_global(),
       );
-      if let Some(bs) = bsdf.sample_bsdf(out, cfg.sampler.sample(), cfg.bsdf_context) {
+      if let Some(bs) = bsdf.sample_bsdf(out, cfg.sampler.sample(), &cfg.bsdf_context) {
         let bs_jac = bs.metadata.jacobian_with(out);
         let total_jac = jac.x * bs_jac;
         let (new_prob, new_radiance) = (bs.prob * total_jac, radiance * bs.sample * total_jac);
@@ -240,7 +240,7 @@ impl<'a> BidirectionalPath<'a> {
       init_vertex,
       init_radiance: radiance.sample,
       init_prob: radiance.metadata.point_prob,
-      bsdf_context: BSDFSampleContext::Light,
+      bsdf_context: BSDFSampleContext::Light, // TODO
       init_direction: radiance.metadata.direction,
     })
   }
@@ -271,7 +271,7 @@ impl<'a> BidirectionalPath<'a> {
       init_vertex,
       init_radiance: INITIAL_IMPORTANCE,
       init_prob: 1.0,
-      bsdf_context: BSDFSampleContext::Camera,
+      bsdf_context: BSDFSampleContext::Camera, // TODO
       init_direction: init_ray.direction.into(),
     })
   }

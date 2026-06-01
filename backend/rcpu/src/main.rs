@@ -1,31 +1,32 @@
 #![feature(iter_map_windows)]
 
-
 use glam::Vec3;
 use rcpu::{
   RayTracer, Sampler, Scene,
   camera::Camera,
   scene_loader::{SceneLoadError, SceneLoader},
-  solver::bdpt::PathTerminator,
 };
 
-struct UniformLEqPath {
-  n:    usize,
-  prob: f32,
-}
+#[cfg(false)]
+mod bdpt_legacy {
+  struct UniformLEqPath {
+    n:    usize,
+    prob: f32,
+  }
 
-impl UniformLEqPath {
-  fn new(n: usize, prob: f32) -> Self { Self { n, prob } }
-}
+  impl UniformLEqPath {
+    fn new(n: usize, prob: f32) -> Self { Self { n, prob } }
+  }
 
-impl PathTerminator for UniformLEqPath {
-  fn should_terminate(
-    &self,
-    vertices: usize,
-    _gen_vertex: &rcpu::solver::bdpt::PathVertex,
-    sampler: &Sampler,
-  ) -> bool {
-    sampler.sample().uniform_1d >= self.prob || self.n <= vertices
+  impl PathTerminator for UniformLEqPath {
+    fn should_terminate(
+      &self,
+      vertices: usize,
+      _gen_vertex: &rcpu::solver::bdpt::PathVertex,
+      sampler: &Sampler,
+    ) -> bool {
+      sampler.sample().uniform_1d >= self.prob || self.n <= vertices
+    }
   }
 }
 

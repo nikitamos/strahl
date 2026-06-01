@@ -16,7 +16,7 @@ impl BSDF for Lambertian {
     &self,
     out: crate::VecHit,
     inc: crate::VecHit,
-    _tm: super::BSDFSampleContext,
+    _tm: &super::BSDFSampleContext,
   ) -> Spectrum {
     if out.z * inc.z < 0.0 {
       Spectrum::ZERO
@@ -29,7 +29,7 @@ impl BSDF for Lambertian {
     &self,
     out: crate::VecHit,
     u: crate::SampleState,
-    _tm: super::BSDFSampleContext,
+    _tm: &super::BSDFSampleContext,
   ) -> Option<crate::Sample<Spectrum, super::BsdfMetadata>> {
     Some(u.hemisphere_cosine().map_all(|mut inc, _| {
       if out.z < 0.0 {
@@ -46,7 +46,7 @@ impl BSDF for Lambertian {
     &self,
     out: crate::VecHit,
     inc: crate::VecHit,
-    ctx: super::BSDFSampleContext,
+    ctx: &super::BSDFSampleContext,
   ) -> Option<crate::Sample<Spectrum, BsdfMetadata>> {
     Some(crate::Sample {
       prob:     self.pdf(out, inc, ctx),
@@ -58,7 +58,7 @@ impl BSDF for Lambertian {
     })
   }
 
-  fn pdf(&self, out: crate::VecHit, inc: crate::VecHit, _tm: super::BSDFSampleContext) -> f32 {
+  fn pdf(&self, out: crate::VecHit, inc: crate::VecHit, _tm: &super::BSDFSampleContext) -> f32 {
     if out.z * inc.z < 0.0 {
       0.0
     } else {

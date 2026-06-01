@@ -51,6 +51,7 @@ pub(crate) fn closest_hit<'a>(scene: &'a Scene, r: &impl Castable) -> Option<Int
     .min_by(|a, b| a.hit.ray_distance.partial_cmp(&b.hit.ray_distance).unwrap())
 }
 
+#[cfg(false)]
 pub mod bdpt;
 
 mod solver2;

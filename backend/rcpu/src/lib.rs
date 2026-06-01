@@ -22,9 +22,9 @@ use crate::{
   material::{
     ConcreteMaterial, Material,
     bsdf::{BSDF, BSDFSampleContext, lambertian::Lambertian},
-    medium::UniformMedium,
+    medium::{Medium, UniformMedium},
   },
-  solver::bdpt::PathTerminator,
+  // solver::bdpt::PathTerminator,
 };
 pub mod camera;
 
@@ -94,6 +94,7 @@ impl RayTracer {
   pub fn create_solver2(&self, max_depth: u32, samples: u32) -> solver::ForwardPathTracer {
     solver::ForwardPathTracer::new(Sampler::new(), max_depth, samples)
   }
+  #[cfg(false)]
   pub fn create_bdpt_solver<LT: PathTerminator, ET: PathTerminator>(
     &self,
     light: LT,
@@ -180,7 +181,7 @@ impl Castable for RayGeneric {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SurfaceHit {
   pub point:        PointLocal,
   /// Surface normal in local coordinates
@@ -216,6 +217,7 @@ impl SurfaceHit {
   }
 }
 
+#[derive(Clone)]
 pub struct Interaction<'a, T = Body> {
   pub hit:     SurfaceHit,
   pub body:    &'a T,
@@ -226,7 +228,7 @@ pub struct Interaction<'a, T = Body> {
 impl<'a> Interaction<'a> {
   pub fn sample_bsdf(
     &self,
-    ctx: BSDFSampleContext,
+    ctx: &BSDFSampleContext,
     u: SampleState,
   ) -> Option<Sample<Vec3, material::bsdf::BsdfMetadata>> {
     let bsdf = self.body.material.bsdf();
@@ -236,6 +238,7 @@ impl<'a> Interaction<'a> {
   }
   pub fn material(&self) -> &dyn Material { self.body.material.as_ref() }
   pub fn bsdf(&self) -> &dyn BSDF { self.material().bsdf() }
+  pub fn body_medium(&self) -> &dyn Medium { self.material().medium() }
   /// Returns direction of ray caused the intersection,
   /// pointing **FROM** the surface
   pub fn caused_by(&self) -> VecHit { self.hit.to_hit(-self.ray_dir) }

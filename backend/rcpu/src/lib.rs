@@ -276,6 +276,10 @@ pub struct TransformParts {
 }
 
 impl TransformParts {
+  pub const IDENTITY: Self = Self {
+    pos:      PointGlobal::new(Vec3::ZERO),
+    rotation: glam::Quat::IDENTITY,
+  };
   pub fn w2l_matrix(&self) -> Mat4 {
     let mut res = Mat4::from_quat(self.rotation);
     res.w_axis = self.pos.extend(1.0);
@@ -375,12 +379,9 @@ impl Scene {
     dir: light::LightEmissionDirection,
     position: glam::Vec3,
   ) -> &LightSource {
-    self.lights.push(LightSource::new(
-      geometry,
-      spectrum,
-      position,
-      dir,
-    ));
+    self
+      .lights
+      .push(LightSource::new(geometry, spectrum, position, dir));
     self.lights.last().unwrap()
   }
 

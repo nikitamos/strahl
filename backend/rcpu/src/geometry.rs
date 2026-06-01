@@ -4,7 +4,7 @@ use glam::Vec3;
 
 use crate::{
   Castable, Interaction, IntersectionContext, PointGlobal, RayGeneric, SurfaceHit, Transform,
-  VecLocal, are_codirectional,
+  VecGlobal, VecLocal, are_codirectional,
   points::PointLocal,
   sampling::{Sample, SampleState},
 };
@@ -90,35 +90,119 @@ impl Geometry for Sphere {
   }
 }
 
-pub struct Plane {}
+pub struct Quad {
+  pub origin: VecLocal,
+  u:          VecLocal,
+  v:          VecLocal,
+  normal:     VecLocal,
+  area:       f32,
+}
 
-pub struct Point {}
+impl Quad {
+  /// Creates an arbitrarily oriented parallelogram quad.
+  #[must_use]
+  pub fn new(origin: VecLocal, u: VecLocal, v: VecLocal) -> Self {
+    let cross = u.cross(*v);
+    let area = cross.length();
+    assert!(area > 1e-5, "Quad must have non-zero area");
 
-impl Geometry for Point {
-  fn sample_point(&self, _state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata> {
+    Self {
+      origin,
+      u,
+      v,
+      normal: (cross / area).into(),
+      area,
+    }
+  }
+
+  pub fn invert_normal(&mut self) { self.normal = -self.normal; }
+
+  /// Creates an axis-aligned square centered at `center`, with side length `side`,
+  /// lying in the plane perpendicular to `axis`.
+  #[must_use]
+  pub fn axis_aligned_square(center: VecGlobal, axis: VecGlobal, side: f32) -> Self {
+    let normal = axis.normalize();
+
+    let up = if normal.abs().z < 0.9 {
+      Vec3::Z
+    } else {
+      Vec3::X
+    };
+    let u_dir = up.cross(normal).normalize();
+    let v_dir = normal.cross(u_dir).normalize();
+
+    let half_side = side * 0.5;
+    let origin = *center - u_dir * half_side - v_dir * half_side;
+
+    Self::new(origin.into(), (u_dir * side).into(), (v_dir * side).into())
+  }
+
+  // /// Helper: Square in the XY plane (normal points along +Z)
+  // #[must_use]
+  // pub fn xy_square(center: Vec3, side: f32) -> Self {
+  //   Self::axis_aligned_square(center, Vec3::Z, side)
+  // }
+
+  /// Helper: Square in the YZ plane (normal points along +X)
+  #[must_use]
+  pub fn yz_square(center: VecGlobal, side: f32) -> Self {
+    Self::axis_aligned_square(center, Vec3::X.into(), side)
+  }
+
+  // /// Helper: Square in the ZX plane (normal points along +Y)
+  // #[must_use]
+  // pub fn zx_square(center: Vec3, side: f32) -> Self {
+  //   Self::axis_aligned_square(center, Vec3::Y, side)
+  // }
+}
+
+impl Geometry for Quad {
+  fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata> {
+    let [u_rand, v_rand] = state.uniform_2d.into();
+
+    let point = *self.origin + u_rand * *self.u + v_rand * *self.v;
+    let pdf = 1.0 / self.area;
+
+    let metadata = GeometrySampleMetadata {
+      normal: self.normal,
+    };
+
     Sample {
-      prob:     1.0,
-      sample:   Vec3::ZERO.into(),
-      metadata: GeometrySampleMetadata {
-        normal: Vec3::ZERO.into(),
-      },
+      sample: point.into(),
+      prob: pdf,
+      metadata,
     }
   }
 
   fn try_intersect<'a>(&self, ctx: IntersectionContext, ray: &dyn Castable) -> Option<SurfaceHit> {
-    let pos = ctx.transform.p2local(ray.pos());
-    let dir = ctx.transform.v2local(ray.direction());
-    if are_codirectional(pos.into(), -*dir) {
-      Some(SurfaceHit::new(
-        Vec3::ZERO.into(),
-        Vec3::ZERO,
-        pos.length(),
-        ctx.transform,
-      ))
-    } else {
-      None
+    let dir = *ctx.transform.v2local(ray.direction());
+    let ray_origin = *ctx.transform.p2local(ray.pos());
+    let normal = *self.normal;
+    let denom = dir.dot(normal);
+
+    // Ray is parallel to the quad plane
+    if denom.abs() < 1e-5 {
+      return None;
     }
+
+    let t = (*self.origin - ray_origin).dot(normal) / denom;
+
+    let p = ray_origin + dir * t;
+    let w = p - *self.origin;
+
+    // (w \cross v) \cdot n_unit = u_coord \cdot area
+    let u_val = w.cross(*self.v).dot(normal) / self.area;
+    let v_val = self.u.cross(w).dot(normal) / self.area;
+
+    // Check if the hit lies within the quad boundaries
+    if !(0.0..=1.0).contains(&u_val) || !(0.0..=1.0).contains(&v_val) {
+      return None;
+    }
+
+    Some(SurfaceHit::new(p.into(), normal, t, ctx.transform))
   }
+
+  // `uv` is omitted as requested; uses the trait's default implementation.
 }
 
 pub trait HasGeometry {

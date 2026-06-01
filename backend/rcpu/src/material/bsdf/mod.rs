@@ -83,3 +83,4 @@ pub struct CombinedBSDF {}
 
 pub mod lambertian;
 pub mod specular;
+pub mod transmissive;

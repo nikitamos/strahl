@@ -4,10 +4,14 @@ use std::{io::Write, sync::Arc};
 
 use glam::{Quat, Vec3};
 use rcpu::{
-  Geometry, RayTracer, Sampler, SurfaceProperty,
+  Geometry, Quad, RayTracer, Sampler, SurfaceProperty, TransformParts,
   camera::{Camera, CameraRay},
   light::LightEmissionDirection,
-  material::{ConcreteMaterial, bsdf::lambertian::Lambertian, medium::UniformMedium},
+  material::{
+    ConcreteMaterial,
+    bsdf::{lambertian::Lambertian, specular::Specular},
+    medium::UniformMedium,
+  },
   solver::bdpt::PathTerminator,
 };
 
@@ -38,7 +42,7 @@ fn main() {
   let g: Arc<dyn Geometry> = back.create_sphere(0.35);
   scene.add_light(
     Arc::clone(&g),
-    SurfaceProperty::Uniform(Vec3::splat(3.2)),
+    SurfaceProperty::Uniform(Vec3::splat(10.2)),
     LightEmissionDirection::Omni,
     -2.0 * glam::vec3(1.0, 1.0, 0.4),
   );
@@ -46,14 +50,24 @@ fn main() {
     back.create_sphere(28.0),
     Arc::new(ConcreteMaterial {
       medium: UniformMedium { ior: 1.0 },
-      bsdf:   Lambertian {
-        s: glam::vec3(1.0, 1.0, 1.0),
-      },
+      bsdf:   Specular { r: Vec3::ONE }, // bsdf:   Lambertian {
+                                         //   s: Vec3::X, //glam::vec3(1.0, 1.0, 1.0),
+                                         // },
     }),
     rcpu::TransformParts {
       pos:      (glam::vec3(30.0, 0.0, 4.0)).into(),
       rotation: Quat::IDENTITY,
     },
+  );
+  scene.add_body(
+    Arc::new(Quad::yz_square((Vec3::X * -3.0).into(), 15.0)),
+    Arc::new(ConcreteMaterial {
+      medium: UniformMedium { ior: 1.0 },
+      bsdf:   Lambertian { s: Vec3::Z }, // bsdf:   Lambertian {
+                                         //   s: Vec3::X, //glam::vec3(1.0, 1.0, 1.0),
+                                         // },
+    }),
+    TransformParts::IDENTITY,
   );
   scene.add_body(
     g,
@@ -68,31 +82,6 @@ fn main() {
       rotation: Quat::IDENTITY,
     },
   );
-  /*
-  let mut f = std::fs::File::create("light-paths.csv").unwrap();
-  for i in 0..64 {
-    let path = rcpu::solver::BidirectionalPath::sample_eye_subpath(
-      &scene,
-      &Sampler::new(),
-      &mut CameraRay::new((5.0 * Vec3::NEG_Y).into(), Vec3::Y.into()),
-      &3,
-      Default::default(),
-    );
-    // rcpu::solver::BidirectionalPath::sample_light_subpath(&scene, &Sampler::new(), &6usize);
-    path
-      .vertices
-      .iter()
-      .map_windows(|[l, r]| {
-        writeln!(
-          &mut f,
-          "{},{},{},{},{},{}",
-          l.point.x, l.point.y, l.point.z, r.point.x, r.point.y, r.point.z
-        )
-        .unwrap();
-      })
-      .for_each(|()| ());
-  }
-  */
 
   let cam = Camera::new(
     (480, 480).into(),
@@ -105,20 +94,8 @@ fn main() {
   solve2(back, scene, cam);
 }
 
-fn bdpt_solve(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
-  for l in 1..3 {
-    for e in 2..4 {
-      let solver = back.create_bdpt_solver(l, e, if l + e == 3 { 24 } else { 24 });
-      solver.render(&scene, &mut cam);
-      let mut img = image::Rgb32FImage::new(480, 480);
-      cam.write_image(&mut img);
-      img.save(format!("l{l}-e{e}.tiff")).unwrap();
-    }
-  }
-}
-
 fn solve2(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
-  let solver = back.create_solver2(3, 32);
+  let solver = back.create_solver2(8, 8);
   solver.render(&scene, &mut cam);
   let mut img = image::Rgb32FImage::new(480, 480);
   cam.write_image(&mut img);

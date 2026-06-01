@@ -1,0 +1,65 @@
+[materials.white]
+type = "lambertian"
+spectrum = [0.3, 0.3, 0.73]
+
+[materials.green]
+type = "lambertian"
+spectrum = [0.12, 0.45, 0.15]
+
+[materials.spec]
+type = "lambertian"
+spectrum = [0.6, 0.6, 0.6]
+
+[geometries.floor]
+type = "quad"
+variant = "xy_square"
+center = [0.0, 0.0, 0.0]
+side = 15.0
+
+[geometries.back_wall]
+type = "quad"
+variant = "zx_square"
+center = [0.0, 0.0, 0.0]
+side = 15.0
+
+[geometries.side_wall]
+type = "quad"
+variant = "yz_square"
+center = [0.0, 0.0, 0.0]
+side = 15.0
+
+[[bodies]]
+geometry = "floor"
+material = "white"
+position = [0.0, 0.0, 0.0]
+
+[[bodies]]
+geometry = "back_wall"
+material = "spec"
+position = [0.0, 7.5, 7.5]
+
+[[bodies]]
+geometry = "side_wall"
+material = { type = "lambertian", spectrum = [0.8, 0.0, 0.0] }
+position = [7.5, 0.0, 7.5]
+
+[[bodies]]
+geometry = "side_wall"
+material = { type = "lambertian", spectrum = [0.6, 0.0, 0.0] }
+position = [-7.5, 0.0, 7.5]
+
+[[bodies]]
+geometry = { type = "sphere", radius = 1.0 }
+material = "green"
+position = [0.0, 2.0, 4.2]
+rotation = [0.0, 0.0, 0.0, 1.0]
+
+[[bodies]]
+geometry = "floor"
+material = "spec"
+position = [0.0, 0.0, 15.0]
+
+[[lights]]
+geometry = { type = "sphere", radius = 1.0 }
+spectrum = [0.9, 0.9, 0.9]
+position = [0.0, -2.0, 5.0]

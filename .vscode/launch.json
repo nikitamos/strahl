@@ -55,7 +55,7 @@
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}/backend/rcpu"
         },
         {
             "type": "lldb",

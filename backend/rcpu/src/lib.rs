@@ -182,19 +182,19 @@ impl Castable for RayGeneric {
 }
 
 #[derive(Debug, Clone)]
-pub struct SurfaceHit {
+pub struct SurfaceHit<'a> {
   pub point:        PointLocal,
   /// Surface normal in local coordinates
   pub normal:       Vec3,
   pub ray_distance: f32,
   /// Transform from global coordinates to the coordinates of the hit body.
   /// Usually is taken from [`IntersectionContext::transform`]
-  pub transform:    Transform,
+  pub transform:    &'a Transform,
   local2hit:        Quat,
 }
 
-impl SurfaceHit {
-  pub fn new(point: PointLocal, normal: Vec3, ray_distance: f32, transform: Transform) -> Self {
+impl<'a> SurfaceHit<'a> {
+  pub fn new(point: PointLocal, normal: Vec3, ray_distance: f32, transform: &'a Transform) -> Self {
     Self {
       point,
       normal,
@@ -219,7 +219,7 @@ impl SurfaceHit {
 
 #[derive(Clone)]
 pub struct Interaction<'a, T = Body> {
-  pub hit:     SurfaceHit,
+  pub hit:     SurfaceHit<'a>,
   pub body:    &'a T,
   /// Normalized direction of ray intersected the surfaces, pointing to the surface
   pub ray_dir: VecLocal,
@@ -244,8 +244,8 @@ impl<'a> Interaction<'a> {
   pub fn caused_by(&self) -> VecHit { self.hit.to_hit(-self.ray_dir) }
 }
 
-pub struct IntersectionContext {
-  transform: Transform,
+pub struct IntersectionContext<'a> {
+  transform: &'a Transform,
 }
 
 /// Transformation of coordinates
@@ -256,6 +256,15 @@ pub struct Transform {
   pub w2l: Mat4,
   /// Transformation of local coordinates to local
   pub l2w: Mat4,
+}
+
+impl Default for Transform {
+  fn default() -> Self {
+    Self {
+      w2l: Mat4::IDENTITY,
+      l2w: Mat4::IDENTITY,
+    }
+  }
 }
 
 impl Transform {
@@ -303,22 +312,31 @@ impl TransformParts {
 
 // #[derive(Default)]
 pub struct Body {
-  geometry:    Arc<dyn Geometry>,
-  material:    Arc<dyn material::Material>,
-  coordinates: RwLock<TransformParts>,
+  geometry:  Arc<dyn Geometry>,
+  material:  Arc<dyn material::Material>,
+  transform: Transform,
 }
 
 impl Body {
+  pub fn new(
+    geometry: Arc<dyn Geometry>,
+    material: Arc<dyn material::Material>,
+    transform: TransformParts,
+  ) -> Self {
+    Self {
+      geometry,
+      material,
+      transform: transform.transform(),
+    }
+  }
   /// Returns matrix representing transform from world coordinates to local
-  pub fn w2l_matrix(&self) -> Mat4 { self.coordinates.read().w2l_matrix() }
+  pub fn w2l_matrix(&self) -> Mat4 { self.transform.w2l }
   /// Returns matrix representing transform from local coordinates to world
-  pub fn l2w_matrix(&self) -> Mat4 { self.coordinates.read().l2w_matrix() }
+  pub fn l2w_matrix(&self) -> Mat4 { self.transform.l2w }
   /// Returns [`Transform`] that maps between local and world coordinates
-  pub fn transform(&self) -> Transform { self.coordinates.read().transform() }
-  pub fn position(&self) -> PointGlobal { self.coordinates.read().pos }
-  pub fn rotation(&self) -> glam::Quat { self.coordinates.read().rotation }
-  pub fn set_position(&self, position: PointGlobal) { self.coordinates.write().pos = position }
-  pub fn set_rotation(&self, rotation: glam::Quat) { self.coordinates.write().rotation = rotation }
+  pub fn transform(&self) -> &Transform { &self.transform }
+  // pub fn position(&self) -> PointGlobal { self.transform.pos }
+  // pub fn rotation(&self) -> glam::Quat { self.transform.rotation }
 }
 
 pub mod light;
@@ -335,7 +353,6 @@ pub type OcclusionRay = RayGeneric;
 // }
 
 pub struct Scene {
-  // TODO: RWLock/mutex on body or lights?
   pub(crate) bodies: Vec<Body>,
   pub(crate) lights: Vec<LightSource>,
   // Why does scene at all stores its cameras?
@@ -367,12 +384,12 @@ impl Scene {
   }
   pub fn add_sphere(&mut self, radius: f32) -> &Body {
     self.bodies.push(Body {
-      geometry:    Arc::new(Sphere { radius }),
-      material:    Arc::new(ConcreteMaterial {
+      geometry:  Arc::new(Sphere { radius }),
+      material:  Arc::new(ConcreteMaterial {
         bsdf:   Lambertian { s: Vec3::X },
         medium: UniformMedium { ior: 1.0 },
       }),
-      coordinates: Default::default(),
+      transform: Default::default(),
     });
     self.bodies.last().unwrap()
   }
@@ -395,11 +412,7 @@ impl Scene {
     material: Arc<dyn Material>,
     coordinates: TransformParts,
   ) -> &Body {
-    self.bodies.push(Body {
-      geometry,
-      material,
-      coordinates: RwLock::new(coordinates),
-    });
+    self.bodies.push(Body::new(geometry, material, coordinates));
     self.bodies.last().unwrap()
   }
   pub fn push_body(&mut self, body: Body) { self.bodies.push(body) }
@@ -435,7 +448,7 @@ impl Scene {
     for body in &self.bodies {
       if let Some(hit) = body.geometry.try_intersect(
         IntersectionContext {
-          transform: body.transform(),
+          transform: body.transform(), // Extra clone
         },
         &ray,
       ) {

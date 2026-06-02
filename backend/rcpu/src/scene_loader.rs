@@ -1,13 +1,21 @@
 use crate::{
-  Body, Geometry, Material, PointGlobal, Quad, Scene, Spectrum, Sphere, SurfaceProperty, TransformParts, camera::Camera, light::{LightEmissionDirection, LightSource}, material::{
+  Body, Geometry, Material, PointGlobal, Quad, Scene, Spectrum, Sphere, SurfaceProperty,
+  TransformParts,
+  camera::Camera,
+  light::{LightEmissionDirection, LightSource},
+  material::{
     ConcreteMaterial, TypeErasedMaterial,
     bsdf::{BSDF, lambertian::Lambertian, specular::Specular},
     medium::{Medium, UniformMedium},
-  }
+  },
 };
 use glam::{Quat, Vec3};
 use serde::Deserialize;
-use std::{collections::HashMap, path::{Path, PathBuf}, sync::Arc};
+use std::{
+  collections::HashMap,
+  path::{Path, PathBuf},
+  sync::Arc,
+};
 
 // =============================================================================
 // UNTAGGED ENUMS: Reference OR Inline
@@ -314,9 +322,7 @@ pub struct SceneLoader {
 }
 
 impl Default for SceneLoader {
-    fn default() -> Self {
-        Self::new()
-    }
+  fn default() -> Self { Self::new() }
 }
 
 impl SceneLoader {
@@ -504,11 +510,7 @@ impl SceneLoader {
       rotation: Quat::from_array(def.rotation),
     };
 
-    Ok(Body {
-      geometry,
-      material,
-      coordinates: std::sync::nonpoison::RwLock::new(coordinates),
-    })
+    Ok(Body::new(geometry, material, coordinates))
   }
 
   /// Build LightSource from LightDef

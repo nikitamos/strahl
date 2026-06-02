@@ -25,10 +25,10 @@ pub struct LightSampleContext<'s> {
 /// For now each point of the source emits light in direction normal
 /// to the surface
 pub struct LightSource {
-  pub(crate) geometry:    Arc<dyn Geometry>,
-  pub(crate) spectrum:    SurfaceProperty<Spectrum>,
-  pub(crate) dir:         LightEmissionDirection,
-  pub(crate) translation: glam::Vec3,
+  pub(crate) geometry:  Arc<dyn Geometry>,
+  pub(crate) spectrum:  SurfaceProperty<Spectrum>,
+  pub(crate) dir:       LightEmissionDirection,
+  pub(crate) transform: Transform,
 }
 
 #[derive(Clone, Default, Debug)]
@@ -55,21 +55,19 @@ impl LightSource {
     Self {
       geometry,
       spectrum,
-      translation,
+      transform: Transform::from_w2l(Mat4::from_translation(-translation)),
       dir,
     }
   }
   pub fn try_intersect(&self, ray: &dyn Castable) -> Option<SurfaceHit> {
     self.geometry.try_intersect(
       IntersectionContext {
-        transform: Transform::from_w2l(Mat4::from_translation(-self.translation)),
+        transform: &self.transform,
       },
       ray,
     )
   }
-  pub fn transform(&self) -> Transform {
-    Transform::from_w2l(Mat4::from_translation(-self.translation))
-  }
+  pub fn transform(&self) -> &Transform { &self.transform }
   pub fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata> {
     self.geometry.sample_point(state)
   }
@@ -135,7 +133,7 @@ impl LightSource {
     if direction.dot(*normal) < 0.0 {
       return Spectrum::ZERO;
     }
-    let surface  = match self.spectrum {
+    let surface = match self.spectrum {
       SurfaceProperty::Uniform(s) => match self.dir {
         LightEmissionDirection::Omni => s,
         LightEmissionDirection::Spot(_, _) => todo!(),

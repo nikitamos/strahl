@@ -16,9 +16,10 @@ mod sphere {
       position:  (2.0 * Vec3::Y).into(),
       direction: Vec3::NEG_Y.into(),
     };
+    let binding = Transform::from_w2l(Mat4::IDENTITY);
     let isect = s.try_intersect(
       crate::IntersectionContext {
-        transform: Transform::from_w2l(Mat4::IDENTITY),
+        transform: &binding,
       },
       &ray,
     );
@@ -40,9 +41,10 @@ mod sphere {
       position:  (2.0 * Vec3::Y).into(),
       direction: Vec3::Y.into(),
     };
+    let binding = Transform::from_w2l(Mat4::IDENTITY);
     let isect = s.try_intersect(
       crate::IntersectionContext {
-        transform: Transform::from_w2l(Mat4::IDENTITY),
+        transform: &binding,
       },
       &ray,
     );
@@ -55,9 +57,10 @@ mod sphere {
       position:  (2.0 * Vec3::Y).into(),
       direction: Vec3::NEG_Y.into(),
     };
+    let binding = Transform::from_w2l(Mat4::from_translation(Vec3::Y));
     let isect = s.try_intersect(
       crate::IntersectionContext {
-        transform: Transform::from_w2l(Mat4::from_translation(Vec3::Y)),
+        transform: &binding,
       },
       &ray,
     );
@@ -79,9 +82,10 @@ mod sphere {
       position:  (2.0 * Vec3::Y).into(),
       direction: Vec3::NEG_Y.into(),
     };
+    let binding = Transform::from_w2l(Mat4::from_translation(Vec3::X));
     let isect = s.try_intersect(
       crate::IntersectionContext {
-        transform: Transform::from_w2l(Mat4::from_translation(Vec3::X)),
+        transform: &binding,
       },
       &ray,
     );

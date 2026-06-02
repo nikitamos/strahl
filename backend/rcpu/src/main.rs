@@ -51,8 +51,8 @@ fn read_scene_from_file() -> Result<Scene, SceneLoadError> {
 }
 
 fn solve2(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
-  let depth = 8;
-  let samples = 256;
+  let depth = 4;
+  let samples = 16;
   let solver = back.create_solver2(depth, samples);
   solver.render(&scene, &mut cam);
   let mut img = image::Rgb32FImage::new(320, 320);

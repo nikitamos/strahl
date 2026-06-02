@@ -28,7 +28,11 @@ pub struct GeometrySampleMetadata {
 
 pub trait Geometry: Sync + Send {
   fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata>;
-  fn try_intersect<'a>(&self, ctx: IntersectionContext, ray: &dyn Castable) -> Option<SurfaceHit>;
+  fn try_intersect<'a>(
+    &self,
+    ctx: IntersectionContext<'a>,
+    ray: &dyn Castable,
+  ) -> Option<SurfaceHit<'a>>;
   fn uv(&self) -> Option<&UVMap> { None }
 }
 
@@ -46,7 +50,11 @@ impl Geometry for Sphere {
     sample
   }
 
-  fn try_intersect(&self, ctx: IntersectionContext, ray: &dyn Castable) -> Option<SurfaceHit> {
+  fn try_intersect<'a>(
+    &self,
+    ctx: IntersectionContext<'a>,
+    ray: &dyn Castable,
+  ) -> Option<SurfaceHit<'a>> {
     let oc: Vec3 = ctx.transform.p2local(ray.pos()).into();
     let direction: Vec3 = ctx.transform.v2local(ray.direction()).into();
 
@@ -174,7 +182,11 @@ impl Geometry for Quad {
     }
   }
 
-  fn try_intersect<'a>(&self, ctx: IntersectionContext, ray: &dyn Castable) -> Option<SurfaceHit> {
+  fn try_intersect<'a>(
+    &self,
+    ctx: IntersectionContext<'a>,
+    ray: &dyn Castable,
+  ) -> Option<SurfaceHit<'a>> {
     let dir = *ctx.transform.v2local(ray.direction());
     let ray_origin = *ctx.transform.p2local(ray.pos());
     let normal = *self.normal;
@@ -209,26 +221,26 @@ pub trait HasGeometry {
   fn geometry(&self) -> &dyn Geometry;
 }
 
-pub trait HasTransform {
-  fn transform(&self) -> Transform;
-}
+// pub trait HasTransform {
+//   fn transform(&self) -> Transform;
+// }
 
-fn closest_hit<'a, T: HasGeometry + HasTransform>(
-  geometries: impl Iterator<Item = &'a T>,
-  ray: RayGeneric,
-) -> Option<Interaction<'a, T>> {
-  geometries
-    .filter_map(|b| {
-      let ctx = IntersectionContext {
-        transform: b.transform(),
-      };
-      b.geometry()
-        .try_intersect(ctx, &ray)
-        .map(|hit| Interaction {
-          body: b,
-          ray_dir: hit.transform.v2local(ray.direction()),
-          hit,
-        })
-    })
-    .min_by(|a, b| a.hit.ray_distance.partial_cmp(&b.hit.ray_distance).unwrap())
-}
+// fn closest_hit<'a, T: HasGeometry + HasTransform>(
+//   geometries: impl Iterator<Item = &'a T>,
+//   ray: RayGeneric,
+// ) -> Option<Interaction<'a, T>> {
+//   geometries
+//     .filter_map(|b| {
+//       let ctx = IntersectionContext {
+//         transform: &b.transform(),
+//       };
+//       b.geometry()
+//         .try_intersect(ctx, &ray)
+//         .map(|hit| Interaction {
+//           body: b,
+//           ray_dir: hit.transform.v2local(ray.direction()),
+//           hit,
+//         })
+//     })
+//     .min_by(|a, b| a.hit.ray_distance.partial_cmp(&b.hit.ray_distance).unwrap())
+// }

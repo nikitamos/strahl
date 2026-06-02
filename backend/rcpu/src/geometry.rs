@@ -3,8 +3,8 @@ use std::ops::Deref;
 use glam::Vec3;
 
 use crate::{
-  Castable, Interaction, IntersectionContext, RayGeneric, SurfaceHit, Transform,
-  VecGlobal, VecLocal,
+  Castable, Interaction, IntersectionContext, RayGeneric, SurfaceHit, Transform, VecGlobal,
+  VecLocal,
   points::PointLocal,
   sampling::{Sample, SampleState},
 };
@@ -207,7 +207,7 @@ impl Geometry for Quad {
     let v_val = self.u.cross(w).dot(normal) / self.area;
 
     // Check if the hit lies within the quad boundaries
-    if !(0.0..=1.0).contains(&u_val) || !(0.0..=1.0).contains(&v_val) {
+    if t < 0.0 || !(0.0..=1.0).contains(&u_val) || !(0.0..=1.0).contains(&v_val) {
       return None;
     }
 

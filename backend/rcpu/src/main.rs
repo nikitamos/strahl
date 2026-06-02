@@ -38,7 +38,7 @@ fn main() {
     (320, 320).into(),
     Vec3::Y,
     Vec3::X,
-    (5.0 * Vec3::NEG_Y + 4.0 * Vec3::Z).into(),
+    (3.0 * Vec3::NEG_Y + 4.0 * Vec3::Z).into(),
     rcpu::camera::CameraType::Perspective,
   );
   // bdpt_solve(back, scene, cam);
@@ -51,8 +51,8 @@ fn read_scene_from_file() -> Result<Scene, SceneLoadError> {
 }
 
 fn solve2(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
-  let depth = 4;
-  let samples = 16;
+  let depth = 6;
+  let samples = 600;
   let solver = back.create_solver2(depth, samples);
   solver.render(&scene, &mut cam);
   let mut img = image::Rgb32FImage::new(320, 320);

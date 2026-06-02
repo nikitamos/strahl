@@ -111,18 +111,21 @@ impl ForwardPathTracer {
   ) {
     let intersected_point = interaction.hit.point_global();
     let material = interaction.material();
-    let new_medium = mediums.interact(material.medium());
+    let mut intr_medium = mediums.interact(material.medium());
     let Some(bsdf) = material.bsdf().sample_bsdf(
       interaction.caused_by(),
       self.sampler.sample(),
-      &BSDFSampleContext::camera(interaction, new_medium.interface()),
+      &BSDFSampleContext::camera(interaction, intr_medium.interface()),
     ) else {
       return;
     };
+    if !bsdf.metadata.transmitted {
+      intr_medium = mediums;
+    }
     let direction = interaction.hit.to_global(bsdf.metadata.inc);
     let ray = RayGeneric::new_stepped(intersected_point, direction);
     let cosine = bsdf.metadata.inc.z.abs();
-    let rt = self.trace_ray_impl(&ray, depth + 1, scene, new_medium);
+    let rt = self.trace_ray_impl(&ray, depth + 1, scene, intr_medium);
     *cumulative_color += rt * bsdf.sample * cosine / bsdf.prob; // TODO: should we divide, should we multiply by cosine?
   }
 

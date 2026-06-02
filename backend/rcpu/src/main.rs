@@ -1,9 +1,12 @@
 #![feature(iter_map_windows)]
 
-use glam::Vec3;
+use std::sync::Arc;
+
+use glam::{Quat, Vec3};
 use rcpu::{
   RayTracer, Sampler, Scene,
   camera::Camera,
+  material::{ConcreteMaterial, bsdf::dielectric::Dielectric, medium::UniformMedium},
   scene_loader::{SceneLoadError, SceneLoader},
 };
 
@@ -32,13 +35,27 @@ mod bdpt_legacy {
 
 fn main() {
   let back = RayTracer::new();
-  let scene = read_scene_from_file().unwrap();
+  let mut scene = read_scene_from_file().unwrap();
+  scene.add_body(
+    back.create_sphere(1.0),
+    Arc::new(ConcreteMaterial {
+      medium: (UniformMedium { ior: 1.33 }),
+      bsdf:   (Dielectric {
+        transmission: Vec3::new(0.6, 0.6, 0.6),
+        reflection:   Vec3::ONE,
+      }),
+    }),
+    rcpu::TransformParts {
+      pos:      glam::vec3(0.5, -1.0, 4.2).into(),
+      rotation: Quat::IDENTITY,
+    },
+  );
 
   let cam = Camera::new(
     (320, 320).into(),
     Vec3::Y,
     Vec3::X,
-    (3.0 * Vec3::NEG_Y + 4.0 * Vec3::Z).into(),
+    (6.5 * Vec3::NEG_Y + 4.0 * Vec3::Z).into(),
     rcpu::camera::CameraType::Perspective,
   );
   // bdpt_solve(back, scene, cam);
@@ -51,8 +68,8 @@ fn read_scene_from_file() -> Result<Scene, SceneLoadError> {
 }
 
 fn solve2(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
-  let depth = 6;
-  let samples = 600;
+  let depth = 8;
+  let samples = 2048;
   let solver = back.create_solver2(depth, samples);
   solver.render(&scene, &mut cam);
   let mut img = image::Rgb32FImage::new(320, 320);

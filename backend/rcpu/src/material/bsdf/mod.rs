@@ -49,9 +49,11 @@ impl BSDFSampleDirection {
 #[derive(Default)]
 pub struct BsdfMetadata {
   /// Sampled direction of incoming light.
-  pub inc:   VecHit,
-  pub eta:   f32,
-  pub dirac: bool,
+  pub inc:         VecHit,
+  pub eta:         f32,
+  pub dirac:       bool,
+  /// Whether the ray was refracted or reflected.
+  pub transmitted: bool,
 }
 
 impl BsdfMetadata {
@@ -63,7 +65,11 @@ impl BsdfMetadata {
 /// Bidirectional scattering distribution functions
 pub trait BSDF: Sync + Send {
   /// Evaluates the BSDF given incident and exitant direction
-  fn bsdf(&self, out: VecHit, inc: VecHit, ctx: &BSDFSampleContext) -> Spectrum;
+  fn bsdf(&self, out: VecHit, inc: VecHit, ctx: &BSDFSampleContext) -> Spectrum {
+    self
+      .bsdf2(out, inc, ctx)
+      .map_or(Spectrum::ZERO, Sample::value)
+  }
   /// Samples the BSDF given the exitant direction. It uses pre-generated state from a sampler
   #[must_use]
   fn sample_bsdf(
@@ -92,6 +98,6 @@ pub struct CombinedBSDF {}
 
 // TODO: implement BSDF for tuple of BSDFs?
 
+pub mod dielectric;
 pub mod lambertian;
 pub mod specular;
-pub mod transmissive;

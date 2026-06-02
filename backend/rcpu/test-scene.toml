@@ -74,4 +74,4 @@ position = [0.0, 0.0, 15.0]
 [[lights]]
 geometry = "lamp"
 spectrum = [0.9, 0.9, 0.9]
-position = [0.0, -2.0, 5.0]
+position = [0.5, -1.0, 5.5]

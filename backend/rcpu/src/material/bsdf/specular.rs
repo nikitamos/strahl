@@ -34,6 +34,7 @@ impl BSDF for Specular {
         inc:   (-out.reflect(Vec3::Z)).into(),
         eta:   1.0,
         dirac: true,
+        transmitted: false
       },
     })
   }
@@ -52,6 +53,7 @@ impl BSDF for Specular {
           inc,
           eta: 1.0,
           dirac: true,
+          transmitted: false
         },
       })
     } else {

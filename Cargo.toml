@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["backend/rcpu", "backend/wgpu-rt", "strahl_types"]
+members = ["backend/rcpu", "strahl_types", "strahl-import"]
 
 [profile.release]
 opt-level = 3
@@ -9,3 +9,6 @@ lto = "thin"
 [profile.dev]
 overflow-checks = false
 opt-level = 2
+
+[workspace.dependencies]
+image = "0.25.10"

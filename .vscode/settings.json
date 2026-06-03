@@ -5,6 +5,7 @@
         "codirectional",
         "downcasting",
         "isect",
+        "gltf",
         "Lambertian",
         "raygen",
         "Raymarcher",

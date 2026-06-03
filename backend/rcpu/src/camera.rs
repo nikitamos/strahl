@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-use crate::{Castable, PointGlobal, Spectrum, VecGlobal};
+use crate::{PointGlobal, RayGeneric, Spectrum, VecGlobal};
 
 /// Represents a ray with an origin and direction.
 #[derive(Debug, Clone, Default)]
@@ -24,15 +24,20 @@ impl CameraRay {
       camera_dir: direction,
     }
   }
-}
 
-impl Castable for CameraRay {
   fn pos(&self) -> PointGlobal { self.origin }
 
   fn direction(&self) -> VecGlobal { self.direction.into() }
   fn scatter(&mut self, new_direction: VecGlobal) {
     self.direction = new_direction.into();
     self.origin = (*self.origin + 0.0001f32 * *new_direction).into();
+  }
+
+  pub fn as_generic(&self) -> RayGeneric {
+    RayGeneric {
+      position:  self.pos(),
+      direction: self.direction(),
+    }
   }
 }
 

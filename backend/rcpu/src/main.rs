@@ -36,20 +36,20 @@ mod bdpt_legacy {
 fn main() {
   let back = RayTracer::new();
   let mut scene = read_scene_from_file().unwrap();
-  scene.add_body(
-    back.create_sphere(1.0),
-    Arc::new(ConcreteMaterial {
-      medium: (UniformMedium { ior: 1.0/1.33 }),
-      bsdf:   (Dielectric {
-        transmission: Vec3::new(0.6, 0.6, 0.6),
-        reflection:   Vec3::ONE,
-      }),
-    }),
-    rcpu::TransformParts {
-      pos:      glam::vec3(0.5, -1.0, 4.2).into(),
-      rotation: Quat::IDENTITY,
-    },
-  );
+  // scene.add_body(
+  //   back.create_sphere(1.0),
+  //   Arc::new(ConcreteMaterial {
+  //     medium: (UniformMedium { ior: 1.0/1.33 }),
+  //     bsdf:   (Dielectric {
+  //       transmission: Vec3::new(0.6, 0.6, 0.6),
+  //       reflection:   Vec3::ONE,
+  //     }),
+  //   }),
+  //   rcpu::TransformParts {
+  //     pos:      glam::vec3(0.5, -1.0, 4.2).into(),
+  //     rotation: Quat::IDENTITY,
+  //   },
+  // );
 
   let cam = Camera::new(
     (320, 320).into(),

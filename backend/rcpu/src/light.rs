@@ -1,9 +1,9 @@
 use glam::{Mat4, Quat, Vec3, Vec3Swizzles};
 
 use crate::{
-  Castable, Geometry, GeometrySampleMetadata, IntersectionContext, PointGlobal, PointLocal, Sample,
-  SampleState, Sampler, Scene, Spectrum, SurfaceHit, SurfaceProperty, Transform, VecGlobal, VecHit,
-  VecLocal,
+  Geometry, GeometrySampleMetadata, IntersectionContext, PointGlobal, PointLocal, RayGeneric,
+  Sample, SampleState, Sampler, Scene, Spectrum, SurfaceHit, SurfaceProperty, Transform, VecGlobal,
+  VecHit, VecLocal,
 };
 use std::{ops::Deref, sync::Arc};
 
@@ -59,7 +59,7 @@ impl LightSource {
       dir,
     }
   }
-  pub fn try_intersect(&self, ray: &dyn Castable) -> Option<SurfaceHit> {
+  pub fn try_intersect(&self, ray: &RayGeneric) -> Option<SurfaceHit> {
     self.geometry.try_intersect(
       IntersectionContext {
         transform: &self.transform,

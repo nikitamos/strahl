@@ -3,8 +3,7 @@ use std::ops::Deref;
 use glam::Vec3;
 
 use crate::{
-  Castable, Interaction, IntersectionContext, RayGeneric, SurfaceHit, Transform, VecGlobal,
-  VecLocal,
+  Interaction, IntersectionContext, RayGeneric, SurfaceHit, Transform, VecGlobal, VecLocal,
   points::PointLocal,
   sampling::{Sample, SampleState},
 };
@@ -31,7 +30,7 @@ pub trait Geometry: Sync + Send {
   fn try_intersect<'a>(
     &self,
     ctx: IntersectionContext<'a>,
-    ray: &dyn Castable,
+    ray: &RayGeneric,
   ) -> Option<SurfaceHit<'a>>;
   fn uv(&self) -> Option<&UVMap> { None }
 }
@@ -53,7 +52,7 @@ impl Geometry for Sphere {
   fn try_intersect<'a>(
     &self,
     ctx: IntersectionContext<'a>,
-    ray: &dyn Castable,
+    ray: &RayGeneric,
   ) -> Option<SurfaceHit<'a>> {
     let oc: Vec3 = ctx.transform.p2local(ray.pos()).into();
     let direction: Vec3 = ctx.transform.v2local(ray.direction()).into();
@@ -185,7 +184,7 @@ impl Geometry for Quad {
   fn try_intersect<'a>(
     &self,
     ctx: IntersectionContext<'a>,
-    ray: &dyn Castable,
+    ray: &RayGeneric,
   ) -> Option<SurfaceHit<'a>> {
     let dir = *ctx.transform.v2local(ray.direction());
     let ray_origin = *ctx.transform.p2local(ray.pos());

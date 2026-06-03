@@ -57,7 +57,7 @@ impl ForwardPathTracer {
     let rays = cam.init_rays();
     rays.into_par_iter().enumerate().for_each(|(_i, ray)| {
       for _ in 0..self.samples {
-        ray.color += self.trace_ray(&RayGeneric::from_castable(ray), 0, scene);
+        ray.color += self.trace_ray(&ray.as_generic(), 0, scene);
         ray.reset_direction();
       }
       ray.color /= self.samples as f32;

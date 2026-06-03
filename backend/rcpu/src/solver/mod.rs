@@ -2,7 +2,7 @@ use std::{fs::File, io::Write};
 
 use super::{Interaction, IntersectionContext, Scene, Spectrum};
 use crate::{
-  Castable, PointGlobal, Sample, Sampler,
+  PointGlobal, RayGeneric, Sample, Sampler,
   camera::CameraRay,
   light::{LightSampleContext, LightSampleMetadata},
 };
@@ -30,7 +30,7 @@ fn sample_light(
     .and_then(|src, ()| src.sample(sampler.sample(), LightSampleContext { dst: dest, scene }))
 }
 
-pub(crate) fn closest_hit<'a>(scene: &'a Scene, r: &impl Castable) -> Option<Interaction<'a>> {
+pub(crate) fn closest_hit<'a>(scene: &'a Scene, r: &RayGeneric) -> Option<Interaction<'a>> {
   let mut x = 0;
   scene
     .bodies

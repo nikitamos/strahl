@@ -1,6 +1,9 @@
-use glam::Vec3;
-use crate::{Castable, GeometrySampleMetadata, IntersectionContext, PointLocal, Sample, SampleState, SurfaceHit};
 use super::Geometry;
+use crate::{
+  GeometrySampleMetadata, IntersectionContext, PointLocal, RayGeneric, Sample, SampleState,
+  SurfaceHit,
+};
+use glam::Vec3;
 
 pub struct TriangleMesh {
     vertices: Vec<Vec3>,
@@ -61,7 +64,7 @@ impl TriangleMesh {
 }
 
 impl Geometry for TriangleMesh {
-    fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata> {
+  fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata> {
         // 1. Select a random triangle with probability proportional to its area
         let [r_tri, r_bary1] = state.uniform_2d.into();
         let target_area = r_tri * self.total_area;
@@ -115,11 +118,11 @@ impl Geometry for TriangleMesh {
         }
     }
 
-    fn try_intersect<'a>(
-        &self,
-        ctx: IntersectionContext<'a>,
-        ray: &dyn Castable,
-    ) -> Option<SurfaceHit<'a>> {
+  fn try_intersect<'a>(
+    &self,
+    ctx: IntersectionContext<'a>,
+    ray: &RayGeneric,
+  ) -> Option<SurfaceHit<'a>> {
         let dir = *ctx.transform.v2local(ray.direction());
         let origin = *ctx.transform.p2local(ray.pos());
         

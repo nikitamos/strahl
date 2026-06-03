@@ -4,7 +4,7 @@ use glam::Vec3;
 use rayon::prelude::*;
 
 use crate::{
-  Castable, Interaction, PointGlobal, RayGeneric, Sample, Sampler, Scene, Spectrum, VecGlobal,
+  Interaction, PointGlobal, RayGeneric, Sample, Sampler, Scene, Spectrum, VecGlobal,
   camera::{self, CameraRay},
   light::{LightSampleContext, LightSource},
   material::bsdf::{BSDFSampleContext, BsdfMetadata},

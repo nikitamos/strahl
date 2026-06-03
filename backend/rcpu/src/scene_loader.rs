@@ -1,11 +1,21 @@
 use crate::{
-  Body, Geometry, Material, PointGlobal, Quad, Scene, Spectrum, Sphere, SurfaceProperty,
+  Body,
+  Geometry,
+  Material,
+  PointGlobal,
+  Quad,
+  Scene,
+  Spectrum,
+  Sphere,
+  SurfaceProperty,
   TransformParts,
+  TriangleMesh, // <-- Added TriangleMesh
   camera::Camera,
   light::{LightEmissionDirection, LightSource},
   material::{
-    ConcreteMaterial, TypeErasedMaterial,
-    bsdf::{BSDF, lambertian::Lambertian, specular::Specular},
+    ConcreteMaterial,
+    TypeErasedMaterial,
+    bsdf::{BSDF, dielectric::Dielectric, lambertian::Lambertian, specular::Specular}, // <-- Added Dielectric
     medium::{Medium, UniformMedium},
   },
 };
@@ -21,27 +31,20 @@ use std::{
 // UNTAGGED ENUMS: Reference OR Inline
 // =============================================================================
 
-/// Resolves to either a named geometry or an inline definition
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub enum GeometryRef {
-  /// Reference to a named geometry in [geometries] section
   Named(String),
-  /// Inline geometry definition
   Inline(GeometryDef),
 }
 
-/// Resolves to either a named material or an inline definition  
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub enum MaterialRef {
-  /// Reference to a named material in [materials] section
   Named(String),
-  /// Inline material definition
   Inline(MaterialDef),
 }
 
-/// Resolves to either a named texture or an inline definition
 #[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum TextureRef {
@@ -56,9 +59,7 @@ pub enum TextureRef {
 #[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum SpectrumDef {
-  /// Uniform color: [r, g, b]
   Uniform([f32; 3]),
-  /// Textured: { texture = "name" } or inline texture def
   Textured { texture: TextureRef },
 }
 
@@ -66,10 +67,7 @@ impl From<SpectrumDef> for crate::Spectrum {
   fn from(def: SpectrumDef) -> Self {
     match def {
       SpectrumDef::Uniform([r, g, b]) => Vec3::new(r, g, b),
-      SpectrumDef::Textured { .. } => {
-        // TODO: Implement texture sampling
-        Vec3::ONE
-      }
+      SpectrumDef::Textured { .. } => Vec3::ONE,
     }
   }
 }
@@ -86,21 +84,21 @@ pub enum GeometryDef {
 
   #[serde(rename = "quad")]
   Quad {
-    // Arbitrary parallelogram
     #[serde(flatten)]
     params: QuadParams,
   },
+
+  // NEW: glTF Mesh support
+  #[serde(rename = "mesh")]
+  Mesh { path: String },
 }
 
 #[derive(Deserialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct QuadParams {
-  // Parallelogram definition
-  pub origin: Option<[f32; 3]>,
-  pub u:      Option<[f32; 3]>,
-  pub v:      Option<[f32; 3]>,
-
-  // Convenience square variants
+  pub origin:  Option<[f32; 3]>,
+  pub u:       Option<[f32; 3]>,
+  pub v:       Option<[f32; 3]>,
   pub variant: Option<QuadVariant>,
   pub center:  Option<[f32; 3]>,
   pub side:    Option<f32>,
@@ -121,7 +119,6 @@ pub enum QuadVariant {
 #[derive(Deserialize, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum MaterialDef {
-  /// Simple material: just a BSDF
   Lambertian {
     spectrum: SpectrumDef,
   },
@@ -129,24 +126,31 @@ pub enum MaterialDef {
     reflectance: SpectrumDef,
   },
 
-  /// Full material with BSDF + Medium
+  // NEW: Dielectric material (Glass, Water, etc.)
+  Dielectric {
+    transmission: SpectrumDef,
+    #[serde(default = "default_reflection")]
+    reflection:   SpectrumDef,
+    #[serde(default = "default_ior")]
+    ior:          f32,
+  },
+
   Concrete {
     bsdf:   BsdfDef,
     medium: MediumDef,
   },
 }
 
+fn default_reflection() -> SpectrumDef { SpectrumDef::Uniform([1.0, 1.0, 1.0]) }
+fn default_ior() -> f32 { 1.5 }
+
 #[derive(Deserialize, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum BsdfDef {
   #[serde(rename = "lambertian")]
   Lambertian { spectrum: SpectrumDef },
-
   #[serde(rename = "specular")]
   Specular { reflectance: SpectrumDef },
-  // Future extensions:
-  // Glossy { spectrum: SpectrumDef, roughness: f32 },
-  // Transmissive { spectrum: SpectrumDef, ior: f32 },
 }
 
 #[derive(Deserialize, Debug)]
@@ -157,29 +161,23 @@ pub enum MediumDef {
 }
 
 // =============================================================================
-// SCENE STRUCTURES
+// SCENE STRUCTURES (Unchanged)
 // =============================================================================
 
 #[derive(Deserialize, Debug)]
 pub struct SceneFile {
   #[serde(default)]
-  pub scene: SceneMeta,
-
+  pub scene:      SceneMeta,
   #[serde(default)]
-  pub materials: std::collections::HashMap<String, MaterialDef>,
-
+  pub materials:  std::collections::HashMap<String, MaterialDef>,
   #[serde(default)]
   pub geometries: std::collections::HashMap<String, GeometryDef>,
-
   #[serde(default)]
-  pub textures: std::collections::HashMap<String, TextureDef>,
-
-  pub bodies: Vec<BodyDef>,
-
+  pub textures:   std::collections::HashMap<String, TextureDef>,
+  pub bodies:     Vec<BodyDef>,
   #[serde(default)]
-  pub lights: Vec<LightDef>,
-
-  pub camera: Option<CameraDef>,
+  pub lights:     Vec<LightDef>,
+  pub camera:     Option<CameraDef>,
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -191,26 +189,21 @@ pub struct SceneMeta {
 pub struct BodyDef {
   pub geometry: GeometryRef,
   pub material: MaterialRef,
-
   #[serde(default)]
   pub position: [f32; 3],
-
   #[serde(default = "default_quat")]
-  pub rotation: [f32; 4], // [x, y, z, w] for glam::Quat
+  pub rotation: [f32; 4],
 }
-
 fn default_quat() -> [f32; 4] { [0.0, 0.0, 0.0, 1.0] }
 
 #[derive(Deserialize, Debug)]
 pub struct LightDef {
-  pub geometry: GeometryRef,
-  pub spectrum: SpectrumDef,
-
+  pub geometry:  GeometryRef,
+  pub spectrum:  SpectrumDef,
   #[serde(default)]
   pub direction: LightDirectionDef,
-
   #[serde(default)]
-  pub position: [f32; 3],
+  pub position:  [f32; 3],
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -218,8 +211,7 @@ pub struct LightDef {
 pub enum LightDirectionDef {
   #[default]
   #[serde(rename = "omni")]
-  Omni, // Deserializes from string "omni"
-
+  Omni,
   #[serde(rename_all = "lowercase")]
   Structured {
     #[serde(flatten)]
@@ -241,13 +233,11 @@ pub struct CameraDef {
   pub position:   [f32; 3],
   pub direction:  [f32; 3],
   pub right:      [f32; 3],
-
   #[serde(default)]
   #[serde(rename = "type")]
-  pub cam_type: CameraType,
-
+  pub cam_type:   CameraType,
   #[serde(default = "default_fov")]
-  pub fov: f32,
+  pub fov:        f32,
 }
 
 #[derive(Deserialize, Debug, Default, Clone, Copy)]
@@ -257,12 +247,7 @@ pub enum CameraType {
   Perspective,
   Orthographic,
 }
-
 fn default_fov() -> f32 { 45.0 }
-
-// =============================================================================
-// TEXTURE DEFINITIONS (stub for future)
-// =============================================================================
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -273,10 +258,12 @@ pub enum TextureDef {
     #[serde(default = "default_scale")]
     scale:  [f32; 2],
   },
-  // Image { path: String, ... },
 }
-
 fn default_scale() -> [f32; 2] { [1.0, 1.0] }
+
+// =============================================================================
+// ERRORS
+// =============================================================================
 
 #[derive(Debug)]
 pub enum SceneLoadError {
@@ -300,16 +287,63 @@ impl std::fmt::Display for SceneLoadError {
 }
 
 impl std::error::Error for SceneLoadError {}
-
 impl From<std::io::Error> for SceneLoadError {
   fn from(e: std::io::Error) -> Self { SceneLoadError::Io(e) }
 }
-
 impl From<toml::de::Error> for SceneLoadError {
   fn from(e: toml::de::Error) -> Self { SceneLoadError::Toml(e) }
 }
 
 type Result<T> = std::result::Result<T, SceneLoadError>;
+
+// =============================================================================
+// GLTF DATA EXTRACTION HELPERS
+// =============================================================================
+
+fn extract_vec3(view: &strahl_import::reader::GltfBufferView, buffer: &[u8]) -> Vec<Vec3> {
+  let mut res = Vec::with_capacity(view.count);
+  for i in 0..view.count {
+    let offset = view.offset + i * view.stride;
+    let bytes = &buffer[offset..offset + 12];
+    let x = f32::from_le_bytes(bytes[0..4].try_into().unwrap());
+    let y = f32::from_le_bytes(bytes[4..8].try_into().unwrap());
+    let z = f32::from_le_bytes(bytes[8..12].try_into().unwrap());
+    res.push(Vec3::new(x, y, z));
+  }
+  res
+}
+
+fn extract_vec2(view: &strahl_import::reader::GltfBufferView, buffer: &[u8]) -> Vec<glam::Vec2> {
+  let mut res = Vec::with_capacity(view.count);
+  for i in 0..view.count {
+    let offset = view.offset + i * view.stride;
+    let bytes = &buffer[offset..offset + 8];
+    let x = f32::from_le_bytes(bytes[0..4].try_into().unwrap());
+    let y = f32::from_le_bytes(bytes[4..8].try_into().unwrap());
+    res.push(glam::Vec2::new(x, y));
+  }
+  res
+}
+
+fn extract_indices(geom: &strahl_import::reader::GltfGeometry) -> Vec<[u32; 3]> {
+  let mut res = Vec::with_capacity(geom.indices.count / 3);
+  let read_idx = |i: usize| -> u32 {
+    let offset = geom.indices.offset + i * geom.indices.stride;
+    match geom.index_size {
+      1 => geom.buffer[offset] as u32,
+      2 => u16::from_le_bytes(geom.buffer[offset..offset + 2].try_into().unwrap()) as u32,
+      4 => u32::from_le_bytes(geom.buffer[offset..offset + 4].try_into().unwrap()),
+      _ => panic!("Invalid index size"),
+    }
+  };
+  for i in 0..(geom.indices.count / 3) {
+    let i0 = read_idx(i * 3);
+    let i1 = read_idx(i * 3 + 1);
+    let i2 = read_idx(i * 3 + 2);
+    res.push([i0, i1, i2]);
+  }
+  res
+}
 
 // =============================================================================
 // SCENE LOADER
@@ -334,58 +368,41 @@ impl SceneLoader {
     }
   }
 
-  /// Load a scene from a TOML file at `path`
   pub fn load(&mut self, path: impl AsRef<Path>) -> Result<Scene> {
     let path = path.as_ref();
     self.source_path = path.parent().map(|p| p.to_path_buf());
 
-    // Read and parse TOML
     let contents = std::fs::read_to_string(path)?;
     let scene_file: SceneFile = toml::from_str(&contents)?;
 
-    // First pass: register named definitions
     self.register_definitions(&scene_file)?;
 
-    // Build the scene
     let mut scene = Scene::new();
-
-    // Add bodies
     for body_def in &scene_file.bodies {
-      let body = self.build_body(body_def)?;
-      scene.push_body(body);
+      scene.push_body(self.build_body(body_def)?);
     }
-
-    // Add lights
     for light_def in &scene_file.lights {
-      let light = self.build_light(light_def)?;
-      scene.push_light(light);
+      scene.push_light(self.build_light(light_def)?);
     }
-
-    // Configure camera if present
     if let Some(cam_def) = &scene_file.camera {
-      let cam = self.build_camera(cam_def)?;
-      scene.cameras.push(Arc::new(cam));
+      scene.cameras.push(Arc::new(self.build_camera(cam_def)?));
     }
 
     Ok(scene)
   }
 
-  /// First pass: populate registries from named definitions
   fn register_definitions(&mut self, defs: &SceneFile) -> Result<()> {
     for (name, geom_def) in &defs.geometries {
-      let geom = Self::build_geometry(geom_def)?;
+      let geom = self.build_geometry(geom_def)?; // Changed to self.
       self.geom_registry.insert(name.clone(), geom);
     }
-
     for (name, mat_def) in &defs.materials {
       let mat = Self::build_material(mat_def)?;
       self.mat_registry.insert(name.clone(), mat);
     }
-
     Ok(())
   }
 
-  /// Resolve GeometryRef -> Arc<dyn Geometry>
   fn resolve_geometry(&self, geom_ref: &GeometryRef) -> Result<Arc<dyn Geometry>> {
     match geom_ref {
       GeometryRef::Named(name) => self
@@ -393,11 +410,10 @@ impl SceneLoader {
         .get(name)
         .cloned()
         .ok_or_else(|| SceneLoadError::NotFound(format!("Unknown geometry: '{}'", name))),
-      GeometryRef::Inline(def) => Self::build_geometry(def),
+      GeometryRef::Inline(def) => self.build_geometry(def), // Changed to self.
     }
   }
 
-  /// Resolve MaterialRef -> Arc<dyn Material>
   fn resolve_material(&self, mat_ref: &MaterialRef) -> Result<Arc<dyn Material>> {
     match mat_ref {
       MaterialRef::Named(name) => self
@@ -409,21 +425,18 @@ impl SceneLoader {
     }
   }
 
-  /// Build runtime Geometry from GeometryDef
-  fn build_geometry(def: &GeometryDef) -> Result<Arc<dyn Geometry>> {
+  fn build_geometry(&self, def: &GeometryDef) -> Result<Arc<dyn Geometry>> {
+    // Added &self
     match def {
       GeometryDef::Sphere { radius } => Ok(Arc::new(Sphere { radius: *radius })),
       GeometryDef::Quad { params } => {
-        // Prefer explicit parallelogram params
         if let (Some(origin), Some(u), Some(v)) = (params.origin, params.u, params.v) {
           Ok(Arc::new(Quad::new(
             Vec3::from(origin).into(),
             Vec3::from(u).into(),
             Vec3::from(v).into(),
           )))
-        }
-        // Fall back to convenience square variants
-        else if let (Some(variant), Some(center), Some(side)) =
+        } else if let (Some(variant), Some(center), Some(side)) =
           (params.variant, params.center, params.side)
         {
           let center = Vec3::from(center).into();
@@ -439,10 +452,32 @@ impl SceneLoader {
           ))
         }
       }
+      // NEW: glTF Mesh Loading
+      GeometryDef::Mesh { path } => {
+        let full_path = if let Some(ref base) = self.source_path {
+          base.join(path)
+        } else {
+          PathBuf::from(path)
+        };
+
+        let geom = strahl_import::reader::GltfGeometry::import_validate(&full_path)
+          .map_err(|e| SceneLoadError::Parse(format!("Failed to load glTF mesh: {}", e)))?;
+
+        let vertices = extract_vec3(&geom.position, &geom.buffer);
+        let normals = extract_vec3(&geom.normals, &geom.buffer);
+        let uvs = extract_vec2(&geom.uv, &geom.buffer);
+        let indices = extract_indices(&geom);
+
+        Ok(Arc::new(TriangleMesh::new(
+          vertices,
+          indices,
+          Some(normals),
+          Some(uvs),
+        )))
+      }
     }
   }
 
-  /// Build runtime BSDF from BsdfDef
   fn build_bsdf(def: &BsdfDef) -> Result<Arc<dyn BSDF>> {
     match def {
       BsdfDef::Lambertian { spectrum } => {
@@ -463,7 +498,6 @@ impl SceneLoader {
     }
   }
 
-  /// Build runtime Material from MaterialDef
   fn build_material(def: &MaterialDef) -> Result<Arc<dyn Material>> {
     match def {
       MaterialDef::Lambertian { spectrum } => {
@@ -480,31 +514,40 @@ impl SceneLoader {
           medium: UniformMedium { ior: 1.0 },
         }))
       }
+      // NEW: Dielectric Material Construction
+      MaterialDef::Dielectric {
+        transmission,
+        reflection,
+        ior,
+      } => {
+        let t = Self::parse_spectrum(transmission)?;
+        let r = Self::parse_spectrum(reflection)?;
+        Ok(Arc::new(TypeErasedMaterial::new(
+          Arc::new(Dielectric {
+            transmission: t,
+            reflection:   r,
+          }),
+          Arc::new(UniformMedium { ior: *ior }),
+        )))
+      }
       MaterialDef::Concrete { bsdf, medium } => {
         let bsdf_obj = Self::build_bsdf(bsdf)?;
         let medium_obj = Self::build_medium(medium)?;
-
         Ok(Arc::new(TypeErasedMaterial::new(bsdf_obj, medium_obj)))
       }
     }
   }
 
-  /// Helper: parse SpectrumDef into runtime Spectrum (Vec3)
   fn parse_spectrum(def: &SpectrumDef) -> Result<Spectrum> {
     match def {
       SpectrumDef::Uniform([r, g, b]) => Ok(Vec3::new(*r, *g, *b)),
-      SpectrumDef::Textured { .. } => {
-        // Textures not yet implemented; return white as fallback
-        Ok(Vec3::ONE)
-      }
+      SpectrumDef::Textured { .. } => Ok(Vec3::ONE),
     }
   }
 
-  /// Convert BodyDef -> runtime Body
   fn build_body(&self, def: &BodyDef) -> Result<Body> {
     let geometry = self.resolve_geometry(&def.geometry)?;
     let material = self.resolve_material(&def.material)?;
-
     let coordinates = TransformParts {
       pos:      PointGlobal::new(def.position.into()),
       rotation: Quat::from_array(def.rotation),

@@ -10,5 +10,6 @@ rand = "0.10.1"
 rand_distr = "0.6.0"
 rayon = "1.11.0"
 serde = { version = "1.0.228", features = ["derive", "rc"] }
+strahl-import = { version = "0.2.0", path = "../../strahl-import" }
 strahl_types = {path = "../../strahl_types"}
 toml = "1.1.2"

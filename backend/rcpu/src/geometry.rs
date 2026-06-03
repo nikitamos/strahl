@@ -218,6 +218,7 @@ impl Geometry for Quad {
 }
 
 mod mesh;
+pub use mesh::TriangleMesh;
 
 pub trait HasGeometry {
   fn geometry(&self) -> &dyn Geometry;

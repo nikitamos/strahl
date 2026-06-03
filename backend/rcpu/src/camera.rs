@@ -79,6 +79,36 @@ impl Camera {
     }
   }
 
+  /// Creates a new camera that with given orientation looking at given direction.
+  /// `fovy` parameter is expected to be passed in radians.
+  pub fn new_with_fov(
+    resolution: glam::USizeVec2,
+    direction: Vec3,
+    fovy: f32,
+    up: Vec3,
+    pos: PointGlobal,
+    cam_type: CameraType,
+  ) -> Self {
+    assert!(
+      resolution.x != 0 && resolution.y != 0,
+      "resolution can't be zero"
+    );
+    let direction = direction.normalize();
+    let up_len = (fovy / 2.0).tan();
+    let up = up.normalize() * up_len;
+    let right =
+      direction.cross(up).normalize() * up_len * (resolution.x as f32 / resolution.y as f32);
+
+    Camera {
+      resolution,
+      cam_type,
+      right,
+      direction,
+      translation: pos,
+      rays: Vec::new(),
+    }
+  }
+
   pub fn write_image(&self, img: &mut image::Rgb32FImage) {
     for x in 0..self.resolution.x {
       for y in 0..self.resolution.y {

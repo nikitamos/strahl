@@ -8,7 +8,7 @@ spectrum = [0.12, 0.45, 0.15]
 
 [materials.spec]
 type = "lambertian"
-spectrum = [0.6, 0.6, 0.6]
+spectrum = [0.8, 0.8, 0.8]
 
 [geometries.floor]
 type = "quad"
@@ -45,31 +45,51 @@ geometry = "back_wall"
 material = "spec"
 position = [0.0, 7.5, 7.5]
 
-# [[bodies]]
-# geometry = "back_wall"
-# material = { type = "lambertian", spectrum = [0.7, 0.7, 0.2] }
-# position = [0.0, -7.5, 7.5]
-
-# [[bodies]]
-# geometry = "side_wall"
-# material = { type = "lambertian", spectrum = [0.6, 0.0, 0.0] }
-# position = [7.5, 0.0, 7.5]
-
-# [[bodies]]
-# geometry = "side_wall"
-# material = { type = "lambertian", spectrum = [0.6, 0.0, 0.0] }
-# position = [-7.5, 0.0, 7.5]
-
-# [[bodies]]
-# geometry = { type = "sphere", radius = 1.0 }
-# material = "green"
-# position = [0.5, 1.0, 4.2]
-# rotation = [0.0, 0.0, 0.0, 1.0]
+[[bodies]]
+geometry = "back_wall"
+material = { type = "lambertian", spectrum = [0.7, 0.7, 0.2] }
+position = [0.0, -7.5, 7.5]
 
 [[bodies]]
-geometry = { type = "mesh", path = "suzanne.glb" }
+geometry = "side_wall"
+material = { type = "lambertian", spectrum = [0.0, 0.6, 0.0] }
+position = [7.5, 0.0, 7.5]
+
+[[bodies]]
+geometry = "side_wall"
+material = { type = "lambertian", spectrum = [0.6, 0.0, 0.0] }
+position = [-7.5, 0.0, 7.5]
+
+[[bodies]]
+geometry = { type = "sphere", radius = 1.0 }
 material = "green"
-position = [0.0, 0.0, 2.0]
+position = [0.5, 1.0, 1.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+
+[[bodies]]
+geometry = { type = "sphere", radius = 1.5 }
+material = { type = "specular", reflectance = [1, 1, 1] }
+position = [3.5, 0.5, 1.8]
+rotation = [0.0, 0.0, 0.0, 1.0]
+
+# [[bodies]]
+# material = { type = "dielectric", transmission = [
+#     0.6,
+#     0.6,
+#     0.65,
+# ], reflection = [
+#     0.2,
+#     0.2,
+#     0.2,
+# ], ior = 0.6667 }
+# geometry = { type = "sphere", radius = 1.5 }
+# position = [-3.5, 0.5, 1.5]
+# rotation = [0.0, 0.0, 0.0, 1.0]
+
+# [[bodies]]
+# geometry = { type = "mesh", path = "suzanne.glb" }
+# material = "green"
+# position = [0.0, 0.0, 2.0]
 
 [[bodies]]
 geometry = "floor"

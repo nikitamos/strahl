@@ -28,15 +28,21 @@ mod bdpt_legacy {
   }
 }
 
+const IMAGE_SIDE: u32 = 512;
+
+const DEPTH: u32 = 6;
+const SAMPLES: u32 = 512;
+
 fn main() {
   let back = RayTracer::new();
   let scene = read_scene_from_file().unwrap();
 
-  let cam = Camera::new(
-    (320, 320).into(),
+  let cam = Camera::new_with_fov(
+    (IMAGE_SIDE as usize, IMAGE_SIDE as usize).into(),
     Vec3::Y,
-    Vec3::X,
-    (6.5 * Vec3::NEG_Y + 4.0 * Vec3::Z).into(),
+    78.0f32.to_radians(),
+    Vec3::Z,
+    (7.0 * Vec3::NEG_Y + 4.2 * Vec3::Z).into(),
     rcpu::camera::CameraType::Perspective,
   );
   // bdpt_solve(back, scene, cam);
@@ -49,11 +55,9 @@ fn read_scene_from_file() -> Result<Scene, SceneLoadError> {
 }
 
 fn solve2(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
-  let depth = 4;
-  let samples = 512;
-  let solver = back.create_solver2(depth, samples);
+  let solver = back.create_solver2(DEPTH, SAMPLES);
   solver.render(&scene, &mut cam);
-  let mut img = image::Rgb32FImage::new(320, 320);
+  let mut img = image::Rgb32FImage::new(IMAGE_SIDE, IMAGE_SIDE);
   cam.write_image(&mut img);
-  img.save(format!("solver-{depth}-x{samples}.tiff")).unwrap();
+  img.save(format!("solver-{DEPTH}-x{SAMPLES}.tiff")).unwrap();
 }

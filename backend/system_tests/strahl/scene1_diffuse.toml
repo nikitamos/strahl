@@ -1,0 +1,64 @@
+[geometries.floor]
+type = "quad"
+variant = "xy_square"
+center = [0.0, -1.0, 0.0]
+side = 20.0
+
+[geometries.light]
+type = "quad"
+variant = "xy_square"
+center = [0.0, 5.0, 0.0]
+side = 4.0
+
+[geometries.sphere]
+type = "sphere"
+radius = 1.0
+
+[materials.white]
+type = "lambertian"
+spectrum = [0.8, 0.8, 0.8]
+
+[materials.red]
+type = "lambertian"
+spectrum = [0.8, 0.1, 0.1]
+
+[materials.green]
+type = "lambertian"
+spectrum = [0.1, 0.8, 0.1]
+
+[materials.blue]
+type = "lambertian"
+spectrum = [0.1, 0.1, 0.8]
+
+[[scene.bodies]]
+geometry = "floor"
+material = "white"
+
+[[scene.bodies]]
+geometry = "sphere"
+material = "red"
+position = [-2.5, 0.0, 0.0]
+
+[[scene.bodies]]
+geometry = "sphere"
+material = "green"
+position = [0.0, 0.0, 0.0]
+
+[[scene.bodies]]
+geometry = "sphere"
+material = "blue"
+position = [2.5, 0.0, 0.0]
+
+[[scene.lights]]
+geometry = "light"
+spectrum = [10.0, 10.0, 10.0]
+direction = "omni"
+position = [0.0, 5.0, 0.0]
+
+[scene.camera]
+resolution = [800, 600]
+position = [0.0, 2.0, -8.0]
+direction = [0.0, 0.0, 1.0]
+right = [1.0, 0.0, 0.0]
+type = "perspective"
+fov = 40.0

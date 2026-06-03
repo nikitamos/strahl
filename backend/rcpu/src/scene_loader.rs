@@ -359,7 +359,7 @@ impl SceneLoader {
     }
   }
 
-  pub fn load(&mut self, path: impl AsRef<Path>) -> Result<Scene> {
+  pub fn load(&mut self, path: impl AsRef<Path>) -> Result<(Scene, Option<Camera>)> {
     let path = path.as_ref();
     self.source_path = path.parent().map(|p| p.to_path_buf());
 
@@ -378,8 +378,12 @@ impl SceneLoader {
     if let Some(cam_def) = &scene_file.camera {
       scene.cameras.push(Arc::new(self.build_camera(cam_def)?));
     }
-
-    Ok(scene)
+    scene_file
+      .camera
+      .as_ref()
+      .map(|def| self.build_camera(def))
+      .transpose()
+      .and_then(|c| Ok((scene, c)))
   }
 
   fn register_definitions(&mut self, defs: &SceneFile) -> Result<()> {
@@ -422,11 +426,14 @@ impl SceneLoader {
       GeometryDef::Sphere { radius } => Ok(Arc::new(Sphere { radius: *radius }.into())),
       GeometryDef::Quad { params } => {
         if let (Some(origin), Some(u), Some(v)) = (params.origin, params.u, params.v) {
-          Ok(Arc::new(Quad::new(
-            Vec3::from(origin).into(),
-            Vec3::from(u).into(),
-            Vec3::from(v).into(),
-          ).into()))
+          Ok(Arc::new(
+            Quad::new(
+              Vec3::from(origin).into(),
+              Vec3::from(u).into(),
+              Vec3::from(v).into(),
+            )
+            .into(),
+          ))
         } else if let (Some(variant), Some(center), Some(side)) =
           (params.variant, params.center, params.side)
         {
@@ -459,12 +466,9 @@ impl SceneLoader {
         let uvs = extract_vec2(&geom.uv, &geom.buffer);
         let indices = extract_indices(&geom);
 
-        Ok(Arc::new(TriangleMesh::new(
-          vertices,
-          indices,
-          Some(normals),
-          Some(uvs),
-        ).into()))
+        Ok(Arc::new(
+          TriangleMesh::new(vertices, indices, Some(normals), Some(uvs)).into(),
+        ))
       }
     }
   }
@@ -574,13 +578,14 @@ impl SceneLoader {
     ))
   }
 
-  /// Build Camera from CameraDef
   fn build_camera(&self, def: &CameraDef) -> Result<Camera> {
-    Ok(Camera::new(
+    let direction = Vec3::from(def.direction);
+    Ok(Camera::new_with_fov(
       def.resolution.into(),
-      Vec3::from(def.direction),
-      Vec3::from(def.right),
-      PointGlobal::new(def.position.into()),
+      direction,
+      def.fov,
+      -direction.cross(def.right.into()),
+      Vec3::from(def.position).into(),
       match def.cam_type {
         CameraType::Perspective => crate::camera::CameraType::Perspective,
         CameraType::Orthographic => crate::camera::CameraType::Orthographic,

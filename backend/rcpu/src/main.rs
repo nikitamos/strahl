@@ -31,25 +31,26 @@ mod bdpt_legacy {
 const IMAGE_SIDE: u32 = 512;
 
 const DEPTH: u32 = 6;
-const SAMPLES: u32 = 512;
+const SAMPLES: u32 = 4;
 
 fn main() {
   let back = RayTracer::new();
-  let scene = read_scene_from_file().unwrap();
+  let (scene, camera) = read_scene_from_file().unwrap();
 
-  let cam = Camera::new_with_fov(
-    (IMAGE_SIDE as usize, IMAGE_SIDE as usize).into(),
-    Vec3::Y,
-    78.0f32.to_radians(),
-    Vec3::Z,
-    (7.0 * Vec3::NEG_Y + 4.2 * Vec3::Z).into(),
-    rcpu::camera::CameraType::Perspective,
-  );
-  // bdpt_solve(back, scene, cam);
-  solve2(back, scene, cam);
+  let camera = camera.unwrap_or_else(|| {
+    Camera::new_with_fov(
+      (IMAGE_SIDE as usize, IMAGE_SIDE as usize).into(),
+      Vec3::NEG_Y,
+      78f32.to_radians(),
+      Vec3::Z,
+      (7.0 * Vec3::Y + 4.2 * Vec3::Z).into(),
+      rcpu::camera::CameraType::Perspective,
+    )
+  });
+  solve2(back, scene, camera);
 }
 
-fn read_scene_from_file() -> Result<Scene, SceneLoadError> {
+fn read_scene_from_file() -> Result<(Scene, Option<Camera>), SceneLoadError> {
   let mut loader = SceneLoader::new();
   loader.load("test-scene.toml")
 }
@@ -57,7 +58,8 @@ fn read_scene_from_file() -> Result<Scene, SceneLoadError> {
 fn solve2(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
   let solver = back.create_solver2(DEPTH, SAMPLES);
   solver.render(&scene, &mut cam);
-  let mut img = image::Rgb32FImage::new(IMAGE_SIDE, IMAGE_SIDE);
+  let (width, height) = cam.resolution().into();
+  let mut img = image::Rgb32FImage::new(width as u32, height as u32);
   cam.write_image(&mut img);
   img.save(format!("solver-{DEPTH}-x{SAMPLES}.tiff")).unwrap();
 }

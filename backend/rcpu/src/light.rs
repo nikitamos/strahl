@@ -59,7 +59,7 @@ impl LightSource {
       dir,
     }
   }
-  pub fn try_intersect(&self, ray: &RayGeneric) -> Option<SurfaceHit> {
+  pub fn try_intersect(&self, ray: &RayGeneric) -> Option<SurfaceHit<'_>> {
     self.geometry.try_intersect(
       IntersectionContext {
         transform: &self.transform,

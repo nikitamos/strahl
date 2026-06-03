@@ -151,7 +151,7 @@ impl GeometryTrait for TriangleMesh {
             let s = origin - v0;
             let u = f * s.dot(h);
             
-            if u < 0.0 || u > 1.0 {
+            if !(0.0..=1.0).contains(&u) {
                 continue;
             }
             
@@ -180,7 +180,7 @@ impl GeometryTrait for TriangleMesh {
                 
                 closest_hit = Some(SurfaceHit::new(
                     (origin + dir * t).into(),
-                    normal.into(),
+                    normal,
                     t,
                     ctx.transform,
                 ));

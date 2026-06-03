@@ -75,11 +75,11 @@ impl ForwardPathTracer {
     self.trace_ray_impl(ray, depth, scene, interaction_medium)
   }
 
-  fn trace_ray_impl<'a>(
+  fn trace_ray_impl(
     &self,
     ray: &RayGeneric,
     depth: u32,
-    scene: &'a Scene,
+    scene: &Scene,
     medium: InteractionMedium<'_>,
   ) -> glam::Vec3 {
     // We assume that the last `medium` is the medium containing the ray origin

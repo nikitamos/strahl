@@ -41,7 +41,7 @@ impl BSDF for Dielectric {
         let (fresnel, is_tir) = if sin_theta_t_sq >= 1.0 {
             (1.0, true) // Total Internal Reflection
         } else {
-            let cos_theta_t = (1.0 - sin_theta_t_sq).sqrt();
+            let _cos_theta_t = (1.0 - sin_theta_t_sq).sqrt();
             let r0 = ((1.0 - eta) / (1.0 + eta)).powi(2);
             (r0 + (1.0 - r0) * (1.0 - cos_theta_i).powi(5), false)
         };
@@ -97,7 +97,7 @@ impl BSDF for Dielectric {
         let fresnel = if sin_theta_t_sq >= 1.0 {
             1.0
         } else {
-            let cos_theta_t = (1.0 - sin_theta_t_sq).sqrt();
+            let _cos_theta_t = (1.0 - sin_theta_t_sq).sqrt();
             let r0 = ((1.0 - eta) / (1.0 + eta)).powi(2);
             r0 + (1.0 - r0) * (1.0 - cos_theta_i).powi(5)
         };

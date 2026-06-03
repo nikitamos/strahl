@@ -1,22 +1,13 @@
 use crate::{
-  Body,
-  Geometry,
-  Material,
-  PointGlobal,
-  Quad,
-  Scene,
-  Spectrum,
-  Sphere,
-  SurfaceProperty,
-  TransformParts,
-  TriangleMesh, // <-- Added TriangleMesh
+  Body, Geometry, GeometryTrait, Material, PointGlobal, Quad, Scene, Spectrum, Sphere,
+  SurfaceProperty, TransformParts, TriangleMesh,
   camera::Camera,
   light::{LightEmissionDirection, LightSource},
   material::{
     ConcreteMaterial,
     TypeErasedMaterial,
     bsdf::{BSDF, dielectric::Dielectric, lambertian::Lambertian, specular::Specular}, // <-- Added Dielectric
-    medium::{Medium, UniformMedium},
+    medium::Medium,
   },
 };
 use glam::{Quat, Vec3};
@@ -350,7 +341,7 @@ fn extract_indices(geom: &strahl_import::reader::GltfGeometry) -> Vec<[u32; 3]> 
 // =============================================================================
 
 pub struct SceneLoader {
-  geom_registry: HashMap<String, Arc<dyn Geometry>>,
+  geom_registry: HashMap<String, Arc<Geometry>>,
   mat_registry:  HashMap<String, Arc<dyn Material>>,
   source_path:   Option<PathBuf>,
 }
@@ -403,7 +394,7 @@ impl SceneLoader {
     Ok(())
   }
 
-  fn resolve_geometry(&self, geom_ref: &GeometryRef) -> Result<Arc<dyn Geometry>> {
+  fn resolve_geometry(&self, geom_ref: &GeometryRef) -> Result<Arc<Geometry>> {
     match geom_ref {
       GeometryRef::Named(name) => self
         .geom_registry
@@ -425,17 +416,17 @@ impl SceneLoader {
     }
   }
 
-  fn build_geometry(&self, def: &GeometryDef) -> Result<Arc<dyn Geometry>> {
+  fn build_geometry(&self, def: &GeometryDef) -> Result<Arc<Geometry>> {
     // Added &self
     match def {
-      GeometryDef::Sphere { radius } => Ok(Arc::new(Sphere { radius: *radius })),
+      GeometryDef::Sphere { radius } => Ok(Arc::new(Sphere { radius: *radius }.into())),
       GeometryDef::Quad { params } => {
         if let (Some(origin), Some(u), Some(v)) = (params.origin, params.u, params.v) {
           Ok(Arc::new(Quad::new(
             Vec3::from(origin).into(),
             Vec3::from(u).into(),
             Vec3::from(v).into(),
-          )))
+          ).into()))
         } else if let (Some(variant), Some(center), Some(side)) =
           (params.variant, params.center, params.side)
         {
@@ -445,7 +436,7 @@ impl SceneLoader {
             QuadVariant::YzSquare => Quad::yz_square(center, side),
             QuadVariant::ZxSquare => Quad::zx_square(center, side),
           };
-          Ok(Arc::new(quad))
+          Ok(Arc::new(quad.into()))
         } else {
           Err(SceneLoadError::Parse(
             "Quad definition requires either (origin,u,v) or (variant,center,side)".into(),
@@ -473,7 +464,7 @@ impl SceneLoader {
           indices,
           Some(normals),
           Some(uvs),
-        )))
+        ).into()))
       }
     }
   }
@@ -492,9 +483,9 @@ impl SceneLoader {
   }
 
   /// Build runtime Medium from MediumDef
-  fn build_medium(def: &MediumDef) -> Result<Arc<dyn Medium>> {
+  fn build_medium(def: &MediumDef) -> Result<Arc<Medium>> {
     match def {
-      MediumDef::Uniform { ior } => Ok(Arc::new(UniformMedium { ior: *ior })),
+      MediumDef::Uniform { ior } => Ok(Arc::new(Medium { ior: *ior })),
     }
   }
 
@@ -504,14 +495,14 @@ impl SceneLoader {
         let spec = Self::parse_spectrum(spectrum)?;
         Ok(Arc::new(ConcreteMaterial {
           bsdf:   Lambertian { s: spec },
-          medium: UniformMedium { ior: 1.0 },
+          medium: Medium { ior: 1.0 },
         }))
       }
       MaterialDef::Specular { reflectance } => {
         let spec = Self::parse_spectrum(reflectance)?;
         Ok(Arc::new(ConcreteMaterial {
           bsdf:   Specular { r: spec },
-          medium: UniformMedium { ior: 1.0 },
+          medium: Medium { ior: 1.0 },
         }))
       }
       // NEW: Dielectric Material Construction
@@ -527,7 +518,7 @@ impl SceneLoader {
             transmission: t,
             reflection:   r,
           }),
-          Arc::new(UniformMedium { ior: *ior }),
+          Arc::new(Medium { ior: *ior }),
         )))
       }
       MaterialDef::Concrete { bsdf, medium } => {

@@ -1,9 +1,9 @@
 use glam::{Mat4, Quat, Vec3, Vec3Swizzles};
 
 use crate::{
-  Geometry, GeometrySampleMetadata, IntersectionContext, PointGlobal, PointLocal, RayGeneric,
-  Sample, SampleState, Sampler, Scene, Spectrum, SurfaceHit, SurfaceProperty, Transform, VecGlobal,
-  VecHit, VecLocal,
+  Geometry, GeometrySampleMetadata, GeometryTrait, IntersectionContext, PointGlobal, PointLocal,
+  RayGeneric, Sample, SampleState, Sampler, Scene, Spectrum, SurfaceHit, SurfaceProperty,
+  Transform, VecGlobal, VecHit, VecLocal,
 };
 use std::{ops::Deref, sync::Arc};
 
@@ -25,7 +25,7 @@ pub struct LightSampleContext<'s> {
 /// For now each point of the source emits light in direction normal
 /// to the surface
 pub struct LightSource {
-  pub(crate) geometry:  Arc<dyn Geometry>,
+  pub(crate) geometry:  Arc<Geometry>,
   pub(crate) spectrum:  SurfaceProperty<Spectrum>,
   pub(crate) dir:       LightEmissionDirection,
   pub(crate) transform: Transform,
@@ -47,7 +47,7 @@ impl Deref for LightSampleMetadata {
 
 impl LightSource {
   pub(crate) fn new(
-    geometry: Arc<dyn Geometry>,
+    geometry: Arc<Geometry>,
     spectrum: SurfaceProperty<Spectrum>,
     translation: glam::Vec3,
     dir: LightEmissionDirection,

@@ -1,18 +1,14 @@
 use std::marker::PhantomData;
 
-pub trait Medium: Send + Sync {
-  fn ior(&self) -> f32;
-  fn interface<'a, 'b>(&'a self, next: &'b dyn Medium) -> MediumInterface<'a, 'b> {
-    MediumInterface::with_relative_ior(self.ior() / next.ior())
-  }
-}
-
-pub struct UniformMedium {
+pub struct Medium {
   pub ior: f32,
 }
 
-impl Medium for UniformMedium {
+impl Medium {
   fn ior(&self) -> f32 { self.ior }
+  fn interface<'a, 'b>(&'a self, next: &'b Medium) -> MediumInterface<'a, 'b> {
+    MediumInterface::with_relative_ior(self.ior() / next.ior())
+  }
 }
 
 #[derive(Clone, Copy)]
@@ -23,7 +19,7 @@ pub struct MediumInterface<'e, 'i> {
 }
 
 impl<'e, 'i> MediumInterface<'e, 'i> {
-  pub fn new(from: &'e dyn Medium, to: &'i dyn Medium) -> Self {
+  pub fn new(from: &'e Medium, to: &'i Medium) -> Self {
     Self::with_relative_ior(from.ior() / to.ior())
   }
   pub fn with_relative_ior(ior: f32) -> Self {

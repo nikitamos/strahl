@@ -25,10 +25,10 @@ impl CameraRay {
     }
   }
 
-  fn pos(&self) -> PointGlobal { self.origin }
+  pub fn pos(&self) -> PointGlobal { self.origin }
 
-  fn direction(&self) -> VecGlobal { self.direction.into() }
-  fn scatter(&mut self, new_direction: VecGlobal) {
+  pub fn direction(&self) -> VecGlobal { self.direction.into() }
+  pub fn scatter(&mut self, new_direction: VecGlobal) {
     self.direction = new_direction.into();
     self.origin = (*self.origin + 0.0001f32 * *new_direction).into();
   }

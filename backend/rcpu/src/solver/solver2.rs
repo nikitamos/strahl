@@ -7,7 +7,7 @@ use crate::{
   camera::Camera,
   material::{
     bsdf::BSDFSampleContext,
-    medium::{Medium, MediumInterface, UniformMedium},
+    medium::{Medium, MediumInterface},
   },
 };
 use rayon::prelude::*;
@@ -19,14 +19,14 @@ pub struct ForwardPathTracer {
 }
 
 struct InteractionMedium<'a> {
-  current: &'a dyn Medium,
-  parent:  &'a dyn Medium,
+  current: &'a Medium,
+  parent:  &'a Medium,
 }
 
 impl<'a> InteractionMedium<'a> {
-  fn interact(&self, body: &'a dyn Medium) -> InteractionMedium<'a> {
-    let last_ptr: *const dyn Medium = self.current;
-    let next_ptr: *const dyn Medium = body;
+  fn interact(&self, body: &'a Medium) -> InteractionMedium<'a> {
+    let last_ptr: *const Medium = self.current;
+    let next_ptr: *const Medium = body;
     if std::ptr::addr_eq(last_ptr.cast::<()>(), next_ptr.cast::<()>()) {
       // Ray hits internal surface. Interacting medium is parent
       InteractionMedium {
@@ -67,7 +67,7 @@ impl ForwardPathTracer {
   #[must_use = "Raytracing has no side-effects except mutating thread's RNG"]
   #[inline(always)]
   pub fn trace_ray(&self, ray: &RayGeneric, depth: u32, scene: &Scene) -> Spectrum {
-    let starting_medium = UniformMedium { ior: 1.0 };
+    let starting_medium = Medium { ior: 1.0 };
     let interaction_medium = InteractionMedium {
       current: &starting_medium,
       parent:  &starting_medium,

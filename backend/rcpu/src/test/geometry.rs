@@ -7,7 +7,7 @@ mod sphere {
 
   use glam::{Mat4, Vec3};
 
-  use crate::{Geometry, PointLocal, Sphere, SurfaceHit, Transform, test::geometry::TestRay};
+  use crate::{GeometryTrait, PointLocal, Sphere, SurfaceHit, Transform, test::geometry::TestRay};
 
   #[test]
   fn direct_origin_collision() {

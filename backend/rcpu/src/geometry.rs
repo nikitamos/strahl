@@ -25,7 +25,8 @@ pub struct GeometrySampleMetadata {
   pub normal: VecLocal,
 }
 
-pub trait Geometry: Sync + Send {
+#[enum_dispatch::enum_dispatch]
+pub trait GeometryTrait: Sync + Send {
   fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata>;
   fn try_intersect<'a>(
     &self,
@@ -38,7 +39,8 @@ pub trait Geometry: Sync + Send {
 pub struct Sphere {
   pub radius: f32,
 }
-impl Geometry for Sphere {
+
+impl GeometryTrait for Sphere {
   fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata> {
     let mut sample = state.sphere_uniform().map_all(|x, _| {
       ((x.deref() * self.radius).into(), GeometrySampleMetadata {
@@ -163,7 +165,7 @@ impl Quad {
   }
 }
 
-impl Geometry for Quad {
+impl GeometryTrait for Quad {
   fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata> {
     let [u_rand, v_rand] = state.uniform_2d.into();
 
@@ -219,30 +221,9 @@ impl Geometry for Quad {
 mod mesh;
 pub use mesh::TriangleMesh;
 
-pub trait HasGeometry {
-  fn geometry(&self) -> &dyn Geometry;
+#[enum_dispatch::enum_dispatch(GeometryTrait)]
+pub enum Geometry {
+  Quad,
+  Sphere,
+  TriangleMesh,
 }
-
-// pub trait HasTransform {
-//   fn transform(&self) -> Transform;
-// }
-
-// fn closest_hit<'a, T: HasGeometry + HasTransform>(
-//   geometries: impl Iterator<Item = &'a T>,
-//   ray: RayGeneric,
-// ) -> Option<Interaction<'a, T>> {
-//   geometries
-//     .filter_map(|b| {
-//       let ctx = IntersectionContext {
-//         transform: &b.transform(),
-//       };
-//       b.geometry()
-//         .try_intersect(ctx, &ray)
-//         .map(|hit| Interaction {
-//           body: b,
-//           ray_dir: hit.transform.v2local(ray.direction()),
-//           hit,
-//         })
-//     })
-//     .min_by(|a, b| a.hit.ray_distance.partial_cmp(&b.hit.ray_distance).unwrap())
-// }

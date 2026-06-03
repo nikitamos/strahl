@@ -1,12 +1,8 @@
-#![feature(nonpoison_rwlock)]
-#![feature(sync_nonpoison)]
+#![allow(unused_features)]
 #![feature(fn_traits)]
 #![feature(trait_alias)]
 
-use std::{
-  marker::PhantomData,
-  sync::{Arc, nonpoison::RwLock},
-};
+use std::{marker::PhantomData, sync::Arc};
 
 mod points;
 use glam::{Mat4, Quat, USizeVec2, Vec3, Vec3Swizzles};
@@ -20,9 +16,9 @@ pub use geometry::*;
 use crate::{
   light::LightSource,
   material::{
-    ConcreteMaterial, Material,
-    bsdf::{BSDF, BSDFSampleContext, lambertian::Lambertian},
-    medium::{Medium, UniformMedium},
+    Material,
+    bsdf::{BSDF, BSDFSampleContext},
+    medium::Medium,
   },
   // solver::bdpt::PathTerminator,
 };
@@ -214,7 +210,7 @@ impl<'a> Interaction<'a> {
   }
   pub fn material(&self) -> &dyn Material { self.body.material.as_ref() }
   pub fn bsdf(&self) -> &dyn BSDF { self.material().bsdf() }
-  pub fn body_medium(&self) -> &dyn Medium { self.material().medium() }
+  pub fn body_medium(&self) -> &Medium { self.material().medium() }
   /// Returns direction of ray caused the intersection,
   /// pointing **FROM** the surface
   pub fn caused_by(&self) -> VecHit { self.hit.to_hit(-self.ray_dir) }
@@ -288,14 +284,14 @@ impl TransformParts {
 
 // #[derive(Default)]
 pub struct Body {
-  geometry:  Arc<dyn Geometry>,
+  geometry:  Arc<Geometry>,
   material:  Arc<dyn material::Material>,
   transform: Transform,
 }
 
 impl Body {
   pub fn new(
-    geometry: Arc<dyn Geometry>,
+    geometry: Arc<Geometry>,
     material: Arc<dyn material::Material>,
     transform: TransformParts,
   ) -> Self {
@@ -350,20 +346,9 @@ impl Scene {
   ) -> camera::Camera {
     camera::Camera::new(resolution, direction, right, pos, cam_type)
   }
-  pub fn add_sphere(&mut self, radius: f32) -> &Body {
-    self.bodies.push(Body {
-      geometry:  Arc::new(Sphere { radius }),
-      material:  Arc::new(ConcreteMaterial {
-        bsdf:   Lambertian { s: Vec3::X },
-        medium: UniformMedium { ior: 1.0 },
-      }),
-      transform: Default::default(),
-    });
-    self.bodies.last().unwrap()
-  }
   pub fn add_light(
     &mut self,
-    geometry: Arc<dyn Geometry>,
+    geometry: Arc<Geometry>,
     spectrum: SurfaceProperty<Spectrum>,
     dir: light::LightEmissionDirection,
     position: glam::Vec3,
@@ -376,7 +361,7 @@ impl Scene {
 
   pub fn add_body(
     &mut self,
-    geometry: Arc<dyn Geometry>,
+    geometry: Arc<Geometry>,
     material: Arc<dyn Material>,
     coordinates: TransformParts,
   ) -> &Body {

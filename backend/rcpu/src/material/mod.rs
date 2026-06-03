@@ -7,55 +7,47 @@ pub mod bsdf;
 pub mod medium;
 
 pub trait Material: Send + Sync {
-  fn medium(&self) -> &dyn Medium;
+  fn medium(&self) -> &Medium;
   fn bsdf(&self) -> &dyn BSDF;
 }
 
 pub struct TypeErasedMaterial {
   bsdf:   Arc<dyn BSDF>,
-  medium: Arc<dyn Medium>,
+  medium: Arc<Medium>,
 }
 
 impl TypeErasedMaterial {
-  pub fn new(bsdf: Arc<dyn BSDF>, medium: Arc<dyn Medium>) -> Self { Self { bsdf, medium } }
+  pub fn new(bsdf: Arc<dyn BSDF>, medium: Arc<Medium>) -> Self { Self { bsdf, medium } }
 }
 
 impl Material for TypeErasedMaterial {
-  fn medium(&self) -> &dyn Medium { self.medium.as_ref() }
+  fn medium(&self) -> &Medium { self.medium.as_ref() }
 
   fn bsdf(&self) -> &dyn BSDF { self.bsdf.as_ref() }
 }
 
 pub trait TypedMaterial {
-  type FixedMedium: Medium;
   type FixedBSDF: BSDF;
 
-  fn medium(&self) -> &Self::FixedMedium
-  where Self: Sized;
+  fn medium(&self) -> &Medium;
 
   fn bsdf(&self) -> &Self::FixedBSDF
   where Self: Sized;
 }
 
-pub struct ConcreteMaterial<M, B>
-where
-  M: Medium + Send + Sync,
-  B: BSDF + Send + Sync,
+pub struct ConcreteMaterial<B>
+where B: BSDF + Send + Sync
 {
-  pub medium: M,
+  pub medium: Medium,
   pub bsdf:   B,
 }
 
-impl<M, B> TypedMaterial for ConcreteMaterial<M, B>
-where
-  M: Medium + Send + Sync,
-  B: BSDF + Send + Sync,
+impl<B> TypedMaterial for ConcreteMaterial<B>
+where B: BSDF + Send + Sync
 {
-  type FixedMedium = M;
   type FixedBSDF = B;
 
-  fn medium(&self) -> &Self::FixedMedium
-  where Self: Sized {
+  fn medium(&self) -> &Medium {
     &self.medium
   }
 
@@ -65,12 +57,9 @@ where
   }
 }
 
-impl<M, B> Material for ConcreteMaterial<M, B>
-where
-  B: bsdf::BSDF + Send + Sync,
-  M: Medium + Send + Sync,
+impl<B> Material for ConcreteMaterial<B>
+where B: bsdf::BSDF + Send + Sync
 {
-  fn medium(&self) -> &dyn Medium { &self.medium }
-
+  fn medium(&self) -> &Medium { &self.medium }
   fn bsdf(&self) -> &dyn BSDF { &self.bsdf }
 }

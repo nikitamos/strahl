@@ -1,4 +1,4 @@
-use super::Geometry;
+use super::GeometryTrait;
 use crate::{
   GeometrySampleMetadata, IntersectionContext, PointLocal, RayGeneric, Sample, SampleState,
   SurfaceHit,
@@ -63,7 +63,7 @@ impl TriangleMesh {
     }
 }
 
-impl Geometry for TriangleMesh {
+impl GeometryTrait for TriangleMesh {
   fn sample_point(&self, state: SampleState) -> Sample<PointLocal, GeometrySampleMetadata> {
         // 1. Select a random triangle with probability proportional to its area
         let [r_tri, r_bary1] = state.uniform_2d.into();

@@ -2,7 +2,7 @@ use std::{fs::File, io::Write};
 
 use super::{Interaction, IntersectionContext, Scene, Spectrum};
 use crate::{
-  PointGlobal, RayGeneric, Sample, Sampler,
+  GeometryTrait, PointGlobal, RayGeneric, Sample, Sampler,
   camera::CameraRay,
   light::{LightSampleContext, LightSampleMetadata},
 };

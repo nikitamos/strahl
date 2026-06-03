@@ -217,6 +217,8 @@ impl Geometry for Quad {
   // `uv` is omitted as requested; uses the trait's default implementation.
 }
 
+mod mesh;
+
 pub trait HasGeometry {
   fn geometry(&self) -> &dyn Geometry;
 }

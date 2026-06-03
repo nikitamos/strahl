@@ -39,7 +39,7 @@ fn main() {
   scene.add_body(
     back.create_sphere(1.0),
     Arc::new(ConcreteMaterial {
-      medium: (UniformMedium { ior: 1.33 }),
+      medium: (UniformMedium { ior: 1.0/1.33 }),
       bsdf:   (Dielectric {
         transmission: Vec3::new(0.6, 0.6, 0.6),
         reflection:   Vec3::ONE,
@@ -68,8 +68,8 @@ fn read_scene_from_file() -> Result<Scene, SceneLoadError> {
 }
 
 fn solve2(back: RayTracer, scene: rcpu::Scene, mut cam: Camera) {
-  let depth = 8;
-  let samples = 2048;
+  let depth = 1;
+  let samples = 48;
   let solver = back.create_solver2(depth, samples);
   solver.render(&scene, &mut cam);
   let mut img = image::Rgb32FImage::new(320, 320);

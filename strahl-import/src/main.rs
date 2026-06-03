@@ -8,8 +8,10 @@ use std::{
 use clap::Parser;
 use serde::Deserialize;
 use strahl_import::{
-  MaterialComponentSource, builder::MaterialFileBuilder, per_texture::PerTexture,
-  reader::GltfGeometry,
+  MaterialComponentSource,
+  builder::MaterialFileBuilder,
+  per_texture::PerTexture,
+  reader::{Cubemap, GltfGeometry},
 };
 
 #[derive(Deserialize)]
@@ -45,6 +47,14 @@ enum Commands {
     /// Path to the gltf (or glb) file
     path: PathBuf,
   },
+  /// Validate the cubemap
+  ValidateCubemap {
+    /// Path to the directory containing cubemap images
+    dir:       PathBuf,
+    /// Transcode non-RGBA8 images to RGBA8
+    #[arg(long)]
+    transcode: bool,
+  },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -59,6 +69,10 @@ fn main() -> anyhow::Result<()> {
     Commands::ValidateGltf { path } => {
       let geom = GltfGeometry::import_validate(path)?;
       log::info!("glTF is valid, {geom:#?}");
+    }
+    Commands::ValidateCubemap { dir, transcode} => {
+      let cubemap = Cubemap::read_from_dir_png(dir, transcode)?;
+      log::info!("Cubemap is valid");
     }
   }
   Ok(())

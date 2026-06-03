@@ -5,7 +5,6 @@ use std::{
 };
 
 use anyhow::bail;
-use ktx2_rw::Ktx2Texture;
 use zip::write::FileOptions;
 
 use crate::{MaterialComponentSource, TextureMetadata, per_texture::PerTexture};
@@ -93,6 +92,7 @@ impl MaterialFileBuilder {
 }
 
 fn encode_to_ktx(img: image::DynamicImage) -> anyhow::Result<()> {
+  /*
   let mut tex = Ktx2Texture::create(
     img.width(),
     img.height(),
@@ -111,6 +111,7 @@ fn encode_to_ktx(img: image::DynamicImage) -> anyhow::Result<()> {
       .ok_or(anyhow::anyhow!("invalid image format"))?,
   )?;
   tex.compress_basis_simple(80)?;
+  */
 
   todo!()
 }

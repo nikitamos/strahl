@@ -1,14 +1,21 @@
 #![doc = include_str!("../README.md")]
+#![feature(file_buffered)]
 use std::{fs::File, io::Write};
 
 use image::codecs::png::PngEncoder;
-use ktx2_rw::Ktx2Texture;
 use serde::{Deserialize, Serialize};
 
 pub mod builder;
 pub mod reader;
 
 pub mod per_texture;
+
+pub enum Never {}
+impl Never {
+  pub fn write_to_memory(self) -> Result<Vec<u8>, anyhow::Error> { unimplemented!() }
+  pub fn from_memory(mem: &[u8]) -> Result<Self, anyhow::Error> { unimplemented!() }
+}
+pub(crate) type Ktx2Texture = Never;
 
 #[derive(Serialize, Deserialize)]
 pub enum TextureFormat {
